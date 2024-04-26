@@ -1,0 +1,57 @@
+{
+  "info": {
+    "name": "Auth API Requests",
+    "description": "Коллекция запросов для аутентификации",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Регистрация/Вход",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:3000/auth/register-login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"phoneNumber\": \"1234567890\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Подтверждение Кода",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:3000/auth/confirm-code",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"phoneNumber\": \"1234567890\",\n    \"confirmationCode\": \"123456\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Повторная Отправка Кода Подтверждения",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:3000/auth/resend-confirmation-code",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"phoneNumber\": \"1234567890\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
