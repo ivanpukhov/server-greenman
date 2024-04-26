@@ -18,11 +18,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(express.static('public'));
 
-app.use('/products', productRoutes);
-app.use('/auth', authRoutes);
-app.use('/orders', orderRoutes);
-app.use('/order-profiles', orderProfileRoutes);
-app.use('/profile', profileRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/order-profiles', orderProfileRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.use((error, req, res, next) => {
     res.status(error.status || 500);

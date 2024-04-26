@@ -6,9 +6,6 @@ const OpenAI = require('openai');
 const meiliSearchClient = require('../utilities/meiliSearchClient')
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
-const assistantId = 'asst_NnLKRpB58h9Xuxiz5Ra1Qkha'; // ID вашего ассистента
-
-const openai = new OpenAI({apiKey: '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'})
 
 
 
