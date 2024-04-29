@@ -37,7 +37,13 @@ const OrderProfile = orderDB.define('orderProfile', {
     phoneNumber: { // Новое поле для номера телефона
         type: Sequelize.STRING,
         allowNull: false
-    }
+    },
+    kaspiNumber: {
+        type: Sequelize.STRING,
+        allowNull: function() {
+            return this.paymentMethod !== 'kaspi';
+        }
+    },
 });
 
 module.exports = OrderProfile;

@@ -32,7 +32,8 @@ const orderController = {
                 deliveryMethod,
                 paymentMethod,
                 products,
-                totalPrice
+                totalPrice,
+                kaspiNumber
             } = req.body;
 
             console.log("Полученные данные:", req.body);
@@ -48,11 +49,12 @@ const orderController = {
                 city,
                 street,
                 houseNumber,
-                phoneNumber
+                phoneNumber,
+                kaspiNumber
             };
 
             if (userId) {
-                const profileData = {userId, name: customerName, addressIndex, city, street, houseNumber, phoneNumber};
+                const profileData = {userId, name: customerName, addressIndex, city, street, houseNumber, phoneNumber, kaspiNumber};
 
                 // Поиск существующего профиля, который полностью соответствует предоставленным данным
                 let existingProfile = await OrderProfile.findOne({where: profileData});
@@ -134,6 +136,7 @@ const orderController = {
                 paymentMethod,
                 products,
                 totalPrice,
+                kaspiNumber,
                 status
             } = req.body;
             const cleanPhoneNumber = phoneNumber.replace('+7', '');
@@ -149,6 +152,7 @@ const orderController = {
                 paymentMethod,
                 products,
                 totalPrice,
+                kaspiNumber,
                 status
             }, {where: {id: req.params.id}});
 

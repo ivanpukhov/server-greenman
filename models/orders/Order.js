@@ -62,7 +62,14 @@ const Order = orderDB.define('order', {
     trackingNumber: {
         type: Sequelize.STRING,
         allowNull: true // Может быть null, если заказ еще не отправлен
-    }
+    },
+    kaspiNumber: {
+        type: Sequelize.STRING,
+        allowNull: function() {
+            return this.paymentMethod !== 'kaspi';
+        }
+    },
+
 });
 
 

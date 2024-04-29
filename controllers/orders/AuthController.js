@@ -25,6 +25,7 @@ const AuthController = {
             user.confirmationCode = confirmationCode;
             user.confirmationCodeExpires = new Date(new Date().getTime() + 10 * 60000); // Код действителен 10 минут
             await user.save();
+            console.log(confirmationCode)
 
             sendNotification(phoneNumber, `Ваш код подтверждения: ${confirmationCode}`);
 

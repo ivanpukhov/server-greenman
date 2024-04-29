@@ -8,7 +8,7 @@ const chatId = '-1002058582331';
 const bot = new TelegramBot(token, {polling: false});
 
 async function sendMessageToChannel(order) {
-    const message = `Новый заказ:\nID: ${order.id}\nНомер: ${order.phoneNumber}\nКомментарий: ${order.phoneNumber}\nЦена: ${order.totalPrice}\nИмя клиента: ${order.customerName}\nИндекс: ${order.addressIndex}\nГород: ${order.city}\nУлица: ${order.street}\nДом: ${order.houseNumber}\nСпособ доставки: ${order.deliveryMethod}\nСпособ оплаты: ${order.paymentMethod}`;
+    const message = `Новый заказ:\nID: ${order.id}\nНомер: ${order.kaspiNumber}\nКомментарий: ${order.phoneNumber}\nЦена: ${order.totalPrice}\nИмя клиента: ${order.customerName}\nИндекс: ${order.addressIndex}\nГород: ${order.city}\nУлица: ${order.street}\nДом: ${order.houseNumber}\nСпособ доставки: ${order.deliveryMethod}\nСпособ оплаты: ${order.paymentMethod}`;
 
     try {
         await bot.sendMessage(chatId, message);
