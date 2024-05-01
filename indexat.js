@@ -35,4 +35,4 @@ async function indexProductsInMeiliSearch() {
 }
 
 // Запуск индексации при старте приложения
-module.exports = indexProductsInMeiliSearch;
+indexProductsInMeiliSearch();

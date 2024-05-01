@@ -34,7 +34,7 @@ const upload = multer({
 router.post('/add', upload.single('video'), productController.addProduct);
 router.get('/', productController.getAllProducts);
 router.get('/:id', productController.getProductById);
-router.put('/:id', authMiddleware, adminMiddleware, upload.single('video'), productController.updateProduct);
+router.put('/:id',  upload.single('video'), productController.updateProduct);
 router.delete('/:id',  productController.deleteProduct);
 router.get('/search/:name', productController.searchProducts);
 router.post('/getProductsByIdsAndTypes', productController.getProductsByIdsAndTypes);

@@ -120,33 +120,52 @@ const productController = {
 
     // Обновление продукта
     updateProduct: async (req, res) => {
+        const { id } = req.params;
+        const { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types, videoUrl } = req.body;
+
         try {
-            const {name, description, applicationMethod, diseases, contraindications} = req.body;
-            let videoUrl = req.file ? req.file.path : null;
+            const product = await Product.findByPk(id);
 
+            if (!product) {
+                res.status(404).json({ error: 'Продукт не найден' });
+                return;
+            }
 
-            const updated = await Product.update({
+            await product.update({
                 name,
                 description,
-                applicationMethod,
+                applicationMethodChildren,
+                applicationMethodAdults,
                 diseases,
                 contraindications,
-                videoUrl
-            }, {where: {id: req.params.id}});
-            if (updated[0] > 0) {
-                const updatedProduct = await Product.findByPk(req.params.id);
-                // Обновление в MeiliSearch
-                try {
-                    await meiliSearchClient.index('products').updateDocuments([updatedProduct.toJSON()]);
-                } catch (meiliError) {
-                    console.error('Ошибка обновления индекса в MeiliSearch:', meiliError);
+                videoUrl: req.file ? req.file.path : videoUrl
+            });
+
+            // Обновление типов продукта
+            if (types) {
+                // Удаляем существующие типы
+                await ProductType.destroy({ where: { productId: id } });
+
+                // Создаем новые типы с обновленными данными
+                for (const type of types) {
+                    await ProductType.create({ ...type, productId: id });
                 }
-                res.json(updatedProduct);
-            } else {
-                res.status(404).json({error: 'Продукт не найден'});
             }
+
+            // Опционально: Переиндексация данных в поисковом движке, если используется
+            // Обновление индексов в MeiliSearch, если требуется
+            console.log('Переиндексация данных');
+            await indexProductsInMeiliSearch();
+            console.log('Переиндексация завершена');
+
+            // Отправка обновленных данных клиенту
+            const updatedProduct = await Product.findByPk(id, {
+                include: [{ model: ProductType, as: 'types' }]
+            });
+            res.json(updatedProduct);
         } catch (err) {
-            res.status(500).json({error: err.message});
+            console.error('Ошибка при обновлении продукта:', err);
+            res.status(500).json({ error: err.message });
         }
     },
 
