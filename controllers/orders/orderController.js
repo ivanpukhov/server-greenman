@@ -3,7 +3,7 @@ const sendNotification = require('../../utilities/notificationService');
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
-const productController = require("../productController");
+const {getProductById} = require("../productController");
 
 const orderController = {
 
@@ -112,18 +112,19 @@ const orderController = {
         }
     },
 
-    // Получение заказа по ID с подробной информацией о продуктах
+
+    // Получение заказа по ID с информацией о продуктах
     getOrderById: async (req, res) => {
-        const {id} = req.params;
+        const { id } = req.params;
         try {
             const order = await Order.findByPk(id);
             if (!order) {
-                return res.status(404).json({error: 'Заказ не найден'});
+                return res.status(404).json({ error: 'Заказ не найден' });
             }
 
             // Массив запросов для получения информации о каждом продукте в заказе
             const productRequests = order.products.map(product =>
-                productController.getProductById({params: {id: product.productId}}) // Предполагается, что getProductById доступен для вызова и возвращает промис
+                getProductById({ params: { id: product.productId } }) // Предполагается, что getProductById возвращает Promise
             );
 
             // Выполнение всех запросов параллельно
@@ -131,7 +132,7 @@ const orderController = {
 
             // Сборка информации о продуктах с выбранными типами
             const productsInfo = productsDetails.map((response, index) => {
-                const product = response.data; // Допустим, что getProductById возвращает объект в response.data
+                const product = response; // Допустим, что getProductById возвращает объект напрямую
                 const type = product.types.find(t => t.id === order.products[index].typeId); // Поиск нужного типа по typeId
 
                 return {
@@ -142,31 +143,19 @@ const orderController = {
                 };
             });
 
-            // Возврат расширенной информации о заказе
+            // Возврат информации о заказе
             res.json({
-                orderId: order.id,
                 customerName: order.customerName,
-                address: {
-                    index: order.addressIndex,
-                    city: order.city,
-                    street: order.street,
-                    houseNumber: order.houseNumber,
-                    phoneNumber: order.phoneNumber
-                },
-                deliveryMethod: order.deliveryMethod,
-                paymentMethod: order.paymentMethod,
-                products: productsInfo,
-                totalPrice: order.totalPrice,
-                status: order.status,
-                trackingNumber: order.trackingNumber,
-                kaspiNumber: order.kaspiNumber,
-                createdAt: order.createdAt,
-                updatedAt: order.updatedAt
+                phoneNumber: order.phoneNumber,
+                address: `${order.addressIndex}, ${order.city}, ${order.street}, дом ${order.houseNumber}`,
+                products: productsInfo
             });
         } catch (err) {
-            res.status(500).json({error: err.message});
+            res.status(500).json({ error: 'Ошибка при получении данных: ' + err.message });
         }
     },
+
+
 
 
     // Обновление заказа
