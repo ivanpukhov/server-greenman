@@ -3,6 +3,8 @@ const sendNotification = require('../../utilities/notificationService');
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
+const Product = require("../../models/Product");
+const ProductType = require("../../models/ProductType");
 
 const orderController = {
 
@@ -112,19 +114,26 @@ const orderController = {
     },
 
 
-// Получение заказа по ID без проверок прав
-    getOrderById: async (req, res) => {
-        const {id} = req.params;
+    getProductById: async (req, res) => {
         try {
-            const order = await Order.findByPk(id);
-            if (!order) {
-                return res.status(404).json({error: 'Заказ не найден'});
+            const product = await Product.findByPk(req.params.id, {
+                include: [{model: ProductType, as: 'types'}]
+            });
+            if (product) {
+                const productResponse = {
+                    id: product.id,
+                    name: product.name,
+                    types: product.types.map(type => ({ typeName: type.type, price: type.price })) // Возвращаем имя типа и цену каждого типа
+                };
+                res.json(productResponse);
+            } else {
+                res.status(404).json({error: 'Продукт не найден'});
             }
-            res.json(order);
         } catch (err) {
             res.status(500).json({error: err.message});
         }
     },
+
 
 
 
