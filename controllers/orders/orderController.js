@@ -112,7 +112,7 @@ const orderController = {
     },
 
 
-// Получение заказа по ID без проверок прав
+    // Получение заказа по ID с детальной информацией о продуктах и типах продуктов
     getOrderById: async (req, res) => {
         const {id} = req.params;
         try {
@@ -120,11 +120,45 @@ const orderController = {
             if (!order) {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
-            res.json(order);
+
+            // Извлекаем данные о продуктах из заказа
+            const productDetails = await Promise.all(order.products.map(async item => {
+                const product = await Product.findByPk(item.productId);
+                if (!product) {
+                    return null; // Если продукт не найден, возвращаем null и фильтруем его позже
+                }
+
+                const productType = await ProductType.findByPk(item.typeId);
+                if (!productType) {
+                    return null; // Если тип продукта не найден, возвращаем null и фильтруем его позже
+                }
+
+                // Возвращаем детализированную информацию о продукте и его типе
+                return {
+                    productId: product.id,
+                    productName: product.name,
+                    productType: productType.type
+                };
+            }));
+
+            // Фильтруем null значения, если какие-то продукты или типы не были найдены
+            const filteredProductDetails = productDetails.filter(detail => detail !== null);
+
+            // Возврат информации о заказе с детальной информацией о продуктах и типах
+            res.json({
+                orderId: order.id,
+                customerName: order.customerName,
+                products: filteredProductDetails,
+                totalPrice: order.totalPrice,
+                status: order.status,
+                trackingNumber: order.trackingNumber,
+                createdAt: order.createdAt
+            });
         } catch (err) {
             res.status(500).json({error: err.message});
         }
     },
+
 
 
 
