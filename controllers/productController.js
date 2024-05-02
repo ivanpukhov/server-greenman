@@ -91,6 +91,23 @@ const productController = {
         }
     },
 
+    getProductByIdServer: async (productId) => {
+        try {
+            const product = await Product.findByPk(productId, {
+                include: [{ model: ProductType, as: 'types' }]
+            });
+
+            if (!product) {
+                return null;  // Продукт не найден
+            }
+
+            return product;  // Возвращаем объект продукта
+        } catch (err) {
+            console.error("Ошибка при получении продукта:", err);
+            return null;  // В случае ошибки возвращаем null
+        }
+    },
+
 
     getAllProducts: async (req, res) => {
         try {

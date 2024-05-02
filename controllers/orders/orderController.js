@@ -114,21 +114,21 @@ const orderController = {
 
 
     getOrderById: async (req, res) => {
-        const {id} = req.params;  // ID заказа
+        const {id} = req.params;
         try {
             const order = await Order.findByPk(id);
             if (!order) {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
 
-            // Извлекаем информацию о каждом продукте в заказе
+            // Получаем информацию о продуктах в заказе
             const productsInfo = await Promise.all(order.products.map(async product => {
-                // product.productId и product.typeId уже должны быть в массиве продуктов в заказе
-                const productResponse = await productController.getProductById({params: {id: product.productId}});
+                const productResponse = await productController.getProductByIdServer(product.productId);
+                if (!productResponse) {
+                    return { error: "Продукт не найден" };
+                }
 
-                // Находим тип продукта по typeId
                 const productType = productResponse.types.find(type => type.id === product.typeId);
-
                 return {
                     productId: product.productId,
                     name: productResponse.name,
@@ -137,7 +137,7 @@ const orderController = {
                 };
             }));
 
-            // Собираем итоговый объект заказа с полной информацией о продуктах
+            // Собираем итоговый ответ
             const response = {
                 ...order.dataValues,
                 products: productsInfo
@@ -148,9 +148,6 @@ const orderController = {
             res.status(500).json({error: err.message});
         }
     },
-
-
-
 
     // Обновление заказа
     updateOrder: async (req, res) => {
