@@ -253,7 +253,7 @@ const orderController = {
             if (updated[0] > 0) {
 
                 // Отправка запроса на track.greenman.kz
-                const response = await fetch(`https://greenman.kz/add/${trackingNumber}`, {method: 'GET'});
+                const response = await fetch(`https://track.greenman.kz/add/${trackingNumber}`, {method: 'GET'});
                 const responseData = await response.json();
 
 
