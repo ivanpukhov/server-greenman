@@ -105,8 +105,9 @@ const orderController = {
 
     // Получение заказа по ID
     getOrderById: async (req, res) => {
+        const {id} = req.body
         try {
-            const order = await Order.findByPk(req.params.id);
+            const order = await Order.findByPk(id);
             if (!order) {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
