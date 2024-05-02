@@ -122,11 +122,7 @@ const orderController = {
             }
 
             // Проверяем, является ли пользователь владельцем заказа или админом
-            if (req.user.id === order.userId || req.user.phoneNumber === order.phoneNumber || req.user.role === 'admin') {
-                res.json(order);
-            } else {
-                res.status(403).json({error: 'Доступ запрещен'});
-            }
+            res.json(order);
         } catch (err) {
             res.status(500).json({error: err.message});
         }
