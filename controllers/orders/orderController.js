@@ -3,6 +3,7 @@ const sendNotification = require('../../utilities/notificationService');
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
+const productController = require("../productController");
 
 const orderController = {
 
@@ -111,8 +112,7 @@ const orderController = {
         }
     },
 
-
-    // Получение заказа по ID с детальной информацией о продуктах и типах продуктов
+    // Получение заказа по ID с подробной информацией о продуктах
     getOrderById: async (req, res) => {
         const {id} = req.params;
         try {
@@ -121,45 +121,52 @@ const orderController = {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
 
-            // Извлекаем данные о продуктах из заказа
-            const productDetails = await Promise.all(order.products.map(async item => {
-                const product = await Product.findByPk(item.productId);
-                if (!product) {
-                    return null; // Если продукт не найден, возвращаем null и фильтруем его позже
-                }
+            // Массив запросов для получения информации о каждом продукте в заказе
+            const productRequests = order.products.map(product =>
+                productController.getProductById({params: {id: product.productId}}) // Предполагается, что getProductById доступен для вызова и возвращает промис
+            );
 
-                const productType = await ProductType.findByPk(item.typeId);
-                if (!productType) {
-                    return null; // Если тип продукта не найден, возвращаем null и фильтруем его позже
-                }
+            // Выполнение всех запросов параллельно
+            const productsDetails = await Promise.all(productRequests);
 
-                // Возвращаем детализированную информацию о продукте и его типе
+            // Сборка информации о продуктах с выбранными типами
+            const productsInfo = productsDetails.map((response, index) => {
+                const product = response.data; // Допустим, что getProductById возвращает объект в response.data
+                const type = product.types.find(t => t.id === order.products[index].typeId); // Поиск нужного типа по typeId
+
                 return {
                     productId: product.id,
                     productName: product.name,
-                    productType: productType.type
+                    productType: type ? `${type.type} - ${type.price} тенге` : 'Тип продукта не найден',
+                    quantity: order.products[index].quantity
                 };
-            }));
+            });
 
-            // Фильтруем null значения, если какие-то продукты или типы не были найдены
-            const filteredProductDetails = productDetails.filter(detail => detail !== null);
-
-            // Возврат информации о заказе с детальной информацией о продуктах и типах
+            // Возврат расширенной информации о заказе
             res.json({
                 orderId: order.id,
                 customerName: order.customerName,
-                products: filteredProductDetails,
+                address: {
+                    index: order.addressIndex,
+                    city: order.city,
+                    street: order.street,
+                    houseNumber: order.houseNumber,
+                    phoneNumber: order.phoneNumber
+                },
+                deliveryMethod: order.deliveryMethod,
+                paymentMethod: order.paymentMethod,
+                products: productsInfo,
                 totalPrice: order.totalPrice,
                 status: order.status,
                 trackingNumber: order.trackingNumber,
-                createdAt: order.createdAt
+                kaspiNumber: order.kaspiNumber,
+                createdAt: order.createdAt,
+                updatedAt: order.updatedAt
             });
         } catch (err) {
             res.status(500).json({error: err.message});
         }
     },
-
-
 
 
     // Обновление заказа
