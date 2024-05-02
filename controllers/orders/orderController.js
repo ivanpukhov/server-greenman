@@ -112,21 +112,20 @@ const orderController = {
     },
 
 
-    // Получение заказа по ID
+// Получение заказа по ID без проверок прав
     getOrderById: async (req, res) => {
-        const {id} = req.params;  // Исправлено для правильного получения id из параметров маршрута
+        const {id} = req.params;
         try {
             const order = await Order.findByPk(id);
             if (!order) {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
-
-            // Проверяем, является ли пользователь владельцем заказа или админом
             res.json(order);
         } catch (err) {
             res.status(500).json({error: err.message});
         }
     },
+
 
 
     // Обновление заказа
