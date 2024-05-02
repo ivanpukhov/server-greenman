@@ -105,7 +105,7 @@ const orderController = {
 
     // Получение заказа по ID
     getOrderById: async (req, res) => {
-        const {id} = req.body
+        const {id} = req.params;
         try {
             const order = await Order.findByPk(id);
             if (!order) {
