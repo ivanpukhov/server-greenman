@@ -3,8 +3,6 @@ const sendNotification = require('../../utilities/notificationService');
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
-const Product = require("../../models/Product");
-const ProductType = require("../../models/ProductType");
 
 const orderController = {
 
@@ -114,45 +112,19 @@ const orderController = {
     },
 
 
-    // Получение заказа по ID с информацией о продуктах и их типах
+// Получение заказа по ID без проверок прав
     getOrderById: async (req, res) => {
-        const {id} = req.params;  // Получение ID заказа из параметров запроса
+        const {id} = req.params;
         try {
-            const order = await Order.findByPk(id, {
-                include: [{
-                    model: Product,  // Включаем модель Product в запрос
-                    as: 'products',  // 'products' должно быть определено в модели Order как ассоциация
-                    include: [{
-                        model: ProductType,  // Включаем модель ProductType в запрос
-                        as: 'types'  // 'types' должно быть определено в модели Product как ассоциация
-                    }]
-                }]
-            });
-
+            const order = await Order.findByPk(id);
             if (!order) {
                 return res.status(404).json({error: 'Заказ не найден'});
             }
-
-            // Подготовка данных о продуктах с типами для ответа
-            const productsInfo = order.products.map(product => {
-                return {
-                    productId: product.id,
-                    productName: product.name,
-                    productTypes: product.types.map(type => type.type)  // Возвращаем только названия типов
-                };
-            });
-
-            // Возврат информации о заказе с информацией о продуктах и их типах
-            res.json({
-                orderId: order.id,
-                products: productsInfo
-            });
+            res.json(order);
         } catch (err) {
             res.status(500).json({error: err.message});
         }
     },
-
-
 
 
 
