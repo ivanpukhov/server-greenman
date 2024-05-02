@@ -233,7 +233,19 @@ const orderController = {
             const {trackingNumber} = req.body;
             const order = await Order.findByPk(req.params.id);
             const updated = await Order.update({trackingNumber}, {where: {id: req.params.id, status: 'Оплачено'}});
-
+            const number = order.phoneNumber;
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
+            console.log(number)
             if (updated[0] > 0) {
 
                 // Отправка запроса на track.greenman.kz
@@ -241,7 +253,7 @@ const orderController = {
                 const responseData = await response.json();
 
                 // Отправка уведомления о трек-номере
-                await sendNotification(order.phoneNumber, `Трек-номер вашего заказа: ${trackingNumber}. Отследить посылку можете по ссылке: https://track.greenman.kz/${trackingNumber}`);
+                await sendNotification(number, `Трек-номер вашего заказа: ${trackingNumber}. Отследить посылку можете по ссылке: https://track.greenman.kz/${trackingNumber}`);
 
                 res.json({message: 'Трек-номер добавлен.', greenmanResponse: responseData});
             } else {
