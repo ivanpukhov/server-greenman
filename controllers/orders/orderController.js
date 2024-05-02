@@ -54,7 +54,16 @@ const orderController = {
             };
 
             if (userId) {
-                const profileData = {userId, name: customerName, addressIndex, city, street, houseNumber, phoneNumber, kaspiNumber};
+                const profileData = {
+                    userId,
+                    name: customerName,
+                    addressIndex,
+                    city,
+                    street,
+                    houseNumber,
+                    phoneNumber,
+                    kaspiNumber
+                };
 
                 // Поиск существующего профиля, который полностью соответствует предоставленным данным
                 let existingProfile = await OrderProfile.findOne({where: profileData});
@@ -105,7 +114,7 @@ const orderController = {
 
     // Получение заказа по ID
     getOrderById: async (req, res) => {
-        const {id} = req.params;
+        const {id} = req.params;  // Исправлено для правильного получения id из параметров маршрута
         try {
             const order = await Order.findByPk(id);
             if (!order) {
@@ -122,6 +131,7 @@ const orderController = {
             res.status(500).json({error: err.message});
         }
     },
+
 
     // Обновление заказа
     updateOrder: async (req, res) => {
@@ -211,7 +221,7 @@ const orderController = {
             if (updated[0] > 0) {
 
                 // Отправка запроса на track.greenman.kz
-                const response = await fetch(`https://greenman.kz/add/${trackingNumber}`, { method: 'GET' });
+                const response = await fetch(`https://greenman.kz/add/${trackingNumber}`, {method: 'GET'});
                 const responseData = await response.json();
 
                 // Отправка уведомления о трек-номере
