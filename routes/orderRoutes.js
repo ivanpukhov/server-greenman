@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/add', orderController.addOrder); // Не защищён
 router.get('/',  orderController.getAllOrders);
-router.get('/:id', authMiddleware, orderController.getOrderById);
+router.get('/:id', orderController.getOrderById);
 router.put('/:id', authMiddleware, adminMiddleware, orderController.updateOrder);
 router.delete('/:id', authMiddleware, adminMiddleware, orderController.deleteOrder);
 router.put('/:id/status', adminMiddleware, orderController.updateOrderStatus);
