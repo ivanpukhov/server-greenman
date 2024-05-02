@@ -246,14 +246,16 @@ const orderController = {
             console.log(number)
             console.log(number)
             console.log(number)
+            // Отправка уведомления о трек-номере
+
+            await sendNotification(number, `Трек-номер вашего заказа: ${trackingNumber}. Отследить посылку можете по ссылке: https://track.greenman.kz/${trackingNumber}`);
+
             if (updated[0] > 0) {
 
                 // Отправка запроса на track.greenman.kz
                 const response = await fetch(`https://greenman.kz/add/${trackingNumber}`, {method: 'GET'});
                 const responseData = await response.json();
 
-                // Отправка уведомления о трек-номере
-                await sendNotification(number, `Трек-номер вашего заказа: ${trackingNumber}. Отследить посылку можете по ссылке: https://track.greenman.kz/${trackingNumber}`);
 
                 res.json({message: 'Трек-номер добавлен.', greenmanResponse: responseData});
             } else {
