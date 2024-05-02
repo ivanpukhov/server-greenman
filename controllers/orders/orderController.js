@@ -3,7 +3,7 @@ const sendNotification = require('../../utilities/notificationService');
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
-const {getProductById} = require("../productController");
+const productController = require("../productController");
 
 const orderController = {
 
@@ -113,45 +113,39 @@ const orderController = {
     },
 
 
-    // Получение заказа по ID с информацией о продуктах
     getOrderById: async (req, res) => {
-        const { id } = req.params;
+        const {id} = req.params;  // ID заказа
         try {
             const order = await Order.findByPk(id);
             if (!order) {
-                return res.status(404).json({ error: 'Заказ не найден' });
+                return res.status(404).json({error: 'Заказ не найден'});
             }
 
-            // Массив запросов для получения информации о каждом продукте в заказе
-            const productRequests = order.products.map(product =>
-                getProductById({ params: { id: product.productId } }) // Предполагается, что getProductById возвращает Promise
-            );
+            // Извлекаем информацию о каждом продукте в заказе
+            const productsInfo = await Promise.all(order.products.map(async product => {
+                // product.productId и product.typeId уже должны быть в массиве продуктов в заказе
+                const productResponse = await productController.getProductById({params: {id: product.productId}});
 
-            // Выполнение всех запросов параллельно
-            const productsDetails = await Promise.all(productRequests);
-
-            // Сборка информации о продуктах с выбранными типами
-            const productsInfo = productsDetails.map((response, index) => {
-                const product = response; // Допустим, что getProductById возвращает объект напрямую
-                const type = product.types.find(t => t.id === order.products[index].typeId); // Поиск нужного типа по typeId
+                // Находим тип продукта по typeId
+                const productType = productResponse.types.find(type => type.id === product.typeId);
 
                 return {
-                    productId: product.id,
-                    productName: product.name,
-                    productType: type ? `${type.type} - ${type.price} тенге` : 'Тип продукта не найден',
-                    quantity: order.products[index].quantity
+                    productId: product.productId,
+                    name: productResponse.name,
+                    type: productType ? productType.type : 'Тип не найден',
+                    quantity: product.quantity
                 };
-            });
+            }));
 
-            // Возврат информации о заказе
-            res.json({
-                customerName: order.customerName,
-                phoneNumber: order.phoneNumber,
-                address: `${order.addressIndex}, ${order.city}, ${order.street}, дом ${order.houseNumber}`,
+            // Собираем итоговый объект заказа с полной информацией о продуктах
+            const response = {
+                ...order.dataValues,
                 products: productsInfo
-            });
+            };
+
+            res.json(response);
         } catch (err) {
-            res.status(500).json({ error: 'Ошибка при получении данных: ' + err.message });
+            res.status(500).json({error: err.message});
         }
     },
 
