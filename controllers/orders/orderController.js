@@ -66,10 +66,8 @@ const orderController = {
                     kaspiNumber
                 };
 
-                // Поиск существующего профиля, который полностью соответствует предоставленным данным
                 let existingProfile = await OrderProfile.findOne({where: profileData});
 
-                // Если соответствующий профиль не найден, создаётся новый
                 if (!existingProfile) {
                     existingProfile = await OrderProfile.create(profileData);
                 }
@@ -81,7 +79,43 @@ const orderController = {
             console.log("Заказ создан:", newOrder);
             await sendMessageToChannel(newOrder);
 
-            await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет в на сумму ${totalPrice} тенге в приложении каспи. `);
+            const productsInfo = await Promise.all(products.map(async product => {
+                const productResponse = await productController.getProductByIdServer(product.productId);
+                if (!productResponse) {
+                    return { error: "Продукт не найден" };
+                }
+                const productType = productResponse.types.find(type => type.id === product.typeId);
+                return {
+                    productId: product.productId,
+                    name: productResponse.name,
+                    type: productType ? productType.type : 'Тип не найден',
+                    quantity: product.quantity
+                };
+            }));
+
+            const productDetails = productsInfo.map(product => `
+                Название: ${product.name}
+                Тип: ${product.type}
+                Количество: ${product.quantity}
+            `).join('\n');
+
+            const notificationMessage = `
+                Имя и Фамилия: ${customerName}
+                Номер телефона: ${phoneNumber}
+                Номер телефона Kaspi: ${kaspiNumber}
+                Город: ${city}
+                Адрес: ${street}, ${houseNumber}
+                Почтовый индекс: ${addressIndex}
+                Метод доставки: ${deliveryMethod}
+                Метод оплаты: ${paymentMethod}
+                Итоговая сумма: ${totalPrice} тенге
+                Товары:
+                ${productDetails}
+            `;
+
+            await sendNotification(phoneNumber, notificationMessage);
+            await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет на сумму ${totalPrice} тенге в приложении Каспи.`);
+
             console.log("Уведомление отправлено на номер:", phoneNumber);
 
             res.status(201).json(newOrder);
