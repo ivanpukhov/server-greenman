@@ -1,8 +1,7 @@
 const User = require('../models/orders/User');
 const jwtUtility = require('../utilities/jwtUtility');
 const sendNotification = require('../utilities/notificationService');
-
-const ADMIN_PHONE_WHITELIST = new Set(['7073670497', '7775464450']);
+const { ADMIN_PHONE_WHITELIST, getAdminByPhone } = require('../utilities/adminUsers');
 const CODE_LIFETIME_MS = 10 * 60 * 1000;
 
 const normalizePhoneNumber = (rawPhone) => {
@@ -85,7 +84,8 @@ const adminAuthController = {
             const token = jwtUtility.generateToken(user.id, {
                 isAdmin: true,
                 phoneNumber: user.phoneNumber,
-                role: 'admin'
+                role: 'admin',
+                fullName: getAdminByPhone(user.phoneNumber)?.fullName || `+7${user.phoneNumber}`
             });
 
             return res.status(200).json({
@@ -93,7 +93,8 @@ const adminAuthController = {
                 user: {
                     id: user.id,
                     phoneNumber: user.phoneNumber,
-                    role: 'admin'
+                    role: 'admin',
+                    fullName: getAdminByPhone(user.phoneNumber)?.fullName || `+7${user.phoneNumber}`
                 }
             });
         } catch (error) {

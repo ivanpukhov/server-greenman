@@ -1,3 +1,5 @@
+import { apiUrl } from '../config/api';
+
 const ADMIN_TOKEN_KEY = 'admin_token';
 const ADMIN_USER_KEY = 'admin_user';
 
@@ -15,7 +17,7 @@ const getErrorMessage = (responseBody, fallbackMessage) => {
 
 const authProvider = {
     login: async ({ phoneNumber, confirmationCode }) => {
-        const response = await fetch('/api/admin/auth/confirm-code', {
+        const response = await fetch(apiUrl('/admin/auth/confirm-code'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phoneNumber, confirmationCode })
@@ -64,7 +66,7 @@ const authProvider = {
 
         return {
             id: user.id,
-            fullName: `Админ +7${user.phoneNumber}`
+            fullName: user.fullName || `Админ +7${user.phoneNumber}`
         };
     },
 

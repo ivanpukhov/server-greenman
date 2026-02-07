@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../../config/api';
 import MaskedInput from 'react-text-mask';
 import phone from '../../images/delivery__phone.png';
 import s from './scss/Login.module.scss';
@@ -15,7 +16,7 @@ const PhoneAuth = ({ onCodeSent, phoneNumber: initialPhoneNumber }) => {
         e.preventDefault();
         const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
         try {
-            await axios.post('/api/auth/register-login', { phoneNumber: formattedPhoneNumber });
+            await axios.post(apiUrl('/auth/register-login'), { phoneNumber: formattedPhoneNumber });
             onCodeSent(formattedPhoneNumber);
         } catch (error) {
             console.error('Ошибка при отправке номера телефона:', error);

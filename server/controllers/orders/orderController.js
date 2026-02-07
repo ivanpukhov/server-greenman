@@ -4,11 +4,14 @@ const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
 const productController = require("../productController");
+const ProductType = require('../../models/ProductType');
 
 const orderController = {
 
     // Добавление нового заказа
     addOrder: async (req, res) => {
+        const decreasedStocks = [];
+
         try {
             console.log("Начало обработки запроса на добавление заказа");
             let userId = null;
@@ -75,6 +78,43 @@ const orderController = {
                 orderData.orderProfileId = existingProfile.id;
             }
 
+            const stockUpdates = [];
+
+            for (const item of products) {
+                const requestedQuantity = Math.max(0, Number(item.quantity) || 0);
+                const productType = await ProductType.findByPk(item.typeId);
+
+                if (!productType) {
+                    return res.status(400).json({ error: `Тип товара с ID ${item.typeId} не найден` });
+                }
+
+                if (requestedQuantity <= 0) {
+                    return res.status(400).json({ error: 'Количество товара должно быть больше нуля' });
+                }
+
+                // null = бесконечный остаток
+                if (productType.stockQuantity !== null) {
+                    if (productType.stockQuantity < requestedQuantity) {
+                        return res.status(400).json({
+                            error: `Недостаточно товара на складе: ${productType.type}. Осталось ${productType.stockQuantity} шт.`
+                        });
+                    }
+
+                    stockUpdates.push({ productType, requestedQuantity });
+                }
+            }
+
+            for (const stockUpdate of stockUpdates) {
+                await stockUpdate.productType.update({
+                    stockQuantity: stockUpdate.productType.stockQuantity - stockUpdate.requestedQuantity
+                });
+
+                decreasedStocks.push({
+                    productTypeId: stockUpdate.productType.id,
+                    quantity: stockUpdate.requestedQuantity
+                });
+            }
+
             const newOrder = await Order.create(orderData);
             console.log("Заказ создан:", newOrder);
             await sendMessageToChannel(newOrder);
@@ -120,6 +160,21 @@ console.log("Уведомление отправлено на номер:", phon
 
 res.status(201).json(newOrder);
 } catch (err) {
+if (decreasedStocks.length > 0) {
+    await Promise.all(
+        decreasedStocks.map(async (item) => {
+            const productType = await ProductType.findByPk(item.productTypeId);
+            if (!productType || productType.stockQuantity === null) {
+                return;
+            }
+
+            await productType.update({
+                stockQuantity: productType.stockQuantity + item.quantity
+            });
+        })
+    );
+}
+
 console.error("Ошибка при добавлении заказа:", err);
 res.status(500).json({error: err.message});
 }

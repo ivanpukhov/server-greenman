@@ -17,4 +17,14 @@ router.get('/orders/:id', adminController.getOrder);
 router.put('/orders/:id', adminController.updateOrder);
 router.delete('/orders/:id', adminController.deleteOrder);
 
+router.get('/analytics/dashboard', adminController.getDashboardAnalytics);
+router.get('/accounting/summary', adminController.getAccountingSummary);
+router.get('/expenses', adminController.getExpenses);
+router.post('/expenses', adminController.createExpense);
+router.delete('/expenses/:id', adminController.deleteExpense);
+
+router.get('/inventory/types', adminController.getInventoryTypes);
+router.post('/inventory/receive', adminController.receiveInventory);
+router.get('/inventory/qr-codes', adminController.getQrCodes);
+
 module.exports = router;

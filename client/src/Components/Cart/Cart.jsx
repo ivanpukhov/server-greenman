@@ -21,6 +21,7 @@ import cityData from './cityData';
 import Swal from 'sweetalert2';
 import {Link, useNavigate} from "react-router-dom";
 import ScrollToTop from "../ScrollToTop";
+import { apiUrl } from "../../config/api";
 
 const Cart = () => {
 
@@ -313,7 +314,7 @@ const Cart = () => {
         try {
             const token = localStorage.getItem('token');
             const config = token ? {headers: {Authorization: `Bearer ${token}`}} : {};
-            await axios.post('/api/orders/add', orderData, config);
+            await axios.post(apiUrl('/orders/add'), orderData, config);
             setIsSubmitting(false);
             clearCart();
             Swal.fire({

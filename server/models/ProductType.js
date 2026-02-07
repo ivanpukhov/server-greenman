@@ -11,6 +11,10 @@ const ProductType = sequelize.define('productType', {
         type: Sequelize.STRING,
         allowNull: false
     },
+    code: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
     price: {
         type: Sequelize.FLOAT,
         allowNull: false,
@@ -21,6 +25,17 @@ const ProductType = sequelize.define('productType', {
             min: {
                 args: [0],
                 msg: "Цена не может быть отрицательной"
+            }
+        }
+    },
+    stockQuantity: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        validate: {
+            min: {
+                args: [0],
+                msg: "Остаток не может быть отрицательным"
             }
         }
     },

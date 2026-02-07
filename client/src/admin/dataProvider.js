@@ -1,7 +1,8 @@
 import { fetchUtils } from 'react-admin';
 import { adminAuthStorage } from './authProvider';
+import { apiBaseUrl } from '../config/api';
 
-const apiUrl = '/api/admin';
+const adminApiUrl = `${apiBaseUrl}/admin`;
 
 const httpClient = async (url, options = {}) => {
     const token = adminAuthStorage.getToken();
@@ -35,7 +36,7 @@ const buildListQuery = (params) => {
 const dataProvider = {
     getList: async (resource, params) => {
         const query = new URLSearchParams(buildListQuery(params));
-        const { json } = await httpClient(`${apiUrl}/${resource}?${query.toString()}`);
+        const { json } = await httpClient(`${adminApiUrl}/${resource}?${query.toString()}`);
 
         return {
             data: json.data,
@@ -44,13 +45,13 @@ const dataProvider = {
     },
 
     getOne: async (resource, params) => {
-        const { json } = await httpClient(`${apiUrl}/${resource}/${params.id}`);
+        const { json } = await httpClient(`${adminApiUrl}/${resource}/${params.id}`);
 
         return { data: json.data };
     },
 
     getMany: async (resource, params) => {
-        const responses = await Promise.all(params.ids.map((id) => httpClient(`${apiUrl}/${resource}/${id}`)));
+        const responses = await Promise.all(params.ids.map((id) => httpClient(`${adminApiUrl}/${resource}/${id}`)));
 
         return {
             data: responses.map((response) => response.json.data)
@@ -61,7 +62,7 @@ const dataProvider = {
         const query = new URLSearchParams(buildListQuery(params));
         query.set('filter', JSON.stringify({ ...(params.filter || {}), [params.target]: params.id }));
 
-        const { json } = await httpClient(`${apiUrl}/${resource}?${query.toString()}`);
+        const { json } = await httpClient(`${adminApiUrl}/${resource}?${query.toString()}`);
 
         return {
             data: json.data,
@@ -70,7 +71,7 @@ const dataProvider = {
     },
 
     create: async (resource, params) => {
-        const { json } = await httpClient(`${apiUrl}/${resource}`, {
+        const { json } = await httpClient(`${adminApiUrl}/${resource}`, {
             method: 'POST',
             body: JSON.stringify(params.data)
         });
@@ -79,7 +80,7 @@ const dataProvider = {
     },
 
     update: async (resource, params) => {
-        const { json } = await httpClient(`${apiUrl}/${resource}/${params.id}`, {
+        const { json } = await httpClient(`${adminApiUrl}/${resource}/${params.id}`, {
             method: 'PUT',
             body: JSON.stringify(params.data)
         });
@@ -90,7 +91,7 @@ const dataProvider = {
     updateMany: async (resource, params) => {
         await Promise.all(
             params.ids.map((id) =>
-                httpClient(`${apiUrl}/${resource}/${id}`, {
+                httpClient(`${adminApiUrl}/${resource}/${id}`, {
                     method: 'PUT',
                     body: JSON.stringify(params.data)
                 })
@@ -101,7 +102,7 @@ const dataProvider = {
     },
 
     delete: async (resource, params) => {
-        const { json } = await httpClient(`${apiUrl}/${resource}/${params.id}`, {
+        const { json } = await httpClient(`${adminApiUrl}/${resource}/${params.id}`, {
             method: 'DELETE'
         });
 
@@ -111,7 +112,7 @@ const dataProvider = {
     deleteMany: async (resource, params) => {
         await Promise.all(
             params.ids.map((id) =>
-                httpClient(`${apiUrl}/${resource}/${id}`, {
+                httpClient(`${adminApiUrl}/${resource}/${id}`, {
                     method: 'DELETE'
                 })
             )

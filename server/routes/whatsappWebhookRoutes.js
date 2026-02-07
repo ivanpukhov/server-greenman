@@ -1,0 +1,96 @@
+const express = require('express');
+const axios = require('axios');
+
+const router = express.Router();
+
+const GREEN_API_SEND_FILE_URL =
+    'https://api.green-api.com/waInstance1101834631/sendFileByUrl/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
+
+const DEFAULT_CAPTION =
+    'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
+
+const findFirstValueByKey = (source, targetKey) => {
+    if (source === null || source === undefined) {
+        return null;
+    }
+
+    if (Array.isArray(source)) {
+        for (const item of source) {
+            const value = findFirstValueByKey(item, targetKey);
+            if (value !== null && value !== undefined) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    if (typeof source === 'object') {
+        if (Object.prototype.hasOwnProperty.call(source, targetKey)) {
+            return source[targetKey];
+        }
+
+        for (const key of Object.keys(source)) {
+            const value = findFirstValueByKey(source[key], targetKey);
+            if (value !== null && value !== undefined) {
+                return value;
+            }
+        }
+    }
+
+    return null;
+};
+
+const sendFileByUrl = async (url, phoneNumber, fileName) => {
+    console.log(`Attempting to send file: URL - ${url}, Phone Number - ${phoneNumber}, File Name - ${fileName}`);
+
+    const payload = {
+        chatId: `${phoneNumber}@c.us`,
+        urlFile: url,
+        fileName,
+        caption: DEFAULT_CAPTION
+    };
+
+    const response = await axios.post(GREEN_API_SEND_FILE_URL, payload);
+    console.log('Response from Green API:', response.data);
+};
+
+router.post('/', async (req, res) => {
+    const content = req.body || {};
+    console.log('Received content:', content);
+
+    const search = 'videoMessage';
+    if (!JSON.stringify(content).includes(search)) {
+        return res.status(200).send('OK');
+    }
+
+    console.log(`${search} found in content.`);
+
+    const downloadUrl = findFirstValueByKey(content, 'downloadUrl');
+    if (downloadUrl) {
+        console.log('Found download_url:', downloadUrl);
+    }
+
+    const phoneNumber = findFirstValueByKey(content, 'caption');
+    if (phoneNumber) {
+        console.log('Found phone_number:', phoneNumber);
+    }
+
+    const fileName = findFirstValueByKey(content, 'fileName');
+    if (fileName) {
+        console.log('Found file_name:', fileName);
+    }
+
+    if (downloadUrl && phoneNumber && fileName) {
+        try {
+            await sendFileByUrl(downloadUrl, phoneNumber, fileName);
+        } catch (error) {
+            console.error('Failed to send file by url:', error.response?.data || error.message);
+        }
+    } else {
+        console.log('Did not find all required fields.');
+    }
+
+    return res.status(200).send('OK');
+});
+
+module.exports = router;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { apiUrl } from "../../config/api";
 import Product from "./Product";
 import { Helmet } from "react-helmet";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -8,7 +9,7 @@ import { TailSpin } from 'react-loader-spinner';
 import back from "../../images/ion_arrow-back.svg";
 
 const Catalog = () => {
-    const API_URL = "/api/products";
+    const API_URL = apiUrl('/products');
     const navigate = useNavigate();
 
     const [products, setProducts] = useState([]);

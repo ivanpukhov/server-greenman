@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '../../config/api';
 import logoutImg from '../../images/logout.svg';
 import icon from '../../images/profile.png';
 import profile__order from '../../images/profile__order.png';
@@ -32,7 +33,7 @@ const Profile = () => {
     }, [navigate]);
     useEffect(() => {
         const token = localStorage.getItem('token');
-        axios.get('/api/profile/', {headers: {'Authorization': `Bearer ${token}`}})
+        axios.get(apiUrl('/profile/'), {headers: {'Authorization': `Bearer ${token}`}})
             .then(response => setProfileData(response.data))
             .catch(error => {
                 console.error('Ошибка при получении данных профиля:', error);

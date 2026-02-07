@@ -25,11 +25,31 @@ const orderStatusChoices = [
     { id: 'Отменено', name: 'Отменено' }
 ];
 
+const orderPeriodChoices = [
+    { id: 'today', name: 'Сегодня' },
+    { id: 'yesterday', name: 'Вчера' },
+    { id: 'week', name: 'Неделя' },
+    { id: 'month', name: 'Месяц' }
+];
+
 export const OrderList = () => {
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
     return (
-        <List perPage={10} sort={{ field: 'id', order: 'DESC' }}>
+        <List
+            perPage={10}
+            sort={{ field: 'id', order: 'DESC' }}
+            filters={[
+                <SelectInput
+                    key="period"
+                    source="period"
+                    label="Период"
+                    choices={orderPeriodChoices}
+                    alwaysOn
+                    emptyText="Все"
+                />
+            ]}
+        >
             {isSmall ? (
                 <SimpleList
                     primaryText={(record) => `Заказ #${record.id}`}
