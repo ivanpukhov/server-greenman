@@ -38,7 +38,7 @@ const Search = () => {
     if (error) return <p>Error: {error}</p>;
 
     return (
-        <div>
+        <div className="search-page">
             <Helmet>
                 <title>{type === "name" ? "Поиск продуктов по имени" : "Поиск продуктов по болезни"}</title>
                 <meta name="description" content={`Поиск продуктов по ${type === "name" ? "имени" : "болезни"} "${query}" в Greenman.`} />
@@ -46,9 +46,11 @@ const Search = () => {
 
             <h1 className="search__title">Результаты поиска для "{query}"</h1>
             {products.length > 0 ? (
-                products.map(product => (
-                    <Product key={product.id} product={product} />
-                ))
+                <div className="product-list">
+                    {products.map(product => (
+                        <Product key={product.id} product={product} />
+                    ))}
+                </div>
             ) : (
                 <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}

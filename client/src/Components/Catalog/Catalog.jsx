@@ -41,7 +41,7 @@ const Catalog = () => {
     const productsWithoutTypes = products.filter(product => !product.types || product.types.length === 0);
 
     return (
-        <div>
+        <div className="catalog-page">
             {isCatalogPage && (
                 <>
                     <Helmet>
@@ -60,15 +60,17 @@ const Catalog = () => {
             </div>
             {productsWithTypes.length > 0 ? (
                 <>
-                    <h2>Продукты с типами</h2>
-                    {productsWithTypes.map(product => (
-                        <Product key={product.id} product={product} />
-                    ))}
+                    <h2 className="catalog-page__subtitle">Продукты</h2>
+                    <div className="product-list">
+                        {productsWithTypes.map(product => (
+                            <Product key={product.id} product={product} />
+                        ))}
+                    </div>
                 </>
             ) : null}
             {productsWithoutTypes.length > 0 ? (
                 <>
-                   
+
                 </>
             ) : (
                 <Empty

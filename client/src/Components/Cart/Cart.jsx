@@ -335,7 +335,7 @@ const Cart = () => {
 
 
     return (
-        <div>
+        <div className="cart-page">
             <ScrollToTop/>
 
             <div className="cart__title">

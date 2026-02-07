@@ -58,4 +58,28 @@
   }
 }
 
+@media screen and (min-width: 1024px) {
+  .banner {
+    margin-top: 104px;
+    border-radius: 24px;
+    padding: 40px 36px;
+
+    .title {
+      font-size: 34px;
+      max-width: 760px;
+    }
+
+    .icons {
+      margin: 22px 0 30px;
+    }
+
+    .phone {
+      font-size: 34px;
+    }
+
+    .text {
+      font-size: 20px;
+    }
+  }
+}
 
