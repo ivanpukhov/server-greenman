@@ -1,20 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+import App from './App.jsx';
 import reportWebVitals from './reportWebVitals';
-import {CartProvider} from "./CartContext";
-import {AuthProvider} from "./AuthContext";
+import {CartProvider} from "./CartContext.jsx";
+import {AuthProvider} from "./AuthContext.jsx";
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-    <React.StrictMode>
-        <CartProvider>
-            <AuthProvider>
-                <App/>
-            </AuthProvider>
-        </CartProvider>
-    </React.StrictMode>
+    <CartProvider>
+        <AuthProvider>
+            <App/>
+        </AuthProvider>
+    </CartProvider>
 );
 
 // If you want to start measuring performance in your app, pass a function

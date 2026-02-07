@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
-import {useCart} from '../../CartContext';
+import {useCart} from '../../CartContext.jsx';
 import {NavLink} from "react-router-dom";
-import AddToCartControl from "./AddToCartControl";
+import AddToCartControl from "./AddToCartControl.jsx";
 
 const Product = ({product}) => {
     const {cart, addToCart, updateQuantity, removeFromCart} = useCart();

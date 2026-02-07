@@ -1,8 +1,8 @@
 // Components/Auth/Auth.js
 
 import React, {useEffect, useState} from 'react';
-import PhoneAuth from './PhoneAuth';
-import CodeConfirm from './CodeConfirm';
+import PhoneAuth from './PhoneAuth.jsx';
+import CodeConfirm from './CodeConfirm.jsx';
 import s from './scss/Login.module.scss'
 import {Helmet} from "react-helmet";
 import {useNavigate} from "react-router-dom";

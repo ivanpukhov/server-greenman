@@ -22,7 +22,7 @@ const Catalog = () => {
         const fetchProducts = async () => {
             try {
                 const response = await axios.get(API_URL);
-                setProducts(response.data);
+                setProducts(Array.isArray(response.data) ? response.data : []);
                 setLoading(false);
             } catch (err) {
                 setError(err.message);

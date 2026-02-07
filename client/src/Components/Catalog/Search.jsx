@@ -17,7 +17,7 @@ const Search = () => {
             try {
                 const url = `/api/products/search/${query}?type=${type}`;
                 const response = await axios.get(url);
-                setProducts(response.data);
+                setProducts(Array.isArray(response.data) ? response.data : []);
                 setLoading(false);
             } catch (err) {
                 if (err.response && err.response.status === 404) {

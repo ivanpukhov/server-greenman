@@ -5,7 +5,7 @@ import back from '../../images/ion_arrow-back.svg'
 import children from '../../images/children.png'
 import adults from '../../images/adults.png'
 import FaqItem from "../FaqItem/FaqItem";
-import AddToCartControl from "./AddToCartControl";
+import AddToCartControl from "./AddToCartControl.jsx";
 import {Helmet} from "react-helmet";
 import ScrollToTop from "../ScrollToTop";
 

@@ -22,7 +22,8 @@ const CatalogTop = () => {
         const fetchProducts = async () => {
             try {
                 const response = await axios.get(API_URL);
-                setProducts(response.data.slice(0, 10)); // Получаем только первые 10 товаров
+                const items = Array.isArray(response.data) ? response.data : [];
+                setProducts(items.slice(0, 10)); // Получаем только первые 10 товаров
                 setLoading(false);
             } catch (err) {
                 setError(err.message);

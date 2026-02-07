@@ -3,7 +3,7 @@ import circe from '../../images/natural-circle.svg'
 import about from '../../images/about.png'
 import stories from '../../images/bottom_bar/stories.png'
 import Faq from "../Faq/Faq";
-import Banner from "../Banner/Banner";
+import Banner from "../Banner/Banner.jsx";
 import {Helmet} from 'react-helmet';
 import SearchBlock from "../Catalog/SearchBlock";
 import CatalogTop from "../Catalog/CatalogTop";

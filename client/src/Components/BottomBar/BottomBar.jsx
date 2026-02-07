@@ -1,6 +1,6 @@
 import React from 'react';
 import {Link, NavLink, useLocation} from 'react-router-dom';
-import { useCart } from '../../CartContext';
+import { useCart } from '../../CartContext.jsx';
 
 import iconHome from '../../images/bottom_bar/home.svg';
 import iconHomeOp from '../../images/bottom_bar/homeOp.svg';

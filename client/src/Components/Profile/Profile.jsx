@@ -4,8 +4,8 @@ import axios from 'axios';
 import logoutImg from '../../images/logout.svg';
 import icon from '../../images/profile.png';
 import profile__order from '../../images/profile__order.png';
-import {useAuth} from "../../AuthContext";
-import Banner from "../Banner/Banner";
+import {useAuth} from "../../AuthContext.jsx";
+import Banner from "../Banner/Banner.jsx";
 import {TailSpin} from "react-loader-spinner";
 import ScrollToTop from "../ScrollToTop";
 

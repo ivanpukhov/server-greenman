@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import s from './scss/Login.module.scss';
 import phone from "../../images/delivery__phone.png";
 import MaskedInput from 'react-text-mask';
-import { useAuth } from "../../AuthContext";
+import { useAuth } from "../../AuthContext.jsx";
 
 const CodeConfirm = ({ phoneNumber, onPhoneNumberChange }) => {
     const [code, setCode] = useState('');

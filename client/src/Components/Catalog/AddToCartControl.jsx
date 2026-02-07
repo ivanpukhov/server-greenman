@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {useCart} from '../../CartContext';
+import {useCart} from '../../CartContext.jsx';
 import cardAdd from '../../images/card__add.svg';
 import iconMinus from '../../images/bottom_bar/Icon-minus.svg';
 import iconPlus from '../../images/bottom_bar/Icon-plus.svg';
