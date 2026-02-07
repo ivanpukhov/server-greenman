@@ -4,8 +4,8 @@ const JWT_SECRET = 'secret';
 const JWT_EXPIRES_IN = '24000h';
 
 const jwtUtility = {
-    generateToken(userId) {
-        return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    generateToken(userId, extraPayload = {}) {
+        return jwt.sign({ userId, ...extraPayload }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
     },
 
     verifyToken(token) {
