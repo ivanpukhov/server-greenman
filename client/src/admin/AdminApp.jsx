@@ -14,7 +14,7 @@ import AdminDashboard from './AdminDashboard';
 import AccountingPage from './AccountingPage';
 import IncomingStockPage from './IncomingStockPage';
 import QrCodesPage from './QrCodesPage';
-import { OrderEdit, OrderList, OrderShow } from './resources/orders';
+import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import './AdminApp.css';
 
@@ -102,6 +102,7 @@ const AdminApp = () => (
             list={OrderList}
             show={OrderShow}
             edit={OrderEdit}
+            create={OrderCreate}
             icon={ShoppingCartOutlinedIcon}
         />
         <Resource

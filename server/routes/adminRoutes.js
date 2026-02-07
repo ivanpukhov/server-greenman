@@ -14,6 +14,7 @@ router.delete('/products/:id', adminController.deleteProduct);
 
 router.get('/orders', adminController.getOrders);
 router.get('/orders/:id', adminController.getOrder);
+router.post('/orders', adminController.createOrder);
 router.put('/orders/:id', adminController.updateOrder);
 router.delete('/orders/:id', adminController.deleteOrder);
 

@@ -9,6 +9,25 @@ const GREEN_API_SEND_FILE_URL =
 const DEFAULT_CAPTION =
     'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
 
+const safeStringify = (value) => {
+    const seen = new WeakSet();
+
+    return JSON.stringify(
+        value,
+        (key, currentValue) => {
+            if (typeof currentValue === 'object' && currentValue !== null) {
+                if (seen.has(currentValue)) {
+                    return '[Circular]';
+                }
+                seen.add(currentValue);
+            }
+
+            return currentValue;
+        },
+        2
+    );
+};
+
 const findFirstValueByKey = (source, targetKey) => {
     if (source === null || source === undefined) {
         return null;
@@ -56,7 +75,13 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
 
 router.post('/', async (req, res) => {
     const content = req.body || {};
-    console.log('Received content:', content);
+    console.log('[WhatsApp webhook] Incoming request:\n' + safeStringify({
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query,
+        body: content
+    }));
 
     const search = 'videoMessage';
     if (!JSON.stringify(content).includes(search)) {

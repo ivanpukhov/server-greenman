@@ -296,6 +296,82 @@ const safeAmount = (value) => {
     return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const toPositiveInt = (value) => {
+    const numeric = Math.floor(Number(value));
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return null;
+    }
+
+    return numeric;
+};
+
+const normalizeOrderProducts = (productsRaw) => {
+    const products = Array.isArray(productsRaw) ? productsRaw : parseJsonParam(productsRaw, []);
+
+    if (!Array.isArray(products)) {
+        return [];
+    }
+
+    return products
+        .map((item) => {
+            const productId = Number(item?.productId);
+            const typeId = Number(item?.typeId);
+            const quantity = toPositiveInt(item?.quantity);
+
+            if (!Number.isFinite(productId) || !Number.isFinite(typeId) || !quantity) {
+                return null;
+            }
+
+            return {
+                productId,
+                typeId,
+                quantity
+            };
+        })
+        .filter(Boolean);
+};
+
+const extractTypeVolume = (typeName) => {
+    const volumeMatch = String(typeName || '').match(/\b\d+\b/);
+    let volume = 1000;
+
+    if (volumeMatch && volumeMatch[0]) {
+        volume = Number(volumeMatch[0]);
+        if (!Number.isFinite(volume) || volume < 300) {
+            volume = 1000;
+        }
+    }
+
+    return volume;
+};
+
+const calculateDeliveryCostForAdminOrder = (deliveryMethod, productsWithTypes) => {
+    if (deliveryMethod === 'kazpost') {
+        const totalVolume = productsWithTypes.reduce((sum, item) => {
+            return sum + extractTypeVolume(item.typeName) * item.quantity;
+        }, 0);
+
+        const basePrice = 1800;
+        if (totalVolume <= 1000) {
+            return basePrice;
+        }
+
+        const extraVolume = totalVolume - 1000;
+        const extraCost = Math.ceil(extraVolume / 1000) * 400;
+        return basePrice + extraCost;
+    }
+
+    if (deliveryMethod === 'indrive') {
+        return 4000;
+    }
+
+    if (deliveryMethod === 'city') {
+        return 1500;
+    }
+
+    return 3000;
+};
+
 const isPaidOrderStatus = (status) => {
     const normalized = String(status || '').trim().toLowerCase();
     return normalized === 'оплачено' || normalized === 'отправлено' || normalized === 'доставлено';
@@ -580,6 +656,167 @@ const adminController = {
             return res.json({ data: enriched });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить заказ', error: error.message });
+        }
+    },
+
+    async createOrder(req, res) {
+        const decreasedStocks = [];
+
+        try {
+            const customerName = String(req.body.customerName || '').trim();
+            const addressIndex = String(req.body.addressIndex || '').trim();
+            const city = String(req.body.city || '').trim();
+            const street = String(req.body.street || '').trim();
+            const houseNumber = String(req.body.houseNumber || '').trim();
+            const deliveryMethod = String(req.body.deliveryMethod || '').trim().toLowerCase();
+            const products = normalizeOrderProducts(req.body.products);
+            const phoneNumber = String(req.body.phoneNumber || '').replace(/\D/g, '').slice(-10);
+            const kaspiNumber = req.body.kaspiNumber
+                ? String(req.body.kaspiNumber).replace(/\D/g, '').slice(-10)
+                : null;
+
+            if (!customerName || !addressIndex || !city || !street || !houseNumber || !phoneNumber || !deliveryMethod) {
+                return res.status(400).json({ message: 'Заполните обязательные поля заказа' });
+            }
+
+            if (phoneNumber.length !== 10) {
+                return res.status(400).json({ message: 'Телефон должен содержать 10 цифр без +7' });
+            }
+
+            if (kaspiNumber && kaspiNumber.length !== 10) {
+                return res.status(400).json({ message: 'Kaspi номер должен содержать 10 цифр без +7' });
+            }
+
+            if (products.length === 0) {
+                return res.status(400).json({ message: 'Добавьте хотя бы один товар в заказ' });
+            }
+
+            const allowedDeliveryMethods = ['kazpost', 'indrive', 'city'];
+            if (!allowedDeliveryMethods.includes(deliveryMethod)) {
+                return res.status(400).json({ message: 'Некорректный способ доставки' });
+            }
+
+            const uniqueTypeIds = [...new Set(products.map((item) => item.typeId))];
+            const typeRows = await ProductType.findAll({
+                where: {
+                    id: {
+                        [Op.in]: uniqueTypeIds
+                    }
+                },
+                include: [{ model: Product, attributes: ['id', 'name'] }]
+            });
+            const typeById = new Map(typeRows.map((row) => [row.id, row]));
+
+            const validatedProducts = products.map((item) => {
+                const typeRow = typeById.get(item.typeId);
+
+                if (!typeRow) {
+                    return { error: `Тип товара с ID ${item.typeId} не найден` };
+                }
+
+                if (typeRow.productId !== item.productId) {
+                    return { error: `Тип товара ${item.typeId} не принадлежит товару ${item.productId}` };
+                }
+
+                const availableStock = typeRow.stockQuantity;
+                if (availableStock !== null && availableStock < item.quantity) {
+                    return { error: `Недостаточно остатка: ${typeRow.type}. Доступно ${availableStock} шт.` };
+                }
+
+                return {
+                    productId: item.productId,
+                    typeId: item.typeId,
+                    quantity: item.quantity,
+                    unitPrice: safeAmount(typeRow.price),
+                    typeName: typeRow.type,
+                    productName: typeRow.product ? typeRow.product.name : null,
+                    stockQuantity: typeRow.stockQuantity
+                };
+            });
+
+            const invalidProduct = validatedProducts.find((item) => item.error);
+            if (invalidProduct) {
+                return res.status(400).json({ message: invalidProduct.error });
+            }
+
+            for (const item of validatedProducts) {
+                const typeRow = typeById.get(item.typeId);
+                if (typeRow.stockQuantity === null) {
+                    continue;
+                }
+
+                await typeRow.update({
+                    stockQuantity: typeRow.stockQuantity - item.quantity
+                });
+
+                decreasedStocks.push({
+                    typeId: typeRow.id,
+                    quantity: item.quantity
+                });
+            }
+
+            const productsTotal = validatedProducts.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+            const autoDeliveryCost = calculateDeliveryCostForAdminOrder(deliveryMethod, validatedProducts);
+            const deliveryPriceOverride = req.body.deliveryPriceOverride;
+            const hasDeliveryOverride =
+                deliveryPriceOverride !== null &&
+                deliveryPriceOverride !== undefined &&
+                deliveryPriceOverride !== '';
+            const manualDeliveryCost = hasDeliveryOverride ? safeAmount(deliveryPriceOverride) : null;
+            const deliveryCost = hasDeliveryOverride && manualDeliveryCost >= 0 ? manualDeliveryCost : autoDeliveryCost;
+            const totalPrice = productsTotal + deliveryCost;
+
+            const orderPayload = {
+                customerName,
+                addressIndex,
+                city,
+                street,
+                houseNumber,
+                phoneNumber,
+                kaspiNumber,
+                deliveryMethod,
+                paymentMethod: 'link',
+                products: validatedProducts.map((item) => ({
+                    productId: item.productId,
+                    typeId: item.typeId,
+                    quantity: item.quantity
+                })),
+                totalPrice
+            };
+
+            const created = await Order.create(orderPayload);
+            const enriched = await enrichOrderProducts(created);
+
+            try {
+                await sendMessageToChannel(created);
+            } catch (_error) {
+                // Не блокируем создание заказа, если уведомление в канал не отправилось.
+            }
+
+            return res.status(201).json({
+                data: {
+                    ...enriched,
+                    deliveryCost,
+                    productsTotal
+                }
+            });
+        } catch (error) {
+            if (decreasedStocks.length > 0) {
+                await Promise.all(
+                    decreasedStocks.map(async (item) => {
+                        const typeRow = await ProductType.findByPk(item.typeId);
+                        if (!typeRow || typeRow.stockQuantity === null) {
+                            return;
+                        }
+
+                        await typeRow.update({
+                            stockQuantity: typeRow.stockQuantity + item.quantity
+                        });
+                    })
+                );
+            }
+
+            return res.status(500).json({ message: 'Не удалось создать заказ', error: error.message });
         }
     },
 
