@@ -1,0 +1,126 @@
+.back {
+  width: 100%;
+  height: 100vh;
+  background: url("../../../images/login_bg.png");
+  background-size: cover;
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 60px;
+}
+
+.title {
+  color: #FFF;
+  font-family: Hagrid;
+  font-size: 45px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+}
+
+
+.sub {
+  color: #FFF;
+  font-family: Roboto;
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: normal;
+  text-align: center;
+
+}
+
+.form{
+  form{
+    display: flex;
+    flex-direction: column;
+    max-width: 388px;
+    width: calc(100vw - 40px);
+    border-radius: 10px;
+    background: #FFF;
+    height: fit-content;
+    flex-shrink: 0;
+    padding: 0 24px 56px;
+    position: relative;
+    margin-top: 91px;
+    label{
+      img{
+        position: absolute;
+        margin-top: 6px;
+        margin-left: 6px;
+      }
+    }
+
+    input{
+      height: 64px;
+      width: 100%;
+      border-radius: 25px;
+      border: 1px solid #D9DCE3;
+      padding-left:  70px;
+
+      color: #000;
+      font-family: Roboto;
+      font-size: 20px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: normal;
+      letter-spacing: 0.48px;
+    }
+
+    button{
+      border-radius: 25px;
+      background: #00AB6D;
+      width: 100%;
+      height: 64px;
+      color: #FFF;
+      font-family: Roboto;
+      font-size: 20px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: normal;
+      margin-top: 16px;
+    }
+
+
+  }
+
+  .title__sub{
+    color: #202020;
+    font-family: Roboto;
+    font-size: 36px;
+    font-style: normal;
+    margin-top: 40px;
+    font-weight: 500;
+    line-height: normal;
+    letter-spacing: 0.72px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .title__sup{
+    color: #202020;
+    text-align: center;
+    font-family: Roboto;
+    font-size: 20px;
+    margin-bottom: 30px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 120%; /* 28.8px */
+    letter-spacing: 0.48px;
+    margin-top: 40px;
+  }
+  a{
+    color: #202020;
+    font-family: Roboto;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 110%; /* 19.8px */
+    text-decoration: underline;
+    margin-top: 10px;
+    text-align: center;
+  }
+}

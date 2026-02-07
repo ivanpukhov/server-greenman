@@ -1,0 +1,5 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow: /auth
+Disallow: /profile
+Sitemap: https://greenman.kz/sitemap.xml

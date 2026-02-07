@@ -1,0 +1,61 @@
+.banner {
+  border-radius: 15px;
+  background: #00AB6D;
+  width: 100%;
+  padding: 32px 24px;
+  margin-top: 88px;
+
+  a{
+    display: block;
+  }
+
+  .title {
+    color: #FFF;
+    font-family: Hagrid;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 120%; /* 28.8px */
+  }
+
+  .icons {
+    display: flex;
+    gap: 15px;
+    margin: 16px 0 24px;
+
+    .icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 8px;
+      background: #ECF3EE;
+
+      img {
+        width: 26px;
+        height: 26px;
+      }
+    }
+  }
+  .phone{
+    color: #FFF;
+    font-family: Hagrid;
+    font-size: 26px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+  }
+
+  .text{
+    color: #FFF;
+    font-family: Roboto;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    margin-top: 8px;
+  }
+}
+
+

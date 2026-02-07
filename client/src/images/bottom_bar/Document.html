@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    
+<link rel="stylesheet" href="Document_files/style.css"></head>
+
+<body>
+    <div class="container">
+        <div class="first">
+            <header class="header">
+                <div class="header__logo">InDisign</div>
+                <nav class="header__nav">
+                    <li>Home</li>
+                    <li>About</li>
+                    <li>Our Gallery</li>
+                    <li>Pricing</li>
+                    <li>Services</li>
+                </nav>
+                <div class="header__btn">
+                    Contact Us
+                </div>
+            </header>
+            <div class="main">
+                <div class="main__left">
+                    <div class="main__text">
+                        Lorem ipsum dolor sit amet, consectetur 
+adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore 
+magna aliqua.
+                    </div>
+                    <h1 class="main__title">
+                        Interi Design
+                    </h1>
+                    <div class="main__img">
+                        <img src="Document_files/hero1.png" alt="main img">
+                    </div>
+                </div>
+                <div class="main__right">
+                    <div class="main__right-subtitle">
+                        Our Recent Work
+                    </div>
+                    <div class="main__right-title">
+                        We Will Make These Unique <br> Tastes of Yours a design reality!
+                    </div>
+                    <div class="main__right-btn">
+                        View Project
+                    </div>
+                    <div class="main__right-img">
+                        <img src="Document_files/hero2.png" alt="main second img">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+
+
+</body></html>

@@ -1,0 +1,44 @@
+{
+  "short_name": "Greenman",
+  "name": "Greenman - Лечебные настойки, соки и сиропы лекарственных растений",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "description": "Откройте для себя натуральные соки, настойки и экстракты из лечебных трав, корней, семян и плодов для поддержания вашего здоровья. Получите бесплатную консультацию для подбора продукции, идеально подходящей именно вам, основываясь на вашем диагнозе. Позаботьтесь о своем здоровье с нашими эксклюзивными продуктами.",
+  "categories": ["health", "wellness", "natural-products"],
+  "lang": "ru",
+  "orientation": "portrait",
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Каталог продукции",
+      "short_name": "Каталог",
+      "description": "Просмотрите ассортимент натуральных продуктов для здоровья",
+      "url": "/catalog"
+    },
+    {
+      "name": "Консультация",
+      "short_name": "Консультация",
+      "description": "Получите бесплатную консультацию в WhatsApp",
+      "url": "https://wa.me/77770978675"
+    }
+  ]
+}

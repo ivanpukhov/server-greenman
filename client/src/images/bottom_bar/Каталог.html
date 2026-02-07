@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Каталог</title>
+	<link rel="stylesheet" href="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/cart.css">
+	<link href="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/nouislider.min.css" rel="stylesheet">
+	<link rel="icon" type="image/png" href="http://127.0.0.1:5500/assets/catalog-img/favicon.png">
+
+	<link rel="stylesheet" href="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/catalog__mobile.css">
+</head>
+
+<body>
+	<div class="container">
+		<header class="header">
+			<div class="header__top">
+				<nav class="header__nav">
+					<li class="header__nav-item">Портфолио </li>
+					<li class="header__nav-item">Доставка и сборка </li>
+					<li class="header__nav-item">Блог </li>
+					<li class="header__nav-item">О компании </li>
+					<li class="header__nav-item">Контакты</li>
+				</nav>
+				<div class="header__contacts">
+					<div class="header__adress">Москва, Сколковское шоссе, д.31 </div>
+					<a href="tel:+74952271299" class="header__phone">(495) 227-12-99 </a>
+					<div class="header__time">с 10 до 21</div>
+					<a href="#" class="header__call">Обратный звонок</a>
+				</div>
+			</div>
+			<div class="header__center">
+				<a href="http://127.0.0.1:5500/">
+					<div class="header__logo">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/logo_002.svg" alt="">
+					</div>
+				</a>
+				<div class="header__btn-catalog ">
+					<span> Каталог товаров</span>
+				</div>
+				<form class="header__search" action="search.html">
+					<input type="text" placeholder="Название, артикул, код" class="header__input">
+					<input type="submit" id="search">
+					<label for="search">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/search.svg" alt="">
+					</label>
+				</form>
+				<div class="header__btn-cart">
+					<div class="cart__circle" style="display: flex;">1</div>
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/header__cart.svg" alt="">
+				</div>
+			</div>
+			<menu class="header__bottom">
+				<a href="http://127.0.0.1:5500/catalog.html">Мебель</a>
+				<a href="">Светильники</a>
+				<a href="">Двери</a>
+				<a href="">Сантехника</a>
+				<a href="">Бытовая техника</a>
+				<a href="">Отделка</a>
+				<a href="">Матрасы</a>
+				<a href="">Аксессуары и декор</a>
+				<a href="">Фабрики</a>
+			</menu>
+			<div class="header__mobile">
+				<div class="header__hum">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/hum.svg" alt="">
+				</div>
+				<div class="header__logo--mobile">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/logo.svg" alt="">
+				</div>
+				<div class="header__search--icon">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/search--mobile.svg" alt="">
+				</div>
+			</div>
+
+
+			<div class="header__catalog none">
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/9.png" alt="">
+					</div>
+					<div class="catalog__name">Мебель</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/8.png" alt="">
+					</div>
+					<div class="catalog__name">Светильники</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/7.png" alt="">
+					</div>
+					<div class="catalog__name">Двери</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/6.png" alt="">
+					</div>
+					<div class="catalog__name">Сантехника</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/5.png" alt="">
+					</div>
+					<div class="catalog__name">Бытовая техника</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/4.png" alt="">
+					</div>
+					<div class="catalog__name">Отделка</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/3.png" alt="">
+					</div>
+					<div class="catalog__name">Матрасы</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/2.png" alt="">
+					</div>
+					<div class="catalog__name">Аксессуары и декор</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/slider.png" alt="">
+					</div>
+					<div class="catalog__name">Коллекции</div>
+				</div>
+				<div class="catalog__item">
+					<div class="catalog__image">
+						<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/0.png" alt="">
+					</div>
+					<div class="catalog__name">Фабрики Италии</div>
+				</div>
+
+			</div>
+		</header>
+		<div class="title">
+			<h1>Корзина</h1>
+			<span>4 товара</span>
+		</div>
+		<div class="cart">
+			<div class="delete__all">удалить</div>
+			<div class="cart__item">
+				<div class="product__delete">удалить</div>
+
+				<div class="cart__photo">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/cart.png" alt="">
+				</div>
+				<div class="cart__texsts">
+					<div class="cart__is">
+						<div class="cart__is--img">•</div>
+						<div class="cart__is--text">В наличии</div>
+					</div>
+					<div class="cart__fabric"><span>Фабрика </span>Cattelan italia</div>
+					<div class="cart__title">Консоль Cattelan italia Terminal Keramik Premium</div>
+					<div class="cart__product">
+
+						<div class="natural">360 230 ₽</div>
+						<div class="discont">320 127 ₽</div>
+					</div>
+				</div>
+				<div class="cart__price">
+					<div class="natural">360 230 ₽</div>
+					<div class="discont">320 127 ₽</div>
+				</div>
+				<div class="cart__q">
+					<div class=" product__quantity">
+
+						<div class="product__minus">
+							—
+						</div>
+						<div class="product__quantity-input">
+							<input type="text" value="1">
+						</div>
+						<div class="product__plus">
+							+
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="cart__item">
+				<div class="product__delete">удалить</div>
+				<div class="cart__photo">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/cart.png" alt="">
+				</div>
+				<div class="cart__texsts">
+					<div class="cart__is">
+						<div class="cart__is--img">•</div>
+						<div class="cart__is--text">В наличии</div>
+					</div>
+					<div class="cart__fabric"><span>Фабрика </span>Cattelan italia</div>
+					<div class="cart__title">Консоль Cattelan italia Terminal Keramik Premium</div>
+					<div class="cart__product">
+
+						<div class="natural">360 230 ₽</div>
+						<div class="discont">320 127 ₽</div>
+					</div>
+				</div>
+				<div class="cart__price">
+					<div class="natural">360 230 ₽</div>
+					<div class="discont">320 127 ₽</div>
+				</div>
+				<div class="cart__q">
+					<div class=" product__quantity">
+
+						<div class="product__minus">
+							—
+						</div>
+						<div class="product__quantity-input">
+							<input type="text">
+						</div>
+						<div class="product__plus">
+							+
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="cart__item">
+				<div class="product__delete">удалить</div>
+				<div class="cart__photo">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/cart.png" alt="">
+				</div>
+				<div class="cart__texsts">
+					<div class="cart__is">
+						<div class="cart__is--img">•</div>
+						<div class="cart__is--text">В наличии</div>
+					</div>
+					<div class="cart__fabric"><span>Фабрика </span>Cattelan italia</div>
+					<div class="cart__title">Консоль Cattelan italia Terminal Keramik Premium</div>
+					<div class="cart__product">
+
+						<div class="natural">360 230 ₽</div>
+						<div class="discont">320 127 ₽</div>
+					</div>
+				</div>
+				<div class="cart__price">
+					<div class="natural">360 230 ₽</div>
+					<div class="discont">320 127 ₽</div>
+				</div>
+				<div class="cart__q">
+					<div class=" product__quantity">
+
+						<div class="product__minus">
+							—
+						</div>
+						<div class="product__quantity-input">
+							<input type="text">
+						</div>
+						<div class="product__plus">
+							+
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+	
+	<div class="container--dark">
+		<footer class="footer">
+			<div class="footer__top">
+				<div class="footer__logo">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/footer__logo--light.svg" alt="">
+				</div>
+				<div class="footer__nav">
+					<li>Портфолио </li>
+					<li>Доставка и сборка </li>
+					<li>Блог </li>
+					<li>О компании </li>
+					<li>Контакты</li>
+				</div>
+			</div>
+			<div class="footer__bottom">
+				<div class="footer__copyright">
+					© 2023 GM HOUSE — комплектация элитных интерьеров под ключ. Все права защищены.
+				</div>
+				<div class="footer__politica">
+					Политика обработки персональных данных
+				</div>
+			</div>
+		</footer>
+
+	</div>
+	<div class="tapbar">
+		<div class="tapbar__item ">
+			<div class="tapbar__img">
+				<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30" fill="none">
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M24.6591 29.9999C26.3786 29.9999 27.7273 28.5175 27.7273 26.7573V15.5745C27.8381 15.6781 27.9654 15.7629 28.1047 15.8245C28.2722 15.8986 28.453 15.937 28.6363 15.9369C28.8197 15.9371 29.0005 15.8986 29.1681 15.8245C29.3356 15.7505 29.4858 15.6427 29.6109 15.509C30.1298 14.9555 30.1297 14.0695 29.6108 13.516L18.3046 1.45523C16.4858 -0.48508 13.5143 -0.48507 11.6954 1.45522L0.389219 13.516C-0.129748 14.0696 -0.12974 14.9557 0.389245 15.5092C0.902577 16.0568 1.73412 16.0786 2.27274 15.5745V26.7573C2.27274 28.5176 3.62154 29.9999 5.34093 29.9999L11.3571 30V18.2143C11.3571 17.9776 11.549 17.7857 11.7857 17.7857H18.2143C18.451 17.7857 18.6429 17.9776 18.6429 18.2143V30L24.6591 29.9999ZM25 12.6696L16.3558 3.44846C15.605 2.64749 14.3951 2.64746 13.6442 3.44845L5.00002 12.6696V26.7573C5.00002 27.0023 5.18054 27.1513 5.34093 27.1513H8.57143V18.2143C8.57143 16.4391 10.0105 15 11.7857 15H18.2143C19.9895 15 21.4286 16.4391 21.4286 18.2143V27.1513H24.6591C24.8195 27.1513 25 27.0023 25 26.7573V12.6696Z" fill="#787878"></path>
+				</svg>
+			</div>
+			<div class="tapbar__text">
+				Главная
+			</div>
+		</div>
+		<div class="tapbar__item tapbar__active">
+			<div class="tapbar__img">
+				<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30" fill="none">
+					<path d="M2.55553e-06 21.5625C2.51027e-06 22.0803 0.419735 22.5 0.937502 22.5H14.8661C15.3838 22.5 15.8036 22.0803 15.8036 21.5625V20.625C15.8036 20.1072 15.3838 19.6875 14.8661 19.6875H0.937503C0.419736 19.6875 2.68276e-06 20.1072 2.63749e-06 20.625L2.55553e-06 21.5625Z" fill="#787878"></path>
+					<path d="M0 14.0625C-4.52641e-08 14.5803 0.419733 15 0.9375 15H7.36607C7.88384 15 8.30357 14.5803 8.30357 14.0625V13.125C8.30357 12.6072 7.88384 12.1875 7.36607 12.1875L0.9375 12.1875C0.419733 12.1875 1.27224e-07 12.6072 8.19593e-08 13.125L0 14.0625Z" fill="#787878"></path>
+					<path d="M1.5795e-06 29.0625C1.53424e-06 29.5803 0.419735 30 0.937501 30H20.4911C21.0088 30 21.4286 29.5803 21.4286 29.0625V28.125C21.4286 27.6072 21.0088 27.1875 20.4911 27.1875L0.937502 27.1875C0.419735 27.1875 1.70673e-06 27.6072 1.66146e-06 28.125L1.5795e-06 29.0625Z" fill="#787878"></path>
+					<path d="M26.8177 15.3346C26.3949 14.9115 26.3551 14.2461 26.6566 13.7295C27.635 12.0531 28.0582 10.0992 27.8485 8.15137C27.6014 5.85649 26.4941 3.7404 24.7495 2.22906C23.0049 0.717717 20.7524 -0.076658 18.4456 0.00583762C16.1388 0.0883332 13.9489 1.04157 12.3167 2.67368C10.6845 4.30578 9.73119 6.49556 9.64869 8.80222C9.56619 11.1089 10.3606 13.3612 11.872 15.1057C13.3835 16.8502 15.4997 17.9575 17.7947 18.2045C19.7425 18.4142 21.6964 17.9911 23.3729 17.0129C23.8896 16.7113 24.5553 16.7513 24.9784 17.1743L27.809 20.0047C28.2786 20.4743 29.0398 20.4747 29.5098 20.0055L29.6468 19.8689C30.1173 19.3993 30.1178 18.6371 29.6479 18.1669L26.8177 15.3346ZM18.8049 15.6577C17.52 15.6577 16.264 15.2767 15.1956 14.5629C14.1272 13.8491 13.2946 12.8345 12.8028 11.6475C12.3111 10.4605 12.1825 9.15431 12.4332 7.89417C12.6838 6.63403 13.3026 5.47651 14.2111 4.568C15.1197 3.65949 16.2773 3.04079 17.5375 2.79013C18.7977 2.53947 20.104 2.66812 21.2911 3.1598C22.4782 3.65148 23.4928 4.48412 24.2067 5.55242C24.9205 6.62071 25.3016 7.87669 25.3016 9.16152C25.3 10.8839 24.615 12.5353 23.397 13.7533C22.179 14.9712 20.5275 15.6561 18.8049 15.6577Z" fill="#787878"></path>
+				</svg>
+			</div>
+			<div class="tapbar__text">
+				Каталог
+			</div>
+		</div>
+		<div class="tapbar__item">
+			<div class="tapbar__img">
+				<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30" fill="none">
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M2.43993e-05 11.5921C0.0156165 5.11992 5.40023 -0.123313 11.864 0.00220767C18.1102 0.128015 23.2525 5.37263 23.2526 11.6205C23.2527 19.6931 14.8923 25.3814 7.40185 22.4504C6.35884 23.1964 5.09038 23.5988 3.80931 23.5988C2.76123 23.5988 1.7373 23.3317 0.810803 22.8129C0.146883 22.4653 -0.116805 21.6066 0.290047 20.9465L0.291677 20.9439C1.10985 19.6365 1.40045 18.0456 1.0299 16.5589C0.928003 16.15 0.814345 15.7557 0.699156 15.3604C0.69002 15.3291 0.68087 15.2977 0.671714 15.2663C0.566147 14.9043 0.45976 14.5396 0.364637 14.1716C0.156984 13.3685 -0.00226615 12.5316 2.43993e-05 11.5921ZM11.8112 2.63889C6.80856 2.53958 2.64936 6.59288 2.6373 11.5985C2.6354 12.3796 2.78635 13.0906 2.99014 13.8196C3.05647 14.0569 3.13054 14.3024 3.20658 14.5545C3.35768 15.0554 3.51652 15.5819 3.63769 16.1202C3.997 17.7169 3.86428 19.3955 3.26302 20.9127C4.33611 21.0801 5.46286 20.7489 6.26732 19.9713C6.4607 19.7843 6.70665 19.6609 6.97217 19.6177C7.23767 19.5745 7.51003 19.6135 7.7527 19.7296C13.6568 22.5524 20.6153 18.1232 20.6153 11.6205C20.6153 6.76768 16.6639 2.73666 11.8112 2.63889ZM25.4546 10.3712C26.0134 9.90396 26.8451 9.97858 27.3121 10.5373C29.0404 12.605 29.9934 15.253 30 17.9933C30.0038 19.5586 29.7009 21.0796 29.0996 22.5128C28.5435 24.1363 28.7992 25.8817 29.709 27.3463L29.7097 27.3475C30.117 28.0079 29.8529 28.8666 29.1889 29.2143C28.2626 29.7328 27.2385 29.9999 26.1905 30C24.9095 30 23.6409 29.5975 22.598 28.8515C18.6348 30.3978 13.99 29.6102 10.764 26.8243C10.2128 26.3482 10.152 25.5156 10.6278 24.9645C11.1038 24.4135 11.9365 24.3522 12.4878 24.8284C15.1548 27.1315 19.0677 27.6508 22.2471 26.1309C22.4898 26.0148 22.7622 25.9758 23.0277 26.019C23.2932 26.0621 23.5392 26.1855 23.7326 26.3725C24.5369 27.1501 25.6636 27.4814 26.7365 27.3141C26.015 25.4999 25.9652 23.4825 26.6232 21.6042C26.6328 21.5769 26.6532 21.5265 26.6532 21.5265L26.6538 21.5251C27.127 20.4095 27.3656 19.224 27.3627 17.9997C27.3575 15.8373 26.6394 13.8447 25.2885 12.2285C24.8216 11.6697 24.8959 10.8382 25.4546 10.3712Z" fill="#787878"></path>
+				</svg>
+			</div>
+			<div class="tapbar__text">
+				Консультант
+			</div>
+		</div>
+		<div class="tapbar__item">
+			<div class="tapbar__img">
+				<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30" fill="none">
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M3.30438 2.14285L3.29655 2.14288H1.07031C0.786444 2.14288 0.514207 2.03 0.313486 1.82906C0.112764 1.62813 0 1.35561 0 1.07145C0 0.78729 0.112764 0.514769 0.313486 0.313837C0.514207 0.112905 0.786444 2.32314e-05 1.07031 2.32314e-05H3.29655C4.12138 -0.00299152 4.92033 0.287502 5.55088 0.819464L5.55874 0.826114C6.18722 1.35951 6.60604 2.09882 6.74084 2.91224L6.74259 2.92289L6.74294 2.92502L7.3316 6.42859H28.8983C29.0633 6.42374 29.2272 6.45718 29.3772 6.52629C29.5272 6.5954 29.6592 6.69831 29.7628 6.82696C29.8665 6.95562 29.939 7.10654 29.9747 7.26791C30.0104 7.42928 30.0083 7.59673 29.9686 7.75716L26.7577 20.6143C26.6991 20.852 26.5609 21.0625 26.3662 21.2106C26.1714 21.3588 25.9319 21.4357 25.6874 21.4286H8.56246C8.31206 21.4336 8.06783 21.3506 7.87226 21.194C7.6767 21.0374 7.54219 20.8171 7.49215 20.5714L5.35154 7.7143V7.65002L4.63443 3.26788L4.63419 3.26645C4.58062 2.95122 4.41701 2.66524 4.17248 2.45947C3.92938 2.25505 3.6217 2.14278 3.30438 2.14285ZM9.99512 18.6429L8.42533 9.2143H26.7334L24.3787 18.6429H9.99512Z" fill="#787878"></path>
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M21.7241 23.7931C22.2937 23.7931 22.8274 23.9465 23.2862 24.2143C24.2081 24.7523 24.8276 25.7521 24.8276 26.8965C24.8276 28.6105 23.4381 30 21.7241 30C20.0101 30 18.6207 28.6105 18.6207 26.8965C18.6207 25.7521 19.2402 24.7523 20.1621 24.2143C20.6209 23.9465 21.1546 23.7931 21.7241 23.7931ZM22.7586 26.8965C22.7586 27.4679 22.2955 27.931 21.7241 27.931C21.1528 27.931 20.6897 27.4679 20.6897 26.8965C20.6897 26.3252 21.1528 25.8621 21.7241 25.8621C22.2955 25.8621 22.7586 26.3252 22.7586 26.8965Z" fill="#787878"></path>
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M9.31034 26.8965C9.31034 25.7521 9.92982 24.7523 10.8517 24.2143C11.3105 23.9465 11.8443 23.7931 12.4138 23.7931C12.9833 23.7931 13.517 23.9465 13.9758 24.2143C14.8978 24.7523 15.5172 25.7521 15.5172 26.8965C15.5172 28.6105 14.1278 30 12.4138 30C10.6998 30 9.31034 28.6105 9.31034 26.8965ZM13.4483 26.8965C13.4483 27.4679 12.9851 27.931 12.4138 27.931C11.8425 27.931 11.3793 27.4679 11.3793 26.8965C11.3793 26.3252 11.8425 25.8621 12.4138 25.8621C12.9851 25.8621 13.4483 26.3252 13.4483 26.8965Z" fill="#787878"></path>
+				</svg>
+			</div>
+			<div class="tapbar__text">Корзина</div>
+		</div>
+	</div>
+	<div class="modal--call">
+		<div class="modal--call__close">
+			<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/x.svg" alt="">
+		</div>
+		<div class="container--dark">
+			<div class="feedback">
+				<div class="feedback__left">
+					<div class="feedback__title">Обратная связь</div>
+					<div class="feedback__desc">
+						Оставьте заявку, наш специалист свяжется с Вами в ближайшее время и ответит на все интересующие
+						вопросы
+					</div>
+					<form class="feedback__form">
+						<div class="feedback__input">
+							<input type="text" placeholder="Имя">
+						</div>
+						<div class="feedback__input">
+							<input type="tel" placeholder="Телефон">
+						</div>
+					</form>
+					<div class="feedback__btn">
+						<div class="feedback__send">Перезвоните мне</div>
+						<div class="feedback__politica">Нажимая кнопку «Перезвоните мне», Вы соглашаетесь с политикой
+							обработки <a href="#">персональных данных</a></div>
+					</div>
+					<div class="feedback__more">*бесплатная консультация</div>
+				</div>
+				<div class="feedback__right">
+					<img src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/feedback.png" alt="">
+				</div>
+
+
+			</div>
+		</div>
+
+
+	</div>
+
+
+	<script src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/nouislider.min.js"></script>
+
+
+	
+	<script src="%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3_files/main.js"></script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+
+
+</body></html>
