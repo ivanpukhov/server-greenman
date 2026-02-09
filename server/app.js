@@ -15,7 +15,11 @@ const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
+require('./models/orders/PaymentLink');
+require('./models/orders/SentPaymentLink');
+require('./models/orders/AdminUser');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
+const { ensureDefaultAdmins } = require('./utilities/adminUsers');
 
 const app = express();
 
@@ -87,9 +91,28 @@ const ensureProductTypeSchema = async () => {
     }
 };
 
+const ensureOrderSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('orders');
+
+        if (!tableDefinition.paymentLink) {
+            await queryInterface.addColumn('orders', 'paymentLink', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы orders:', error);
+    }
+};
+
 sequelize.sync().then(async () => {
     await ensureProductTypeSchema();
-    orderDB.sync().then(() => {
+    orderDB.sync().then(async () => {
+        await ensureDefaultAdmins();
+        await ensureOrderSchema();
         console.log('База данных заказов синхронизирована.');
     }).catch(err => {
         console.error('Ошибка синхронизации базы данных заказов:', err);

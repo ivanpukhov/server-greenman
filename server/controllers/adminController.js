@@ -3,11 +3,15 @@ const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const Order = require('../models/orders/Order');
 const Expense = require('../models/orders/Expense');
+const AdminUser = require('../models/orders/AdminUser');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
-const { getAdminByPhone } = require('../utilities/adminUsers');
+const PaymentLink = require('../models/orders/PaymentLink');
+const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone } = require('../utilities/adminUsers');
+const { attachRecentPaymentLinkToOrder, normalizePaymentLink } = require('../utilities/paymentLinkUtils');
 
 const { Op } = Sequelize;
 const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Доставлено'];
+const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
 
 const parseJsonParam = (value, fallback) => {
     if (!value) return fallback;
@@ -294,6 +298,70 @@ const getOrderPeriodRange = (periodRaw) => {
 const safeAmount = (value) => {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) => {
+    const paymentMethod = String(order.paymentMethod || '').trim().toLowerCase();
+    const paymentLink = normalizePaymentLink(order.paymentLink);
+
+    if (paymentLink) {
+        return linkToAccountMap.get(paymentLink) || WITHOUT_LINK_ACCOUNT_NAME;
+    }
+
+    if (paymentMethod === 'kaspi' || paymentMethod === 'money') {
+        return defaultAccountName;
+    }
+
+    if (paymentMethod === 'link') {
+        return WITHOUT_LINK_ACCOUNT_NAME;
+    }
+
+    return WITHOUT_LINK_ACCOUNT_NAME;
+};
+
+const buildAccountingAllocation = async (orders) => {
+    const activeAdmins = await getActiveAdmins();
+    const nataliaAdmin = activeAdmins.find((item) => String(item.fullName || '').trim().toLowerCase() === 'наталья');
+    const defaultAccountName = nataliaAdmin ? nataliaAdmin.fullName : 'Наталья';
+
+    const paymentLinks = await PaymentLink.findAll({
+        attributes: ['url', 'adminName']
+    });
+    const linkToAccountMap = new Map(
+        paymentLinks.map((item) => [normalizePaymentLink(item.url), String(item.adminName || '').trim()])
+    );
+
+    const byAccountMap = new Map();
+    let withoutLinkTotal = 0;
+    let withoutLinkOrdersCount = 0;
+    const accountNameByOrderId = {};
+
+    orders.forEach((order) => {
+        const accountName = resolveOrderAccountName(order, linkToAccountMap, defaultAccountName);
+        accountNameByOrderId[order.id] = accountName;
+        const orderAmount = safeAmount(order.totalPrice);
+
+        if (accountName === WITHOUT_LINK_ACCOUNT_NAME) {
+            withoutLinkTotal += orderAmount;
+            withoutLinkOrdersCount += 1;
+            return;
+        }
+
+        const current = byAccountMap.get(accountName) || { accountName, total: 0, ordersCount: 0 };
+        current.total += orderAmount;
+        current.ordersCount += 1;
+        byAccountMap.set(accountName, current);
+    });
+
+    return {
+        byAccount: [...byAccountMap.values()].sort((a, b) => b.total - a.total),
+        withoutLink: {
+            accountName: WITHOUT_LINK_ACCOUNT_NAME,
+            total: withoutLinkTotal,
+            ordersCount: withoutLinkOrdersCount
+        },
+        accountNameByOrderId
+    };
 };
 
 const toPositiveInt = (value) => {
@@ -636,8 +704,14 @@ const adminController = {
             });
 
             const enriched = await Promise.all(rows.map((order) => enrichOrderProducts(order)));
+            const allocation = await buildAccountingAllocation(rows.map((order) => order.toJSON()));
 
-            return res.json({ data: enriched, total: count });
+            const enrichedWithAccounts = enriched.map((order) => ({
+                ...order,
+                accountName: allocation.accountNameByOrderId[order.id] || WITHOUT_LINK_ACCOUNT_NAME
+            }));
+
+            return res.json({ data: enrichedWithAccounts, total: count });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить список заказов', error: error.message });
         }
@@ -784,6 +858,8 @@ const adminController = {
                 totalPrice
             };
 
+            await attachRecentPaymentLinkToOrder(orderPayload, phoneNumber);
+
             const created = await Order.create(orderPayload);
             const enriched = await enrichOrderProducts(created);
 
@@ -840,6 +916,7 @@ const adminController = {
                 'products',
                 'totalPrice',
                 'kaspiNumber',
+                'paymentLink',
                 'status',
                 'trackingNumber'
             ];
@@ -952,6 +1029,7 @@ const adminController = {
             const ordersTotal = orders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0);
             const expensesTotal = expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0);
             const balance = ordersTotal - expensesTotal;
+            const allocation = await buildAccountingAllocation(orders.map((order) => order.toJSON()));
 
             return res.json({
                 data: {
@@ -959,11 +1037,184 @@ const adminController = {
                     expensesTotal,
                     balance,
                     ordersCount: orders.length,
-                    expensesCount: expenses.length
+                    expensesCount: expenses.length,
+                    allocations: allocation
                 }
             });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить сводку бухгалтерии', error: error.message });
+        }
+    },
+
+    async getAccountingAdmins(req, res) {
+        try {
+            const admins = await getActiveAdmins();
+            return res.json({
+                data: admins.map((admin) => ({
+                    id: admin.id,
+                    phoneNumber: admin.phoneNumber,
+                    fullName: admin.fullName
+                }))
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить список администраторов', error: error.message });
+        }
+    },
+
+    async getAdmins(req, res) {
+        try {
+            const admins = await getActiveAdmins();
+            return res.json({
+                data: admins,
+                total: admins.length
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить список администраторов', error: error.message });
+        }
+    },
+
+    async createAdmin(req, res) {
+        try {
+            const fullName = String(req.body.fullName || '').trim();
+            const phoneNumber = normalizeAdminPhone(req.body.phoneNumber);
+
+            if (!fullName) {
+                return res.status(400).json({ message: 'Укажите имя администратора' });
+            }
+
+            if (!phoneNumber) {
+                return res.status(400).json({ message: 'Некорректный номер телефона' });
+            }
+
+            const existing = await AdminUser.findOne({
+                where: { phoneNumber }
+            });
+
+            if (existing) {
+                await existing.update({
+                    fullName,
+                    isActive: true
+                });
+
+                return res.status(200).json({ data: existing.toJSON() });
+            }
+
+            const created = await AdminUser.create({
+                fullName,
+                phoneNumber,
+                isActive: true
+            });
+
+            return res.status(201).json({ data: created.toJSON() });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось добавить администратора', error: error.message });
+        }
+    },
+
+    async deleteAdmin(req, res) {
+        try {
+            const adminId = Number(req.params.id);
+
+            if (!Number.isFinite(adminId)) {
+                return res.status(400).json({ message: 'Некорректный ID администратора' });
+            }
+
+            const adminUser = await AdminUser.findByPk(adminId);
+            if (!adminUser || !adminUser.isActive) {
+                return res.status(404).json({ message: 'Администратор не найден' });
+            }
+
+            if (String(adminUser.phoneNumber) === String(normalizeAdminPhone(req.admin?.phoneNumber))) {
+                return res.status(400).json({ message: 'Нельзя удалить текущего авторизованного администратора' });
+            }
+
+            await adminUser.update({ isActive: false });
+
+            return res.json({ data: adminUser.toJSON() });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось удалить администратора', error: error.message });
+        }
+    },
+
+    async getAccountingPaymentLinks(req, res) {
+        try {
+            const links = await PaymentLink.findAll({
+                where: { isActive: true },
+                order: [['createdAt', 'DESC']]
+            });
+
+            return res.json({
+                data: links.map((item) => item.toJSON())
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить список ссылок', error: error.message });
+        }
+    },
+
+    async createAccountingPaymentLink(req, res) {
+        try {
+            const url = normalizePaymentLink(req.body.url);
+            const adminPhone = normalizeAdminPhone(req.body.adminPhone);
+            const adminProfile = await getAdminByPhone(adminPhone);
+
+            if (!url) {
+                return res.status(400).json({ message: 'Укажите ссылку' });
+            }
+
+            try {
+                // Проверяем корректность URL перед сохранением.
+                // eslint-disable-next-line no-new
+                new URL(url);
+            } catch (_error) {
+                return res.status(400).json({ message: 'Ссылка должна быть корректным URL' });
+            }
+
+            if (!adminProfile) {
+                return res.status(400).json({ message: 'Выберите администратора из списка разрешенных' });
+            }
+
+            const existingLink = await PaymentLink.findOne({
+                where: {
+                    url
+                }
+            });
+
+            if (existingLink) {
+                await existingLink.update({
+                    adminPhone,
+                    adminName: adminProfile.fullName,
+                    isActive: true
+                });
+
+                return res.status(200).json({ data: existingLink.toJSON() });
+            }
+
+            const created = await PaymentLink.create({
+                url,
+                adminPhone,
+                adminName: adminProfile.fullName,
+                isActive: true
+            });
+
+            return res.status(201).json({ data: created.toJSON() });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось сохранить ссылку', error: error.message });
+        }
+    },
+
+    async deleteAccountingPaymentLink(req, res) {
+        try {
+            const paymentLink = await PaymentLink.findByPk(req.params.id);
+
+            if (!paymentLink || !paymentLink.isActive) {
+                return res.status(404).json({ message: 'Ссылка не найдена' });
+            }
+
+            await paymentLink.update({ isActive: false });
+
+            return res.json({ data: paymentLink.toJSON() });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось удалить ссылку', error: error.message });
         }
     },
 
@@ -1012,8 +1263,8 @@ const adminController = {
             const category = String(req.body.category || '').trim();
             const description = req.body.description ? String(req.body.description).trim() : '';
             const spentAt = req.body.spentAt ? new Date(req.body.spentAt) : new Date();
-            const adminPhone = String(req.admin?.phoneNumber || '');
-            const adminProfile = getAdminByPhone(adminPhone);
+            const adminPhone = normalizeAdminPhone(req.admin?.phoneNumber) || '';
+            const adminProfile = await getAdminByPhone(adminPhone);
 
             if (!category) {
                 return res.status(400).json({ message: 'Укажите категорию расхода' });

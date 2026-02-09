@@ -1,5 +1,8 @@
 const express = require('express');
 const axios = require('axios');
+const PaymentLink = require('../models/orders/PaymentLink');
+const SentPaymentLink = require('../models/orders/SentPaymentLink');
+const { findMatchedLinkInDescription, normalizePhoneNumber } = require('../utilities/paymentLinkUtils');
 
 const router = express.Router();
 
@@ -73,6 +76,66 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
     console.log('Response from Green API:', response.data);
 };
 
+const processIncomingMessageWebhook = async (content) => {
+    if (String(content.typeWebhook || '') !== 'outgoingMessageReceived') {
+        return;
+    }
+
+    const textMessage = content?.messageData?.textMessageData?.textMessage;
+    const recipientChatId = String(content?.recipientData?.chatId || content?.senderData?.chatId || '');
+    const messageId = String(content?.idMessage || '').trim() || null;
+
+    if (!textMessage || !recipientChatId) {
+        return;
+    }
+
+    const activeLinks = await PaymentLink.findAll({
+        where: { isActive: true },
+        attributes: ['url', 'adminName']
+    });
+    const matchedLink = findMatchedLinkInDescription(textMessage, activeLinks);
+
+    if (!matchedLink) {
+        return;
+    }
+
+    const customerPhone = normalizePhoneNumber(recipientChatId);
+    if (!customerPhone) {
+        return;
+    }
+
+    if (messageId) {
+        const [savedLink, created] = await SentPaymentLink.findOrCreate({
+            where: { messageId },
+            defaults: {
+                messageId,
+                customerPhone,
+                customerChatId: recipientChatId,
+                paymentLink: matchedLink.url,
+                sourceDescription: textMessage
+            }
+        });
+
+        if (created) {
+            console.log(`[WhatsApp webhook] Saved payment link by messageId ${messageId}: ${customerPhone} = ${matchedLink.url}`);
+        } else {
+            console.log(`[WhatsApp webhook] Duplicate messageId ${messageId}, payment link already saved.`);
+        }
+
+        return savedLink;
+    }
+
+    const saved = await SentPaymentLink.create({
+        customerPhone,
+        customerChatId: recipientChatId,
+        paymentLink: matchedLink.url,
+        sourceDescription: textMessage
+    });
+
+    console.log(`[WhatsApp webhook] Saved payment link: ${customerPhone} = ${saved.paymentLink}`);
+    return saved;
+};
+
 router.post('/', async (req, res) => {
     const content = req.body || {};
     console.log('[WhatsApp webhook] Incoming request:\n' + safeStringify({
@@ -82,6 +145,12 @@ router.post('/', async (req, res) => {
         query: req.query,
         body: content
     }));
+
+    try {
+        await processIncomingMessageWebhook(content);
+    } catch (error) {
+        console.error('[WhatsApp webhook] Failed to process incoming message webhook:', error.message);
+    }
 
     const search = 'videoMessage';
     if (!JSON.stringify(content).includes(search)) {

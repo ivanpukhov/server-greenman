@@ -1,7 +1,7 @@
 const User = require('../models/orders/User');
 const jwtUtility = require('../utilities/jwtUtility');
 const sendNotification = require('../utilities/notificationService');
-const { ADMIN_PHONE_WHITELIST, getAdminByPhone } = require('../utilities/adminUsers');
+const { isAdminPhoneAllowed, getAdminByPhone } = require('../utilities/adminUsers');
 const CODE_LIFETIME_MS = 10 * 60 * 1000;
 
 const normalizePhoneNumber = (rawPhone) => {
@@ -29,7 +29,7 @@ const adminAuthController = {
                 return res.status(400).json({ message: 'Некорректный номер телефона' });
             }
 
-            if (!ADMIN_PHONE_WHITELIST.has(normalizedPhone)) {
+            if (!(await isAdminPhoneAllowed(normalizedPhone))) {
                 return res.status(403).json({ message: 'Доступ к админ-панели запрещен для этого номера' });
             }
 
@@ -65,7 +65,7 @@ const adminAuthController = {
                 return res.status(400).json({ message: 'Некорректные данные для входа' });
             }
 
-            if (!ADMIN_PHONE_WHITELIST.has(normalizedPhone)) {
+            if (!(await isAdminPhoneAllowed(normalizedPhone))) {
                 return res.status(403).json({ message: 'Доступ запрещен' });
             }
 
@@ -81,11 +81,13 @@ const adminAuthController = {
             user.role = 'admin';
             await user.save();
 
+            const adminProfile = await getAdminByPhone(user.phoneNumber);
+
             const token = jwtUtility.generateToken(user.id, {
                 isAdmin: true,
                 phoneNumber: user.phoneNumber,
                 role: 'admin',
-                fullName: getAdminByPhone(user.phoneNumber)?.fullName || `+7${user.phoneNumber}`
+                fullName: adminProfile?.fullName || `+7${user.phoneNumber}`
             });
 
             return res.status(200).json({
@@ -94,7 +96,7 @@ const adminAuthController = {
                     id: user.id,
                     phoneNumber: user.phoneNumber,
                     role: 'admin',
-                    fullName: getAdminByPhone(user.phoneNumber)?.fullName || `+7${user.phoneNumber}`
+                    fullName: adminProfile?.fullName || `+7${user.phoneNumber}`
                 }
             });
         } catch (error) {

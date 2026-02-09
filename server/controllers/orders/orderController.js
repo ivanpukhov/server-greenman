@@ -5,6 +5,7 @@ const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
 const productController = require("../productController");
 const ProductType = require('../../models/ProductType');
+const { attachRecentPaymentLinkToOrder } = require('../../utilities/paymentLinkUtils');
 
 const orderController = {
 
@@ -56,6 +57,8 @@ const orderController = {
                 phoneNumber,
                 kaspiNumber
             };
+
+            await attachRecentPaymentLinkToOrder(orderData, phoneNumber);
 
             if (userId) {
                 const profileData = {

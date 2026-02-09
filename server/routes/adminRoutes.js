@@ -19,7 +19,14 @@ router.put('/orders/:id', adminController.updateOrder);
 router.delete('/orders/:id', adminController.deleteOrder);
 
 router.get('/analytics/dashboard', adminController.getDashboardAnalytics);
+router.get('/admins', adminController.getAdmins);
+router.post('/admins', adminController.createAdmin);
+router.delete('/admins/:id', adminController.deleteAdmin);
 router.get('/accounting/summary', adminController.getAccountingSummary);
+router.get('/accounting/admins', adminController.getAccountingAdmins);
+router.get('/accounting/payment-links', adminController.getAccountingPaymentLinks);
+router.post('/accounting/payment-links', adminController.createAccountingPaymentLink);
+router.delete('/accounting/payment-links/:id', adminController.deleteAccountingPaymentLink);
 router.get('/expenses', adminController.getExpenses);
 router.post('/expenses', adminController.createExpense);
 router.delete('/expenses/:id', adminController.deleteExpense);

@@ -69,6 +69,10 @@ const Order = orderDB.define('order', {
             return this.paymentMethod !== 'kaspi';
         }
     },
+    paymentLink: {
+        type: Sequelize.STRING,
+        allowNull: true
+    }
 
 });
 
