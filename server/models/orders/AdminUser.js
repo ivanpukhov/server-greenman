@@ -18,6 +18,11 @@ const AdminUser = orderDB.define(
             type: Sequelize.STRING,
             allowNull: false
         },
+        iin: {
+            type: Sequelize.STRING(12),
+            allowNull: false,
+            defaultValue: '000000000000'
+        },
         isActive: {
             type: Sequelize.BOOLEAN,
             allowNull: false,

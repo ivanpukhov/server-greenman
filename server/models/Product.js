@@ -21,6 +21,11 @@ const Product = sequelize.define('product', {
             }
         }
     },
+    alias: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        defaultValue: null
+    },
     description: {
         type: Sequelize.TEXT,
         allowNull: true

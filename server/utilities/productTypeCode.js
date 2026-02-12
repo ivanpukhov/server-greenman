@@ -1,15 +1,16 @@
-const normalizeCodePart = (value) => {
-    return String(value || '')
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9а-яё-]/gi, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '') || 'na';
-};
+const buildProductTypeCode = (productId, typeId) => {
+    const normalizedProductId = Number(productId);
+    const normalizedTypeId = Number(typeId);
 
-const buildProductTypeCode = (productName, typeName) => {
-    return `greenman-${normalizeCodePart(productName)}-${normalizeCodePart(typeName)}`;
+    if (!Number.isInteger(normalizedProductId) || normalizedProductId <= 0) {
+        return '';
+    }
+
+    if (!Number.isInteger(normalizedTypeId) || normalizedTypeId <= 0) {
+        return '';
+    }
+
+    return `https://greenman.kz/product/${normalizedProductId}#${normalizedTypeId}`;
 };
 
 const buildQrCodeUrl = (code) => {

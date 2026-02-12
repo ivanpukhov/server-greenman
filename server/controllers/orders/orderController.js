@@ -5,7 +5,11 @@ const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
 const productController = require("../productController");
 const ProductType = require('../../models/ProductType');
-const { attachRecentPaymentLinkToOrder } = require('../../utilities/paymentLinkUtils');
+const {
+    attachRecentPaymentLinkToOrder,
+    markPaymentLinkConnectionAsUsed,
+    canAutoMarkOrderAsPaidByConnection
+} = require('../../utilities/paymentLinkUtils');
 
 const orderController = {
 
@@ -58,7 +62,10 @@ const orderController = {
                 kaspiNumber
             };
 
-            await attachRecentPaymentLinkToOrder(orderData, phoneNumber);
+            const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderData, phoneNumber);
+            if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
+                orderData.status = 'Оплачено';
+            }
 
             if (userId) {
                 const profileData = {
@@ -119,6 +126,15 @@ const orderController = {
             }
 
             const newOrder = await Order.create(orderData);
+            if (paymentLinkConnection?.id) {
+                const isLinked = await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, newOrder.id);
+                if (!isLinked) {
+                    await newOrder.destroy();
+                    const conflictError = new Error('Эта связь уже привязана к другому заказу');
+                    conflictError.statusCode = 409;
+                    throw conflictError;
+                }
+            }
             console.log("Заказ создан:", newOrder);
             await sendMessageToChannel(newOrder);
 
@@ -179,7 +195,7 @@ if (decreasedStocks.length > 0) {
 }
 
 console.error("Ошибка при добавлении заказа:", err);
-res.status(500).json({error: err.message});
+res.status(err.statusCode || 500).json({error: err.message});
 }
 },
 

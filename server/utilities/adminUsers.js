@@ -1,10 +1,13 @@
 const AdminUser = require('../models/orders/AdminUser');
+const DEFAULT_ADMIN_IIN = '000000000000';
+const FALLBACK_ADMIN = {
+    phoneNumber: '7073670497',
+    fullName: 'Иван',
+    iin: '041007550334'
+};
 
 const DEFAULT_ADMIN_USERS = [
-    { phoneNumber: '7775464450', fullName: 'Наталья' },
-    { phoneNumber: '7055596645', fullName: 'Константин' },
-    { phoneNumber: '7073670497', fullName: 'Иван' },
-    { phoneNumber: '7474509360', fullName: 'Даниил' }
+    FALLBACK_ADMIN
 ];
 
 const normalizeAdminPhone = (rawPhone) => {
@@ -21,6 +24,25 @@ const normalizeAdminPhone = (rawPhone) => {
     return null;
 };
 
+const normalizeAdminIin = (rawIin) => {
+    const digits = String(rawIin || '').replace(/\D/g, '');
+
+    if (!digits) {
+        return DEFAULT_ADMIN_IIN;
+    }
+
+    if (digits.length !== 12) {
+        return null;
+    }
+
+    return digits;
+};
+
+const normalizeAdminIinStrict = (rawIin) => {
+    const digits = String(rawIin || '').replace(/\D/g, '');
+    return digits.length === 12 ? digits : null;
+};
+
 const ensureDefaultAdmins = async () => {
     await Promise.all(
         DEFAULT_ADMIN_USERS.map(async (admin) => {
@@ -31,9 +53,10 @@ const ensureDefaultAdmins = async () => {
             });
 
             if (existing) {
-                if (!existing.isActive || existing.fullName !== admin.fullName) {
+                if (!existing.isActive || existing.fullName !== admin.fullName || existing.iin !== admin.iin) {
                     await existing.update({
                         fullName: admin.fullName,
+                        iin: admin.iin,
                         isActive: true
                     });
                 }
@@ -43,6 +66,7 @@ const ensureDefaultAdmins = async () => {
             await AdminUser.create({
                 phoneNumber: admin.phoneNumber,
                 fullName: admin.fullName,
+                iin: admin.iin,
                 isActive: true
             });
         })
@@ -71,7 +95,20 @@ const getAdminByPhone = async (phoneNumber) => {
         }
     });
 
-    return admin ? admin.toJSON() : null;
+    if (admin) {
+        return admin.toJSON();
+    }
+
+    if (normalizedPhone === FALLBACK_ADMIN.phoneNumber) {
+        return {
+            id: 'fallback-admin',
+            ...FALLBACK_ADMIN,
+            isActive: true,
+            isFallback: true
+        };
+    }
+
+    return null;
 };
 
 const isAdminPhoneAllowed = async (phoneNumber) => {
@@ -79,11 +116,51 @@ const isAdminPhoneAllowed = async (phoneNumber) => {
     return Boolean(admin);
 };
 
+const getAdminByIin = async (iin) => {
+    const normalizedIin = normalizeAdminIinStrict(iin);
+    if (!normalizedIin) {
+        return null;
+    }
+
+    const admin = await AdminUser.findOne({
+        where: {
+            iin: normalizedIin,
+            isActive: true
+        }
+    });
+
+    if (admin) {
+        return admin.toJSON();
+    }
+
+    if (normalizedIin === FALLBACK_ADMIN.iin) {
+        return {
+            id: 'fallback-admin',
+            ...FALLBACK_ADMIN,
+            isActive: true,
+            isFallback: true
+        };
+    }
+
+    return null;
+};
+
+const isAdminIinAllowed = async (iin) => {
+    const admin = await getAdminByIin(iin);
+    return Boolean(admin);
+};
+
 module.exports = {
     DEFAULT_ADMIN_USERS,
+    FALLBACK_ADMIN,
+    DEFAULT_ADMIN_IIN,
     normalizeAdminPhone,
+    normalizeAdminIin,
+    normalizeAdminIinStrict,
     ensureDefaultAdmins,
     getActiveAdmins,
     getAdminByPhone,
-    isAdminPhoneAllowed
+    getAdminByIin,
+    isAdminPhoneAllowed,
+    isAdminIinAllowed
 };

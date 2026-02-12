@@ -23,6 +23,7 @@
     "node-telegram-bot-api": "^0.65.1",
     "nodemon": "^3.0.2",
     "openai": "^4.20.1",
+    "pdf-parse": "1.1.1",
     "pug": "2.0.0-beta11",
     "react-loader-spinner": "^6.1.6",
     "sequelize": "^6.35.1",

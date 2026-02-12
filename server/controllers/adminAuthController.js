@@ -1,43 +1,31 @@
 const User = require('../models/orders/User');
 const jwtUtility = require('../utilities/jwtUtility');
 const sendNotification = require('../utilities/notificationService');
-const { isAdminPhoneAllowed, getAdminByPhone } = require('../utilities/adminUsers');
+const { getAdminByIin, normalizeAdminIinStrict } = require('../utilities/adminUsers');
 const CODE_LIFETIME_MS = 10 * 60 * 1000;
-
-const normalizePhoneNumber = (rawPhone) => {
-    const digitsOnly = String(rawPhone || '').replace(/\D/g, '');
-
-    if (digitsOnly.length === 10) {
-        return digitsOnly;
-    }
-
-    if (digitsOnly.length === 11 && digitsOnly.startsWith('7')) {
-        return digitsOnly.slice(1);
-    }
-
-    return null;
-};
 
 const generateConfirmationCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 const adminAuthController = {
     async requestCode(req, res) {
         try {
-            const normalizedPhone = normalizePhoneNumber(req.body.phoneNumber);
+            const normalizedIin = normalizeAdminIinStrict(req.body.iin);
 
-            if (!normalizedPhone) {
-                return res.status(400).json({ message: 'Некорректный номер телефона' });
+            if (!normalizedIin) {
+                return res.status(400).json({ message: 'Введите корректный ИИН (12 цифр)' });
             }
 
-            if (!(await isAdminPhoneAllowed(normalizedPhone))) {
-                return res.status(403).json({ message: 'Доступ к админ-панели запрещен для этого номера' });
+            const adminProfile = await getAdminByIin(normalizedIin);
+
+            if (!adminProfile) {
+                return res.status(403).json({ message: 'Доступ к админ-панели запрещен для этого ИИН' });
             }
 
-            let user = await User.findOne({ where: { phoneNumber: normalizedPhone } });
+            let user = await User.findOne({ where: { phoneNumber: adminProfile.phoneNumber } });
 
             if (!user) {
                 user = await User.create({
-                    phoneNumber: normalizedPhone,
+                    phoneNumber: adminProfile.phoneNumber,
                     role: 'admin',
                     isPhoneConfirmed: false
                 });
@@ -48,9 +36,15 @@ const adminAuthController = {
             user.confirmationCodeExpires = new Date(Date.now() + CODE_LIFETIME_MS);
             await user.save();
 
-            await sendNotification(normalizedPhone, `Код входа в админ-панель Greenman: ${user.confirmationCode}`);
+            await sendNotification(
+                adminProfile.phoneNumber,
+                `Код входа в админ-панель Greenman: ${user.confirmationCode}`
+            );
 
-            return res.status(200).json({ message: 'Код подтверждения отправлен' });
+            return res.status(200).json({
+                message: 'Код подтверждения отправлен',
+                phoneMask: `+7${String(adminProfile.phoneNumber).slice(0, 3)}***${String(adminProfile.phoneNumber).slice(-2)}`
+            });
         } catch (error) {
             return res.status(500).json({ message: 'Ошибка при отправке кода', error: error.message });
         }
@@ -58,18 +52,20 @@ const adminAuthController = {
 
     async confirmCode(req, res) {
         try {
-            const normalizedPhone = normalizePhoneNumber(req.body.phoneNumber);
+            const normalizedIin = normalizeAdminIinStrict(req.body.iin);
             const confirmationCode = String(req.body.confirmationCode || '').replace(/\D/g, '');
 
-            if (!normalizedPhone || confirmationCode.length !== 6) {
+            if (!normalizedIin || confirmationCode.length !== 6) {
                 return res.status(400).json({ message: 'Некорректные данные для входа' });
             }
 
-            if (!(await isAdminPhoneAllowed(normalizedPhone))) {
+            const adminProfile = await getAdminByIin(normalizedIin);
+
+            if (!adminProfile) {
                 return res.status(403).json({ message: 'Доступ запрещен' });
             }
 
-            const user = await User.findOne({ where: { phoneNumber: normalizedPhone } });
+            const user = await User.findOne({ where: { phoneNumber: adminProfile.phoneNumber } });
 
             if (!user || user.confirmationCode !== confirmationCode || new Date() > user.confirmationCodeExpires) {
                 return res.status(400).json({ message: 'Неверный или просроченный код' });
@@ -81,11 +77,10 @@ const adminAuthController = {
             user.role = 'admin';
             await user.save();
 
-            const adminProfile = await getAdminByPhone(user.phoneNumber);
-
             const token = jwtUtility.generateToken(user.id, {
                 isAdmin: true,
                 phoneNumber: user.phoneNumber,
+                iin: adminProfile.iin,
                 role: 'admin',
                 fullName: adminProfile?.fullName || `+7${user.phoneNumber}`
             });
@@ -95,6 +90,7 @@ const adminAuthController = {
                 user: {
                     id: user.id,
                     phoneNumber: user.phoneNumber,
+                    iin: adminProfile.iin,
                     role: 'admin',
                     fullName: adminProfile?.fullName || `+7${user.phoneNumber}`
                 }

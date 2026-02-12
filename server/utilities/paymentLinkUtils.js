@@ -42,6 +42,7 @@ const findRecentPaymentLinkForPhone = async (phoneNumber) => {
     return SentPaymentLink.findOne({
         where: {
             customerPhone: normalizedPhone,
+            linkedOrderId: null,
             receivedAt: {
                 [Op.gte]: validFrom
             }
@@ -58,7 +59,56 @@ const attachRecentPaymentLinkToOrder = async (orderPayload, phoneNumber) => {
     }
 
     orderPayload.paymentLink = recentPaymentLink.paymentLink;
-    return recentPaymentLink.paymentLink;
+    if (recentPaymentLink.sellerIin) {
+        orderPayload.paymentSellerIin = String(recentPaymentLink.sellerIin);
+    }
+    if (recentPaymentLink.sellerAdminName) {
+        orderPayload.paymentSellerName = String(recentPaymentLink.sellerAdminName);
+    }
+    return recentPaymentLink;
+};
+
+const markPaymentLinkConnectionAsUsed = async (connectionId, orderId) => {
+    if (!connectionId || !orderId) {
+        return false;
+    }
+
+    const [updatedCount] = await SentPaymentLink.update(
+        {
+            linkedOrderId: orderId,
+            usedAt: new Date()
+        },
+        {
+            where: {
+                id: connectionId,
+                linkedOrderId: null
+            }
+        }
+    );
+
+    return updatedCount > 0;
+};
+
+const roundAmount = (value) => Math.round(Number(value) || 0);
+
+const canAutoMarkOrderAsPaidByConnection = (connection, orderTotalPrice) => {
+    if (!connection || connection.isPaid !== true) {
+        return false;
+    }
+
+    const expectedAmount = Number(connection.expectedAmount);
+    const paidAmount = Number(connection.paidAmount);
+    const orderAmount = roundAmount(orderTotalPrice);
+
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+        return false;
+    }
+
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+        return false;
+    }
+
+    return expectedAmount === paidAmount && orderAmount === expectedAmount;
 };
 
 module.exports = {
@@ -67,5 +117,7 @@ module.exports = {
     normalizePaymentLink,
     findMatchedLinkInDescription,
     findRecentPaymentLinkForPhone,
-    attachRecentPaymentLinkToOrder
+    attachRecentPaymentLinkToOrder,
+    markPaymentLinkConnectionAsUsed,
+    canAutoMarkOrderAsPaidByConnection
 };

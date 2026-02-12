@@ -72,6 +72,14 @@ const Order = orderDB.define('order', {
     paymentLink: {
         type: Sequelize.STRING,
         allowNull: true
+    },
+    paymentSellerIin: {
+        type: Sequelize.STRING(12),
+        allowNull: true
+    },
+    paymentSellerName: {
+        type: Sequelize.STRING,
+        allowNull: true
     }
 
 });

@@ -15,6 +15,11 @@ const ProductType = sequelize.define('productType', {
         type: Sequelize.STRING,
         allowNull: true
     },
+    alias: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        defaultValue: null
+    },
     price: {
         type: Sequelize.FLOAT,
         allowNull: false,

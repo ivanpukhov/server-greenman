@@ -4,14 +4,35 @@ const ProductType = require('../models/ProductType');
 const Order = require('../models/orders/Order');
 const Expense = require('../models/orders/Expense');
 const AdminUser = require('../models/orders/AdminUser');
+const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
 const PaymentLink = require('../models/orders/PaymentLink');
-const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone } = require('../utilities/adminUsers');
-const { attachRecentPaymentLinkToOrder, normalizePaymentLink } = require('../utilities/paymentLinkUtils');
+const sendFileNotification = require('../utilities/sendFileNotification');
+const sendMessageToChannel = require('../utilities/sendMessageToChannel');
+const sendNotification = require('../utilities/notificationService');
+const { logError } = require('../utilities/errorLogger');
+const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone, normalizeAdminIin } = require('../utilities/adminUsers');
+const {
+    attachRecentPaymentLinkToOrder,
+    markPaymentLinkConnectionAsUsed,
+    canAutoMarkOrderAsPaidByConnection,
+    normalizePaymentLink,
+    normalizePhoneNumber
+} = require('../utilities/paymentLinkUtils');
+const {
+    canCurrentAdminSeeTargetAdmin,
+    getVisibleDispatchPlan,
+    saveVisibleDispatchPlan
+} = require('../utilities/paymentLinkDispatchPlan');
 
 const { Op } = Sequelize;
 const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Доставлено'];
 const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
+const EXCLUDED_ACCOUNT_NAME_TOKENS = new Set(['иван', 'даша']);
+
+const filterRestrictedAdmins = (items, currentAdminPhone, getItemPhone) => {
+    return items.filter((item) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, getItemPhone(item)));
+};
 
 const parseJsonParam = (value, fallback) => {
     if (!value) return fallback;
@@ -101,15 +122,20 @@ const parseTypes = (typesRaw) => {
     return types
         .filter((item) => item && item.type)
         .map((item) => ({
+            id: Number(item.id) || null,
             type: String(item.type).trim(),
             price: Number(item.price) || 0,
-            stockQuantity: parseStockQuantity(item.stockQuantity)
+            stockQuantity: parseStockQuantity(item.stockQuantity),
+            alias:
+                item.alias === undefined || item.alias === null || String(item.alias).trim() === ''
+                    ? null
+                    : String(item.alias).trim()
         }));
 };
 
-const serializeType = (typeRecord, productName) => {
+const serializeType = (typeRecord) => {
     const plainType = typeRecord.toJSON ? typeRecord.toJSON() : typeRecord;
-    const code = plainType.code || buildProductTypeCode(productName, plainType.type);
+    const code = buildProductTypeCode(plainType.productId, plainType.id) || plainType.code || '';
 
     return {
         ...plainType,
@@ -125,23 +151,27 @@ const serializeProduct = (productRecord) => {
     return {
         ...plainProduct,
         types: Array.isArray(plainProduct.types)
-            ? plainProduct.types.map((typeItem) => serializeType(typeItem, plainProduct.name))
+            ? plainProduct.types.map((typeItem) => serializeType(typeItem))
             : []
     };
 };
 
-const createProductTypes = async ({ productId, productName, types, transaction }) => {
+const createProductTypes = async ({ productId, types, transaction }) => {
     for (const typeItem of types) {
-        await ProductType.create(
+        const createdType = await ProductType.create(
             {
                 type: typeItem.type,
                 price: typeItem.price,
                 stockQuantity: typeItem.stockQuantity,
-                code: buildProductTypeCode(productName, typeItem.type),
+                alias: typeItem.alias || null,
+                code: null,
                 productId
             },
             { transaction }
         );
+
+        const code = buildProductTypeCode(productId, createdType.id);
+        await createdType.update({ code }, { transaction });
     }
 };
 
@@ -156,12 +186,13 @@ const getFlattenedInventory = async () => {
     products.forEach((product) => {
         const productJson = product.toJSON();
         productJson.types.forEach((typeItem) => {
-            const code = typeItem.code || buildProductTypeCode(productJson.name, typeItem.type);
+            const code = buildProductTypeCode(productJson.id, typeItem.id) || typeItem.code || '';
             rows.push({
                 id: typeItem.id,
                 productId: productJson.id,
                 productName: productJson.name,
                 typeName: typeItem.type,
+                alias: typeItem.alias || null,
                 typePrice: typeItem.price,
                 stockQuantity: typeItem.stockQuantity,
                 stockStatus: typeItem.stockQuantity === null ? 'Бесконечность' : `${typeItem.stockQuantity} шт.`,
@@ -228,28 +259,6 @@ const buildProductPayload = (body) => {
     };
 };
 
-const getPeriodStartDate = (period) => {
-    const now = new Date();
-    const endDate = new Date(now);
-    let startDate = new Date(now);
-    let normalizedPeriod = 'month';
-
-    if (period === 'day') {
-        normalizedPeriod = 'day';
-        startDate.setHours(0, 0, 0, 0);
-    } else if (period === 'week') {
-        normalizedPeriod = 'week';
-        startDate.setDate(startDate.getDate() - 6);
-        startDate.setHours(0, 0, 0, 0);
-    } else {
-        normalizedPeriod = 'month';
-        startDate.setMonth(startDate.getMonth() - 1);
-        startDate.setHours(0, 0, 0, 0);
-    }
-
-    return { normalizedPeriod, startDate, endDate };
-};
-
 const getOrderPeriodRange = (periodRaw) => {
     const period = String(periodRaw || '').trim().toLowerCase();
     const now = new Date();
@@ -300,7 +309,29 @@ const safeAmount = (value) => {
     return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const toVirtualPaidOrderFromConnection = (connection) => {
+    const paidAmount = safeAmount(connection.paidAmount || connection.expectedAmount);
+    const receivedAt = connection.receivedAt || connection.paidAt || new Date().toISOString();
+
+    return {
+        id: `conn-${connection.id}`,
+        customerName: 'Ожидает оформления',
+        city: '—',
+        status: 'Оплачено',
+        totalPrice: paidAmount,
+        createdAt: receivedAt,
+        paymentMethod: 'link',
+        paymentLink: connection.paymentLink || '',
+        paymentSellerName: String(connection.sellerAdminName || '').trim() || null
+    };
+};
+
 const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) => {
+    const paymentSellerName = String(order.paymentSellerName || '').trim();
+    if (paymentSellerName) {
+        return paymentSellerName;
+    }
+
     const paymentMethod = String(order.paymentMethod || '').trim().toLowerCase();
     const paymentLink = normalizePaymentLink(order.paymentLink);
 
@@ -319,16 +350,60 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) =>
     return WITHOUT_LINK_ACCOUNT_NAME;
 };
 
-const buildAccountingAllocation = async (orders) => {
+const buildAccountingContext = async () => {
     const activeAdmins = await getActiveAdmins();
     const nataliaAdmin = activeAdmins.find((item) => String(item.fullName || '').trim().toLowerCase() === 'наталья');
     const defaultAccountName = nataliaAdmin ? nataliaAdmin.fullName : 'Наталья';
-
     const paymentLinks = await PaymentLink.findAll({
         attributes: ['url', 'adminName']
     });
     const linkToAccountMap = new Map(
         paymentLinks.map((item) => [normalizePaymentLink(item.url), String(item.adminName || '').trim()])
+    );
+
+    return {
+        activeAdmins,
+        defaultAccountName,
+        linkToAccountMap
+    };
+};
+
+const resolveOrderAccountNameByContext = (order, context) => {
+    if (!context) {
+        return WITHOUT_LINK_ACCOUNT_NAME;
+    }
+
+    return resolveOrderAccountName(order, context.linkToAccountMap, context.defaultAccountName);
+};
+
+const isExcludedAccountingAccountName = (accountName) => {
+    const tokens = String(accountName || '')
+        .trim()
+        .toLowerCase()
+        .split(/[^a-zа-яё0-9]+/i)
+        .filter(Boolean);
+
+    return tokens.some((token) => EXCLUDED_ACCOUNT_NAME_TOKENS.has(token));
+};
+
+const excludeOrdersByAccountingAccounts = (orders, context) => {
+    return (Array.isArray(orders) ? orders : []).filter((order) => {
+        const accountName = resolveOrderAccountNameByContext(order, context);
+        return !isExcludedAccountingAccountName(accountName);
+    });
+};
+
+const buildAccountingAllocation = async (orders, currentAdminPhone, preloadedContext = null) => {
+    const context = preloadedContext || (await buildAccountingContext());
+    const { activeAdmins } = context;
+    const normalizedCurrentAdminPhone = normalizeAdminPhone(currentAdminPhone);
+    const hiddenAccountNames = new Set(
+        normalizedCurrentAdminPhone
+            ? activeAdmins
+                  .filter((item) => !canCurrentAdminSeeTargetAdmin(normalizedCurrentAdminPhone, item.phoneNumber))
+                  .map((item) => String(item.fullName || '').trim())
+                  .filter(Boolean)
+            : []
     );
 
     const byAccountMap = new Map();
@@ -337,7 +412,8 @@ const buildAccountingAllocation = async (orders) => {
     const accountNameByOrderId = {};
 
     orders.forEach((order) => {
-        const accountName = resolveOrderAccountName(order, linkToAccountMap, defaultAccountName);
+        const resolvedAccountName = resolveOrderAccountNameByContext(order, context);
+        const accountName = hiddenAccountNames.has(resolvedAccountName) ? WITHOUT_LINK_ACCOUNT_NAME : resolvedAccountName;
         accountNameByOrderId[order.id] = accountName;
         const orderAmount = safeAmount(order.totalPrice);
 
@@ -362,6 +438,44 @@ const buildAccountingAllocation = async (orders) => {
         },
         accountNameByOrderId
     };
+};
+
+const getPaidConnectionsWithoutOrder = async (range, phoneQuery = '') => {
+    const where = {
+        isPaid: true,
+        linkedOrderId: null
+    };
+
+    if (range) {
+        where[Op.or] = [
+            {
+                paidAt: {
+                    [Op.gte]: range.start,
+                    [Op.lte]: range.end
+                }
+            },
+            {
+                receivedAt: {
+                    [Op.gte]: range.start,
+                    [Op.lte]: range.end
+                }
+            }
+        ];
+    }
+
+    const normalizedPhoneQuery = String(phoneQuery || '').replace(/\D/g, '');
+    if (normalizedPhoneQuery) {
+        where.customerPhone = {
+            [Op.like]: `%${normalizedPhoneQuery}%`
+        };
+    }
+
+    const rows = await SentPaymentLink.findAll({
+        where,
+        order: [['receivedAt', 'DESC']]
+    });
+
+    return rows.map((item) => item.toJSON()).map(toVirtualPaidOrderFromConnection);
 };
 
 const toPositiveInt = (value) => {
@@ -490,6 +604,213 @@ const buildOrdersAnalytics = (orders, productNameById = new Map()) => {
     };
 };
 
+const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+
+const getDashboardRanges = (periodRaw) => {
+    const now = new Date();
+    const selectedPeriod = ['week', 'month', 'year'].includes(String(periodRaw || '').toLowerCase())
+        ? String(periodRaw || '').toLowerCase()
+        : 'month';
+
+    const weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - 6);
+
+    const monthStart = new Date(now);
+    monthStart.setHours(0, 0, 0, 0);
+    monthStart.setDate(monthStart.getDate() - 29);
+
+    const yearStart = new Date(now);
+    yearStart.setHours(0, 0, 0, 0);
+    yearStart.setMonth(yearStart.getMonth() - 11);
+    yearStart.setDate(1);
+
+    const maxStart = new Date(Math.min(weekStart.getTime(), monthStart.getTime(), yearStart.getTime()));
+
+    return {
+        selectedPeriod,
+        week: { start: weekStart, end: now },
+        month: { start: monthStart, end: now },
+        year: { start: yearStart, end: now },
+        maxStart,
+        now
+    };
+};
+
+const formatDayKey = (date) => date.toISOString().slice(0, 10);
+const formatMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const buildDailyAxis = (range) => {
+    const result = [];
+    const current = new Date(range.start);
+
+    while (current <= range.end) {
+        result.push({
+            key: formatDayKey(current),
+            label: `${String(current.getDate()).padStart(2, '0')}.${String(current.getMonth() + 1).padStart(2, '0')}`
+        });
+        current.setDate(current.getDate() + 1);
+    }
+
+    return result;
+};
+
+const buildMonthlyAxis = (range) => {
+    const result = [];
+    const current = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+    const end = new Date(range.end.getFullYear(), range.end.getMonth(), 1);
+
+    while (current <= end) {
+        result.push({
+            key: formatMonthKey(current),
+            label: MONTH_LABELS[current.getMonth()]
+        });
+        current.setMonth(current.getMonth() + 1);
+    }
+
+    return result;
+};
+
+const withinRange = (date, range) => date >= range.start && date <= range.end;
+
+const buildDashboardSeries = (orders, expenses, ranges) => {
+    const weekAxis = buildDailyAxis(ranges.week);
+    const monthAxis = buildDailyAxis(ranges.month);
+    const yearAxis = buildMonthlyAxis(ranges.year);
+
+    const initOrderMap = (axis) => new Map(axis.map((item) => [item.key, 0]));
+    const initFinanceMap = (axis) =>
+        new Map(
+            axis.map((item) => [
+                item.key,
+                {
+                    turnover: 0,
+                    expenses: 0
+                }
+            ])
+        );
+
+    const orderCountMaps = {
+        week: initOrderMap(weekAxis),
+        month: initOrderMap(monthAxis),
+        year: initOrderMap(yearAxis)
+    };
+    const financeMaps = {
+        week: initFinanceMap(weekAxis),
+        month: initFinanceMap(monthAxis),
+        year: initFinanceMap(yearAxis)
+    };
+
+    const upsertFinanceValue = (map, key, field, amount) => {
+        const current = map.get(key);
+        if (!current) {
+            return;
+        }
+        current[field] += amount;
+        map.set(key, current);
+    };
+
+    orders.forEach((order) => {
+        const createdAt = new Date(order.createdAt);
+        if (Number.isNaN(createdAt.getTime())) {
+            return;
+        }
+
+        const amount = safeAmount(order.totalPrice);
+        const dayKey = formatDayKey(createdAt);
+        const monthKey = formatMonthKey(createdAt);
+
+        if (withinRange(createdAt, ranges.week)) {
+            orderCountMaps.week.set(dayKey, (orderCountMaps.week.get(dayKey) || 0) + 1);
+            upsertFinanceValue(financeMaps.week, dayKey, 'turnover', amount);
+        }
+
+        if (withinRange(createdAt, ranges.month)) {
+            orderCountMaps.month.set(dayKey, (orderCountMaps.month.get(dayKey) || 0) + 1);
+            upsertFinanceValue(financeMaps.month, dayKey, 'turnover', amount);
+        }
+
+        if (withinRange(createdAt, ranges.year)) {
+            orderCountMaps.year.set(monthKey, (orderCountMaps.year.get(monthKey) || 0) + 1);
+            upsertFinanceValue(financeMaps.year, monthKey, 'turnover', amount);
+        }
+    });
+
+    expenses.forEach((expense) => {
+        const spentAt = new Date(expense.spentAt);
+        if (Number.isNaN(spentAt.getTime())) {
+            return;
+        }
+
+        const amount = safeAmount(expense.amount);
+        const dayKey = formatDayKey(spentAt);
+        const monthKey = formatMonthKey(spentAt);
+
+        if (withinRange(spentAt, ranges.week)) {
+            upsertFinanceValue(financeMaps.week, dayKey, 'expenses', amount);
+        }
+
+        if (withinRange(spentAt, ranges.month)) {
+            upsertFinanceValue(financeMaps.month, dayKey, 'expenses', amount);
+        }
+
+        if (withinRange(spentAt, ranges.year)) {
+            upsertFinanceValue(financeMaps.year, monthKey, 'expenses', amount);
+        }
+    });
+
+    const buildOrderSeries = (axis, map) =>
+        axis.map((point) => ({
+            label: point.label,
+            orders: map.get(point.key) || 0
+        }));
+
+    const buildFinanceSeries = (axis, map) =>
+        axis.map((point) => {
+            const value = map.get(point.key) || { turnover: 0, expenses: 0 };
+            return {
+                label: point.label,
+                turnover: value.turnover,
+                expenses: value.expenses,
+                profit: value.turnover - value.expenses
+            };
+        });
+
+    return {
+        orderSeries: {
+            week: buildOrderSeries(weekAxis, orderCountMaps.week),
+            month: buildOrderSeries(monthAxis, orderCountMaps.month),
+            year: buildOrderSeries(yearAxis, orderCountMaps.year)
+        },
+        financeSeries: {
+            week: buildFinanceSeries(weekAxis, financeMaps.week),
+            month: buildFinanceSeries(monthAxis, financeMaps.month),
+            year: buildFinanceSeries(yearAxis, financeMaps.year)
+        }
+    };
+};
+
+const buildTopProducts = (orders, productNameById = new Map(), limit = 5) => {
+    const productStats = new Map();
+
+    orders.forEach((order) => {
+        const orderProducts = Array.isArray(order.products) ? order.products : [];
+        orderProducts.forEach((product) => {
+            const productName =
+                String(product.productName || product.name || '').trim() ||
+                productNameById.get(Number(product.productId)) ||
+                'Без названия';
+            const quantity = Math.max(1, Math.floor(Number(product.quantity) || 1));
+            productStats.set(productName, (productStats.get(productName) || 0) + quantity);
+        });
+    });
+
+    return [...productStats.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name, count]) => ({ name, count }));
+};
+
 const adminController = {
     async getProducts(req, res) {
         try {
@@ -561,7 +882,6 @@ const adminController = {
             if (payload.types.length > 0) {
                 await createProductTypes({
                     productId: product.id,
-                    productName: payload.name,
                     types: payload.types,
                     transaction
                 });
@@ -611,13 +931,57 @@ const adminController = {
                 { transaction }
             );
 
-            await ProductType.destroy({ where: { productId: product.id }, transaction });
+            const existingTypes = await ProductType.findAll({
+                where: { productId: product.id },
+                transaction
+            });
+            const existingTypesById = new Map(existingTypes.map((typeItem) => [typeItem.id, typeItem]));
+            const retainedTypeIds = new Set();
 
-            if (payload.types.length > 0) {
-                await createProductTypes({
-                    productId: product.id,
-                    productName: payload.name,
-                    types: payload.types,
+            for (const typeItem of payload.types) {
+                const existingType = typeItem.id ? existingTypesById.get(typeItem.id) : null;
+
+                if (existingType) {
+                    await existingType.update(
+                        {
+                            type: typeItem.type,
+                            price: typeItem.price,
+                            stockQuantity: typeItem.stockQuantity,
+                            alias:
+                                typeItem.alias === undefined
+                                    ? existingType.alias
+                                    : typeItem.alias
+                        },
+                        { transaction }
+                    );
+                    retainedTypeIds.add(existingType.id);
+                    continue;
+                }
+
+                const createdType = await ProductType.create(
+                    {
+                        type: typeItem.type,
+                        price: typeItem.price,
+                        stockQuantity: typeItem.stockQuantity,
+                        alias: typeItem.alias || null,
+                        code: null,
+                        productId: product.id
+                    },
+                    { transaction }
+                );
+
+                const code = buildProductTypeCode(product.id, createdType.id);
+                await createdType.update({ code }, { transaction });
+                retainedTypeIds.add(createdType.id);
+            }
+
+            const staleTypeIds = existingTypes
+                .map((typeItem) => typeItem.id)
+                .filter((typeId) => !retainedTypeIds.has(typeId));
+
+            if (staleTypeIds.length > 0) {
+                await ProductType.destroy({
+                    where: { id: staleTypeIds, productId: product.id },
                     transaction
                 });
             }
@@ -660,11 +1024,68 @@ const adminController = {
         }
     },
 
+    async sendOrderPhoto(req, res) {
+        try {
+            const orderId = Number(req.params.id);
+
+            if (!Number.isFinite(orderId)) {
+                return res.status(400).json({ message: 'Некорректный ID заказа' });
+            }
+
+            if (!req.file || !req.file.buffer) {
+                return res.status(400).json({ message: 'Выберите файл для отправки' });
+            }
+
+            const order = await Order.findByPk(orderId, {
+                attributes: ['id', 'phoneNumber', 'customerName']
+            });
+
+            if (!order) {
+                return res.status(404).json({ message: 'Заказ не найден' });
+            }
+
+            if (!order.phoneNumber) {
+                return res.status(400).json({ message: 'У заказа отсутствует номер телефона получателя' });
+            }
+
+            const caption = String(req.body?.caption || '').trim();
+            const providerResponse = await sendFileNotification({
+                phoneNumber: order.phoneNumber,
+                fileBuffer: req.file.buffer,
+                fileName: req.file.originalname,
+                mimeType: req.file.mimetype,
+                caption
+            });
+
+            return res.json({
+                data: {
+                    orderId: order.id,
+                    customerName: order.customerName,
+                    phoneNumber: order.phoneNumber,
+                    fileName: req.file.originalname,
+                    providerResponse
+                }
+            });
+        } catch (error) {
+            logError('adminController.sendOrderPhoto', error, {
+                orderId: req.params.id,
+                fileName: req.file?.originalname || null,
+                mimeType: req.file?.mimetype || null,
+                providerStatus: error?.status || null,
+                providerResponseBody: error?.responseBody || null
+            });
+            return res.status(500).json({ message: 'Не удалось отправить файл клиенту', error: error.message });
+        }
+    },
+
     async getOrders(req, res) {
         try {
             const { offset, limit } = parsePagination(req.query);
             const [sortField, sortOrder] = parseSort(req.query, 'id', 'DESC');
             const filter = parseJsonParam(req.query.filter, {});
+            const paidOnly = filter.paidOnly === true || String(filter.paidOnly || '').toLowerCase() === 'true';
+            const excludeIvanDasha = filter.excludeIvanDasha === true || String(filter.excludeIvanDasha || '').toLowerCase() === 'true';
+            const periodRange = filter.period ? getOrderPeriodRange(filter.period) : null;
 
             const where = {};
 
@@ -672,7 +1093,7 @@ const adminController = {
                 where.status = filter.status;
             }
 
-            if (filter.paidOnly === true || String(filter.paidOnly || '').toLowerCase() === 'true') {
+            if (paidOnly) {
                 if (filter.status) {
                     where.status = isPaidOrderStatus(filter.status) ? filter.status : { [Op.in]: [] };
                 } else {
@@ -686,32 +1107,73 @@ const adminController = {
                 };
             }
 
-            if (filter.period) {
-                const range = getOrderPeriodRange(filter.period);
-                if (range) {
+            if (periodRange) {
+                if (periodRange) {
                     where.createdAt = {
-                        [Op.gte]: range.start,
-                        [Op.lte]: range.end
+                        [Op.gte]: periodRange.start,
+                        [Op.lte]: periodRange.end
                     };
                 }
             }
 
-            const { rows, count } = await Order.findAndCountAll({
+            if (!paidOnly) {
+                const { rows, count } = await Order.findAndCountAll({
+                    where,
+                    order: [[sortField, sortOrder]],
+                    offset,
+                    limit
+                });
+
+                const enriched = await Promise.all(rows.map((order) => enrichOrderProducts(order)));
+                const allocation = await buildAccountingAllocation(enriched, req.admin?.phoneNumber);
+                const enrichedWithAccounts = enriched.map((order) => ({
+                    ...order,
+                    accountName: allocation.accountNameByOrderId[order.id] || WITHOUT_LINK_ACCOUNT_NAME
+                }));
+
+                return res.json({ data: enrichedWithAccounts, total: count });
+            }
+
+            const paidOrders = await Order.findAll({
                 where,
-                order: [[sortField, sortOrder]],
-                offset,
-                limit
+                order: [[sortField, sortOrder]]
+            });
+            const enrichedPaidOrders = await Promise.all(paidOrders.map((order) => enrichOrderProducts(order)));
+            const virtualPaidOrders = await getPaidConnectionsWithoutOrder(periodRange, filter.phoneNumber);
+            const accountingContext = excludeIvanDasha ? await buildAccountingContext() : null;
+            const filteredMergedRows =
+                excludeIvanDasha && accountingContext
+                    ? excludeOrdersByAccountingAccounts([...enrichedPaidOrders, ...virtualPaidOrders], accountingContext)
+                    : [...enrichedPaidOrders, ...virtualPaidOrders];
+            const mergedRows = filteredMergedRows.sort((a, b) => {
+                const aValue = a[sortField];
+                const bValue = b[sortField];
+                const aTs = new Date(aValue).getTime();
+                const bTs = new Date(bValue).getTime();
+
+                if (Number.isFinite(aTs) && Number.isFinite(bTs)) {
+                    return sortOrder === 'ASC' ? aTs - bTs : bTs - aTs;
+                }
+
+                if (aValue === bValue) {
+                    return 0;
+                }
+
+                if (sortOrder === 'ASC') {
+                    return aValue > bValue ? 1 : -1;
+                }
+
+                return aValue < bValue ? 1 : -1;
             });
 
-            const enriched = await Promise.all(rows.map((order) => enrichOrderProducts(order)));
-            const allocation = await buildAccountingAllocation(rows.map((order) => order.toJSON()));
-
-            const enrichedWithAccounts = enriched.map((order) => ({
+            const pagedRows = mergedRows.slice(offset, offset + limit);
+            const allocation = await buildAccountingAllocation(pagedRows, req.admin?.phoneNumber, accountingContext);
+            const mergedRowsWithAccounts = pagedRows.map((order) => ({
                 ...order,
                 accountName: allocation.accountNameByOrderId[order.id] || WITHOUT_LINK_ACCOUNT_NAME
             }));
 
-            return res.json({ data: enrichedWithAccounts, total: count });
+            return res.json({ data: mergedRowsWithAccounts, total: mergedRows.length });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить список заказов', error: error.message });
         }
@@ -748,6 +1210,11 @@ const adminController = {
             const kaspiNumber = req.body.kaspiNumber
                 ? String(req.body.kaspiNumber).replace(/\D/g, '').slice(-10)
                 : null;
+            const paymentLinkConnectionIdRaw = Number(req.body.paymentLinkConnectionId);
+            const paymentLinkConnectionId =
+                Number.isInteger(paymentLinkConnectionIdRaw) && paymentLinkConnectionIdRaw > 0
+                    ? paymentLinkConnectionIdRaw
+                    : null;
 
             if (!customerName || !addressIndex || !city || !street || !houseNumber || !phoneNumber || !deliveryMethod) {
                 return res.status(400).json({ message: 'Заполните обязательные поля заказа' });
@@ -858,9 +1325,46 @@ const adminController = {
                 totalPrice
             };
 
-            await attachRecentPaymentLinkToOrder(orderPayload, phoneNumber);
+            let paymentLinkConnection = null;
+            if (paymentLinkConnectionId) {
+                paymentLinkConnection = await SentPaymentLink.findByPk(paymentLinkConnectionId);
+                if (!paymentLinkConnection) {
+                    return res.status(400).json({ message: 'Связь клиент-ссылка не найдена' });
+                }
+
+                if (paymentLinkConnection.linkedOrderId) {
+                    return res.status(409).json({ message: 'Эта связь уже привязана к другому заказу' });
+                }
+
+                const connectionPhone = normalizePhoneNumber(paymentLinkConnection.customerPhone);
+                if (!connectionPhone || connectionPhone !== phoneNumber) {
+                    return res.status(400).json({ message: 'Телефон заказа не совпадает с телефоном в выбранной связи' });
+                }
+
+                orderPayload.paymentLink = String(paymentLinkConnection.paymentLink || '').trim();
+                if (paymentLinkConnection.sellerIin) {
+                    orderPayload.paymentSellerIin = String(paymentLinkConnection.sellerIin);
+                }
+                if (paymentLinkConnection.sellerAdminName) {
+                    orderPayload.paymentSellerName = String(paymentLinkConnection.sellerAdminName);
+                }
+            } else {
+                paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderPayload, phoneNumber);
+            }
+            if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
+                orderPayload.status = 'Оплачено';
+            }
 
             const created = await Order.create(orderPayload);
+            if (paymentLinkConnection?.id) {
+                const isLinked = await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, created.id);
+                if (!isLinked) {
+                    await created.destroy();
+                    const conflictError = new Error('Эта связь уже привязана к другому заказу');
+                    conflictError.statusCode = 409;
+                    throw conflictError;
+                }
+            }
             const enriched = await enrichOrderProducts(created);
 
             try {
@@ -868,6 +1372,31 @@ const adminController = {
             } catch (_error) {
                 // Не блокируем создание заказа, если уведомление в канал не отправилось.
             }
+
+            const productDetails = validatedProducts
+                .map((product) => `
+Название: ${product.productName || 'Продукт не найден'}
+Тип: ${product.typeName || 'Тип не найден'}
+Количество: ${product.quantity}
+`)
+                .join('\n');
+
+            const notificationMessage = `
+Имя и Фамилия: *${customerName}*
+Номер телефона: *${phoneNumber}*
+Номер телефона Kaspi: *${kaspiNumber}*
+Город: *${city}*
+Адрес: *${street}, ${houseNumber}*
+Почтовый индекс: *${addressIndex}*
+Метод доставки: *${deliveryMethod}*
+Метод оплаты: *link*
+Итоговая сумма: *${totalPrice}* тенге
+
+*Товары*:
+${productDetails}`;
+
+            await sendNotification(phoneNumber, notificationMessage);
+            await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет на сумму *${totalPrice}* тенге в приложении Каспи.`);
 
             return res.status(201).json({
                 data: {
@@ -892,7 +1421,7 @@ const adminController = {
                 );
             }
 
-            return res.status(500).json({ message: 'Не удалось создать заказ', error: error.message });
+            return res.status(error.statusCode || 500).json({ message: 'Не удалось создать заказ', error: error.message });
         }
     },
 
@@ -964,34 +1493,52 @@ const adminController = {
 
     async getDashboardAnalytics(req, res) {
         try {
-            const { normalizedPeriod, startDate, endDate } = getPeriodStartDate(String(req.query.period || 'month').trim().toLowerCase());
+            const ranges = getDashboardRanges(req.query.period);
+            const [orders, expenses, products] = await Promise.all([
+                Order.findAll({
+                    where: {
+                        status: { [Op.in]: PAID_ORDER_STATUSES },
+                        createdAt: {
+                            [Op.gte]: ranges.maxStart,
+                            [Op.lte]: ranges.now
+                        }
+                    },
+                    order: [['createdAt', 'DESC']]
+                }),
+                Expense.findAll({
+                    where: {
+                        spentAt: {
+                            [Op.gte]: ranges.maxStart,
+                            [Op.lte]: ranges.now
+                        }
+                    },
+                    order: [['spentAt', 'DESC']]
+                }),
+                Product.findAll({ attributes: ['id', 'name'] })
+            ]);
 
-            const orders = await Order.findAll({
-                where: {
-                    createdAt: {
-                        [Op.gte]: startDate,
-                        [Op.lte]: endDate
-                    }
-                },
-                order: [['createdAt', 'DESC']]
-            });
-
-            const products = await Product.findAll({ attributes: ['id', 'name'] });
+            const orderRows = orders.map((order) => order.toJSON());
+            const expenseRows = expenses.map((expense) => expense.toJSON());
             const productNameById = new Map(products.map((item) => [item.id, item.name]));
-            const analytics = buildOrdersAnalytics(
-                orders.map((order) => order.toJSON()),
-                productNameById
-            );
+            const { orderSeries, financeSeries } = buildDashboardSeries(orderRows, expenseRows, ranges);
+
+            const selectedFinance = financeSeries[ranges.selectedPeriod] || [];
+            const selectedTurnover = selectedFinance.reduce((sum, point) => sum + safeAmount(point.turnover), 0);
+            const selectedExpenses = selectedFinance.reduce((sum, point) => sum + safeAmount(point.expenses), 0);
+            const selectedProfit = selectedTurnover - selectedExpenses;
+            const topProducts = buildTopProducts(orderRows, productNameById, 5);
 
             return res.json({
                 data: {
-                    period: normalizedPeriod,
-                    from: startDate.toISOString(),
-                    to: endDate.toISOString(),
-                    revenue: analytics.revenue,
-                    ordersCount: analytics.ordersCount,
-                    topCity: analytics.topCity,
-                    topProduct: analytics.topProduct
+                    period: ranges.selectedPeriod,
+                    orderSeries,
+                    financeSeries,
+                    topProducts,
+                    financialSummary: {
+                        revenue: selectedTurnover,
+                        expenses: selectedExpenses,
+                        profit: selectedProfit
+                    }
                 }
             });
         } catch (error) {
@@ -1021,22 +1568,26 @@ const adminController = {
                 };
             }
 
-            const [orders, expenses] = await Promise.all([
+            const [orders, expenses, virtualPaidOrders] = await Promise.all([
                 Order.findAll({ where: ordersWhere, order: [['createdAt', 'DESC']] }),
-                Expense.findAll({ where: expensesWhere, order: [['spentAt', 'DESC']] })
+                Expense.findAll({ where: expensesWhere, order: [['spentAt', 'DESC']] }),
+                getPaidConnectionsWithoutOrder(range)
             ]);
 
-            const ordersTotal = orders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0);
+            const accountingContext = await buildAccountingContext();
+            const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
+            const filteredPaidOrders = excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
+            const ordersTotal = filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0);
             const expensesTotal = expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0);
             const balance = ordersTotal - expensesTotal;
-            const allocation = await buildAccountingAllocation(orders.map((order) => order.toJSON()));
+            const allocation = await buildAccountingAllocation(filteredPaidOrders, req.admin?.phoneNumber, accountingContext);
 
             return res.json({
                 data: {
                     ordersTotal,
                     expensesTotal,
                     balance,
-                    ordersCount: orders.length,
+                    ordersCount: filteredPaidOrders.length,
                     expensesCount: expenses.length,
                     allocations: allocation
                 }
@@ -1049,11 +1600,15 @@ const adminController = {
     async getAccountingAdmins(req, res) {
         try {
             const admins = await getActiveAdmins();
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            const visibleAdmins = filterRestrictedAdmins(admins, currentAdminPhone, (item) => item.phoneNumber);
+
             return res.json({
-                data: admins.map((admin) => ({
+                data: visibleAdmins.map((admin) => ({
                     id: admin.id,
                     phoneNumber: admin.phoneNumber,
-                    fullName: admin.fullName
+                    fullName: admin.fullName,
+                    iin: admin.iin
                 }))
             });
         } catch (error) {
@@ -1064,9 +1619,12 @@ const adminController = {
     async getAdmins(req, res) {
         try {
             const admins = await getActiveAdmins();
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            const visibleAdmins = filterRestrictedAdmins(admins, currentAdminPhone, (item) => item.phoneNumber);
+
             return res.json({
-                data: admins,
-                total: admins.length
+                data: visibleAdmins,
+                total: visibleAdmins.length
             });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить список администраторов', error: error.message });
@@ -1077,6 +1635,7 @@ const adminController = {
         try {
             const fullName = String(req.body.fullName || '').trim();
             const phoneNumber = normalizeAdminPhone(req.body.phoneNumber);
+            const iin = normalizeAdminIin(req.body.iin);
 
             if (!fullName) {
                 return res.status(400).json({ message: 'Укажите имя администратора' });
@@ -1085,14 +1644,30 @@ const adminController = {
             if (!phoneNumber) {
                 return res.status(400).json({ message: 'Некорректный номер телефона' });
             }
+            if (!iin) {
+                return res.status(400).json({ message: 'ИИН должен содержать 12 цифр' });
+            }
 
             const existing = await AdminUser.findOne({
                 where: { phoneNumber }
             });
+            const iinOwner = await AdminUser.findOne({
+                where: {
+                    iin,
+                    phoneNumber: {
+                        [Op.ne]: phoneNumber
+                    }
+                }
+            });
+
+            if (iinOwner) {
+                return res.status(400).json({ message: 'Этот ИИН уже привязан к другому администратору' });
+            }
 
             if (existing) {
                 await existing.update({
                     fullName,
+                    iin,
                     isActive: true
                 });
 
@@ -1102,12 +1677,75 @@ const adminController = {
             const created = await AdminUser.create({
                 fullName,
                 phoneNumber,
+                iin,
                 isActive: true
             });
 
             return res.status(201).json({ data: created.toJSON() });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось добавить администратора', error: error.message });
+        }
+    },
+
+    async updateAdmin(req, res) {
+        try {
+            const adminId = Number(req.params.id);
+            const fullName = String(req.body.fullName || '').trim();
+            const phoneNumber = normalizeAdminPhone(req.body.phoneNumber);
+            const iin = normalizeAdminIin(req.body.iin);
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+
+            if (!Number.isFinite(adminId)) {
+                return res.status(400).json({ message: 'Некорректный ID администратора' });
+            }
+
+            if (!fullName) {
+                return res.status(400).json({ message: 'Укажите имя администратора' });
+            }
+
+            if (!phoneNumber) {
+                return res.status(400).json({ message: 'Некорректный номер телефона' });
+            }
+
+            if (!iin) {
+                return res.status(400).json({ message: 'ИИН должен содержать 12 цифр' });
+            }
+
+            const adminUser = await AdminUser.findByPk(adminId);
+            if (!adminUser || !adminUser.isActive) {
+                return res.status(404).json({ message: 'Администратор не найден' });
+            }
+
+            if (!canCurrentAdminSeeTargetAdmin(currentAdminPhone, adminUser.phoneNumber)) {
+                return res.status(403).json({ message: 'Нельзя редактировать этого администратора' });
+            }
+
+            if (!canCurrentAdminSeeTargetAdmin(currentAdminPhone, phoneNumber)) {
+                return res.status(403).json({ message: 'Нельзя назначить этот номер телефона' });
+            }
+
+            const phoneOwner = await AdminUser.findOne({
+                where: { phoneNumber }
+            });
+            const iinOwner = await AdminUser.findOne({
+                where: { iin }
+            });
+            if (phoneOwner && Number(phoneOwner.id) !== adminId) {
+                return res.status(400).json({ message: 'Этот номер телефона уже привязан к другому администратору' });
+            }
+            if (iinOwner && Number(iinOwner.id) !== adminId) {
+                return res.status(400).json({ message: 'Этот ИИН уже привязан к другому администратору' });
+            }
+
+            await adminUser.update({
+                fullName,
+                phoneNumber,
+                iin
+            });
+
+            return res.json({ data: adminUser.toJSON() });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось обновить администратора', error: error.message });
         }
     },
 
@@ -1142,12 +1780,147 @@ const adminController = {
                 where: { isActive: true },
                 order: [['createdAt', 'DESC']]
             });
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            const visibleLinks = filterRestrictedAdmins(links, currentAdminPhone, (item) => item.adminPhone);
 
             return res.json({
-                data: links.map((item) => item.toJSON())
+                data: visibleLinks.map((item) => item.toJSON())
             });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить список ссылок', error: error.message });
+        }
+    },
+
+    async getPaymentLinkDispatchPlan(req, res) {
+        try {
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            const plan = await getVisibleDispatchPlan(currentAdminPhone);
+
+            return res.json({
+                data: plan
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить цепь отправки ссылок', error: error.message });
+        }
+    },
+
+    async savePaymentLinkDispatchPlan(req, res) {
+        try {
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            const chainRaw = Array.isArray(req.body?.chain) ? req.body.chain : [];
+
+            const chain = chainRaw.map((item) => ({
+                adminPhone: normalizeAdminPhone(item?.adminPhone),
+                repeatCount: Math.max(1, Math.floor(Number(item?.repeatCount) || 1))
+            }));
+
+            const hasForbiddenAdmins = chain.some(
+                (item) => !item.adminPhone || !canCurrentAdminSeeTargetAdmin(currentAdminPhone, item.adminPhone)
+            );
+            if (hasForbiddenAdmins) {
+                return res.status(403).json({ message: 'Нельзя использовать администраторов вне вашей зоны видимости' });
+            }
+
+            const saved = await saveVisibleDispatchPlan(currentAdminPhone, chain);
+
+            return res.json({
+                data: saved
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось сохранить цепь отправки ссылок', error: error.message });
+        }
+    },
+
+    async getPaymentLinkConnections(req, res) {
+        try {
+            const { offset, limit } = parsePagination(req.query);
+            const filter = parseJsonParam(req.query.filter, {});
+            const query = String(filter.q || '').trim();
+
+            const where = {};
+            if (query) {
+                where[Op.or] = [
+                    { customerPhone: { [Op.like]: `%${query}%` } },
+                    { customerChatId: { [Op.like]: `%${query}%` } },
+                    { paymentLink: { [Op.like]: `%${query}%` } }
+                ];
+            }
+
+            const { rows, count } = await SentPaymentLink.findAndCountAll({
+                where,
+                order: [['receivedAt', 'DESC']],
+                offset,
+                limit
+            });
+
+            const linkedOrderIds = [
+                ...new Set(
+                    rows
+                        .map((item) => Number(item.linkedOrderId))
+                        .filter((value) => Number.isInteger(value) && value > 0)
+                )
+            ];
+            const linkedOrders = linkedOrderIds.length
+                ? await Order.findAll({
+                      where: { id: { [Op.in]: linkedOrderIds } },
+                      attributes: ['id', 'phoneNumber', 'status', 'paymentLink', 'createdAt']
+                  })
+                : [];
+            const linkedOrdersById = new Map(linkedOrders.map((order) => [order.id, order]));
+
+            const data = rows.map((item) => {
+                const itemJson = item.toJSON();
+                const linkedOrderId = Number(itemJson.linkedOrderId);
+                const linkedOrder =
+                    Number.isInteger(linkedOrderId) && linkedOrderId > 0 ? linkedOrdersById.get(linkedOrderId) || null : null;
+
+                const paymentLinkDisplay =
+                    itemJson.sellerAdminName && (!itemJson.paymentLink || itemJson.paymentLink === 'терминал')
+                        ? itemJson.sellerAdminName
+                        : itemJson.paymentLink;
+
+                return {
+                    id: itemJson.id,
+                    customerPhone: itemJson.customerPhone,
+                    customerChatId: itemJson.customerChatId,
+                    paymentLink: paymentLinkDisplay,
+                    expectedAmount: itemJson.expectedAmount,
+                    paidAmount: itemJson.paidAmount,
+                    isPaid: itemJson.isPaid,
+                    paidAt: itemJson.paidAt,
+                    paymentProofUrl: itemJson.paymentProofUrl,
+                    messageId: itemJson.messageId,
+                    receivedAt: itemJson.receivedAt,
+                    sourceDescription: itemJson.sourceDescription,
+                    linkedOrderId: itemJson.linkedOrderId,
+                    usedAt: itemJson.usedAt,
+                    orderId: linkedOrder ? linkedOrder.id : null,
+                    orderStatus: linkedOrder ? linkedOrder.status : null,
+                    orderCreatedAt: linkedOrder ? linkedOrder.createdAt : null,
+                    hasOrder: Boolean(linkedOrder)
+                };
+            });
+
+            return res.json({ data, total: count });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить связи клиентов и ссылок', error: error.message });
+        }
+    },
+
+    async deletePaymentLinkConnection(req, res) {
+        try {
+            const connection = await SentPaymentLink.findByPk(req.params.id);
+
+            if (!connection) {
+                return res.status(404).json({ message: 'Связь не найдена' });
+            }
+
+            const connectionJson = connection.toJSON();
+            await connection.destroy();
+
+            return res.json({ data: connectionJson });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось удалить связь', error: error.message });
         }
     },
 
@@ -1334,7 +2107,7 @@ const adminController = {
 
     async receiveInventory(req, res) {
         try {
-            const code = String(req.body.code || '').trim().toLowerCase();
+            const code = String(req.body.code || '').trim();
             const quantity = Math.floor(Number(req.body.quantity));
 
             if (!code) {
@@ -1386,6 +2159,51 @@ const adminController = {
             return res.json({ data: rows, total: rows.length });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить QR-коды', error: error.message });
+        }
+    },
+
+    async updateInventoryTypeAlias(req, res) {
+        try {
+            const typeId = Number(req.params.id);
+            if (!Number.isFinite(typeId)) {
+                return res.status(400).json({ message: 'Некорректный id типа товара' });
+            }
+
+            const rawAlias = req.body?.alias;
+            const alias =
+                rawAlias === undefined || rawAlias === null || String(rawAlias).trim() === ''
+                    ? null
+                    : String(rawAlias).trim();
+
+            const typeRecord = await ProductType.findByPk(typeId, {
+                include: [{ model: Product, attributes: ['id', 'name'] }]
+            });
+
+            if (!typeRecord) {
+                return res.status(404).json({ message: 'Тип товара не найден' });
+            }
+
+            await typeRecord.update({ alias });
+
+            const productName = typeRecord.product ? typeRecord.product.name : 'Товар';
+            const code = buildProductTypeCode(typeRecord.productId, typeRecord.id) || typeRecord.code || '';
+
+            return res.json({
+                data: {
+                    id: typeRecord.id,
+                    productId: typeRecord.productId,
+                    productName,
+                    typeName: typeRecord.type,
+                    alias: typeRecord.alias,
+                    typePrice: typeRecord.price,
+                    stockQuantity: typeRecord.stockQuantity,
+                    stockStatus: typeRecord.stockQuantity === null ? 'Бесконечность' : `${typeRecord.stockQuantity} шт.`,
+                    code,
+                    qrCodeUrl: buildQrCodeUrl(code)
+                }
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось обновить псевдоним', error: error.message });
         }
     }
 };

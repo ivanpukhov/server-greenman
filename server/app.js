@@ -17,9 +17,11 @@ const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
 require('./models/orders/SentPaymentLink');
-require('./models/orders/AdminUser');
+const AdminUser = require('./models/orders/AdminUser');
+require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
-const { ensureDefaultAdmins } = require('./utilities/adminUsers');
+const { ensureDefaultAdmins, normalizeAdminIin, DEFAULT_ADMIN_IIN } = require('./utilities/adminUsers');
+const { logError } = require('./utilities/errorLogger');
 
 const app = express();
 
@@ -39,6 +41,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 
 app.use((error, req, res, next) => {
+    logError('express.errorMiddleware', error, {
+        method: req.method,
+        path: req.originalUrl
+    });
     res.status(error.status || 500);
     res.json({
         error: {
@@ -67,27 +73,51 @@ const ensureProductTypeSchema = async () => {
                 defaultValue: null
             });
         }
+
+        if (!tableDefinition.alias) {
+            await queryInterface.addColumn('productTypes', 'alias', {
+                type: Sequelize.STRING,
+                allowNull: true,
+                defaultValue: null
+            });
+        }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы productTypes:', error);
     }
 
     try {
-        const types = await ProductType.findAll({
-            include: [{ model: Product, attributes: ['name'] }]
-        });
+        const types = await ProductType.findAll();
 
         await Promise.all(
             types.map(async (typeItem) => {
-                if (typeItem.code) {
+                const expectedCode = buildProductTypeCode(typeItem.productId, typeItem.id);
+                if (!expectedCode || typeItem.code === expectedCode) {
                     return;
                 }
 
-                const productName = typeItem.product ? typeItem.product.name : 'товар';
-                await typeItem.update({ code: buildProductTypeCode(productName, typeItem.type) });
+                await typeItem.update({ code: expectedCode });
             })
         );
     } catch (error) {
         console.error('Ошибка при заполнении кодов productTypes:', error);
+    }
+};
+
+const ensureProductSchema = async () => {
+    const queryInterface = sequelize.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('products');
+
+        if (!tableDefinition.alias) {
+            await queryInterface.addColumn('products', 'alias', {
+                type: Sequelize.STRING,
+                allowNull: true,
+                defaultValue: null
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы products:', error);
     }
 };
 
@@ -103,16 +133,146 @@ const ensureOrderSchema = async () => {
                 allowNull: true
             });
         }
+
+        if (!tableDefinition.paymentSellerIin) {
+            await queryInterface.addColumn('orders', 'paymentSellerIin', {
+                type: Sequelize.STRING(12),
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paymentSellerName) {
+            await queryInterface.addColumn('orders', 'paymentSellerName', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы orders:', error);
     }
 };
 
+const ensureSentPaymentLinksSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('sent_payment_links');
+
+        if (!tableDefinition.linkedOrderId) {
+            await queryInterface.addColumn('sent_payment_links', 'linkedOrderId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.usedAt) {
+            await queryInterface.addColumn('sent_payment_links', 'usedAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.expectedAmount) {
+            await queryInterface.addColumn('sent_payment_links', 'expectedAmount', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paidAmount) {
+            await queryInterface.addColumn('sent_payment_links', 'paidAmount', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.isPaid) {
+            await queryInterface.addColumn('sent_payment_links', 'isPaid', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: false
+            });
+        }
+
+        if (!tableDefinition.paidAt) {
+            await queryInterface.addColumn('sent_payment_links', 'paidAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paymentProofUrl) {
+            await queryInterface.addColumn('sent_payment_links', 'paymentProofUrl', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.sellerIin) {
+            await queryInterface.addColumn('sent_payment_links', 'sellerIin', {
+                type: Sequelize.STRING(12),
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.sellerAdminPhone) {
+            await queryInterface.addColumn('sent_payment_links', 'sellerAdminPhone', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.sellerAdminName) {
+            await queryInterface.addColumn('sent_payment_links', 'sellerAdminName', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы sent_payment_links:', error);
+    }
+};
+
+const ensureAdminUsersSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('admin_users');
+
+        if (!tableDefinition.iin) {
+            await queryInterface.addColumn('admin_users', 'iin', {
+                type: Sequelize.STRING(12),
+                allowNull: false,
+                defaultValue: DEFAULT_ADMIN_IIN
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы admin_users:', error);
+    }
+
+    try {
+        const admins = await AdminUser.findAll();
+        await Promise.all(
+            admins.map(async (admin) => {
+                const normalizedIin = normalizeAdminIin(admin.iin);
+                if (!normalizedIin || normalizedIin !== admin.iin) {
+                    await admin.update({ iin: normalizedIin || DEFAULT_ADMIN_IIN });
+                }
+            })
+        );
+    } catch (error) {
+        console.error('Ошибка при нормализации ИИН администраторов:', error);
+    }
+};
+
 sequelize.sync().then(async () => {
+    await ensureProductSchema();
     await ensureProductTypeSchema();
     orderDB.sync().then(async () => {
+        await ensureAdminUsersSchema();
         await ensureDefaultAdmins();
         await ensureOrderSchema();
+        await ensureSentPaymentLinksSchema();
         console.log('База данных заказов синхронизирована.');
     }).catch(err => {
         console.error('Ошибка синхронизации базы данных заказов:', err);
