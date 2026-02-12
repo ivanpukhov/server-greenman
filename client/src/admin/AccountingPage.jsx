@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
     Box,
     Button,
     Card,
@@ -13,8 +12,8 @@ import {
     TableCell,
     TableHead,
     TableRow,
-    TextField,
-    Typography
+    Typography,
+    useMediaQuery
 } from '@mui/material';
 import { useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
@@ -40,6 +39,7 @@ const periodOptions = [
 
 const AccountingPage = () => {
     const notify = useNotify();
+    const isSmall = useMediaQuery((theme) => theme.breakpoints.down('md'));
     const [period, setPeriod] = useState('month');
     const [summary, setSummary] = useState({
         ordersTotal: 0,
@@ -51,23 +51,7 @@ const AccountingPage = () => {
     const [orders, setOrders] = useState([]);
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
     const [deletingExpenseId, setDeletingExpenseId] = useState(null);
-    const [form, setForm] = useState({
-        category: '',
-        amount: '',
-        description: ''
-    });
-
-    const currentAdminName = useMemo(() => {
-        try {
-            const rawUser = localStorage.getItem('admin_user');
-            const user = rawUser ? JSON.parse(rawUser) : null;
-            return user?.fullName || `+7${user?.phoneNumber || ''}`;
-        } catch (_error) {
-            return 'Текущий админ';
-        }
-    }, []);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -83,7 +67,7 @@ const AccountingPage = () => {
                     apiUrl(
                         `/admin/orders?sort=${encodeURIComponent(JSON.stringify(['createdAt', 'DESC']))}&range=${encodeURIComponent(
                             JSON.stringify([0, 99999])
-                        )}&filter=${encodeURIComponent(JSON.stringify({ period, paidOnly: true }))}`
+                        )}&filter=${encodeURIComponent(JSON.stringify({ period, paidOnly: true, excludeIvanDasha: true }))}`
                     ),
                     { headers }
                 ),
@@ -112,7 +96,6 @@ const AccountingPage = () => {
             if (!expensesResponse.ok) {
                 throw new Error(expensesBody.message || 'Ошибка загрузки расходов');
             }
-
             setSummary(summaryBody.data || {});
             setOrders(Array.isArray(ordersBody.data) ? ordersBody.data : []);
             setExpenses(Array.isArray(expensesBody.data) ? expensesBody.data : []);
@@ -126,57 +109,6 @@ const AccountingPage = () => {
     useEffect(() => {
         loadData();
     }, [loadData]);
-
-    const onSubmitExpense = async (event) => {
-        event.preventDefault();
-        if (submitting) {
-            return;
-        }
-
-        const amount = Number(form.amount);
-        if (!form.category.trim()) {
-            notify('Укажите категорию расхода', { type: 'warning' });
-            return;
-        }
-        if (!Number.isFinite(amount) || amount <= 0) {
-            notify('Сумма расхода должна быть больше 0', { type: 'warning' });
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            const token = adminAuthStorage.getToken();
-            const response = await fetch(apiUrl('/admin/expenses'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    category: form.category.trim(),
-                    amount,
-                    description: form.description.trim()
-                })
-            });
-
-            const body = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(body.message || 'Не удалось добавить расход');
-            }
-
-            setForm({
-                category: '',
-                amount: '',
-                description: ''
-            });
-            notify('Расход добавлен', { type: 'success' });
-            await loadData();
-        } catch (error) {
-            notify(error.message, { type: 'error' });
-        } finally {
-            setSubmitting(false);
-        }
-    };
 
     const onDeleteExpense = async (expenseId) => {
         if (deletingExpenseId) {
@@ -284,112 +216,177 @@ const AccountingPage = () => {
 
             <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                    Добавить расход
+                    Распределение прихода по счетам
                 </Typography>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                    Кто потратил: <strong>{currentAdminName}</strong> (автоматически)
-                </Alert>
-                <Box component="form" onSubmit={onSubmitExpense}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                        <TextField
-                            label="Категория / на что"
-                            value={form.category}
-                            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-                            fullWidth
-                            required
-                        />
-                        <TextField
-                            label="Сумма"
-                            type="number"
-                            value={form.amount}
-                            onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
-                            inputProps={{ min: 0, step: 1 }}
-                            sx={{ minWidth: 180 }}
-                            required
-                        />
-                    </Stack>
-                    <TextField
-                        label="Комментарий"
-                        value={form.description}
-                        onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        sx={{ mt: 1.5 }}
-                    />
-                    <Button type="submit" variant="contained" sx={{ mt: 1.5 }} disabled={submitting}>
-                        Добавить расход
-                    </Button>
-                </Box>
-            </Paper>
-
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    Расходы
-                </Typography>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Дата</TableCell>
-                            <TableCell>Кто потратил</TableCell>
-                            <TableCell>На что</TableCell>
-                            <TableCell>Комментарий</TableCell>
-                            <TableCell align="right">Сумма</TableCell>
-                            <TableCell align="right">Действие</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {expenses.map((expense) => (
-                            <TableRow key={expense.id}>
-                                <TableCell>{formatDate(expense.spentAt)}</TableCell>
-                                <TableCell>{expense.spentByName}</TableCell>
-                                <TableCell>{expense.category}</TableCell>
-                                <TableCell>{expense.description || '-'}</TableCell>
-                                <TableCell align="right">{formatMoney(expense.amount)}</TableCell>
-                                <TableCell align="right">
-                                    <Button
-                                        color="error"
-                                        size="small"
-                                        onClick={() => onDeleteExpense(expense.id)}
-                                        disabled={deletingExpenseId === expense.id}
-                                    >
-                                        Удалить
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
+                {isSmall ? (
+                    <Stack spacing={1.2}>
+                        {(summary.allocations?.byAccount || []).map((item) => (
+                            <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">{item.accountName}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Заказов: {item.ordersCount}
+                                    </Typography>
+                                    <Typography variant="body1">{formatMoney(item.total)}</Typography>
+                                </CardContent>
+                            </Card>
                         ))}
-                    </TableBody>
-                </Table>
+                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                            <CardContent>
+                                <Typography variant="subtitle2">{summary.allocations?.withoutLink?.accountName || 'Без ссылки'}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Заказов: {summary.allocations?.withoutLink?.ordersCount || 0}
+                                </Typography>
+                                <Typography variant="body1">{formatMoney(summary.allocations?.withoutLink?.total || 0)}</Typography>
+                            </CardContent>
+                        </Card>
+                    </Stack>
+                ) : (
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <Table size="small" sx={{ minWidth: 640 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Счёт</TableCell>
+                                    <TableCell align="right">Заказов</TableCell>
+                                    <TableCell align="right">Сумма</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {(summary.allocations?.byAccount || []).map((item) => (
+                                    <TableRow key={item.accountName}>
+                                        <TableCell>{item.accountName}</TableCell>
+                                        <TableCell align="right">{item.ordersCount}</TableCell>
+                                        <TableCell align="right">{formatMoney(item.total)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                <TableRow>
+                                    <TableCell>{summary.allocations?.withoutLink?.accountName || 'Без ссылки'}</TableCell>
+                                    <TableCell align="right">{summary.allocations?.withoutLink?.ordersCount || 0}</TableCell>
+                                    <TableCell align="right">{formatMoney(summary.allocations?.withoutLink?.total || 0)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </Box>
+                )}
             </Paper>
 
             <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                     Оплаченные заказы (учтены в приходе)
                 </Typography>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Дата</TableCell>
-                            <TableCell>Клиент</TableCell>
-                            <TableCell>Город</TableCell>
-                            <TableCell>Статус</TableCell>
-                            <TableCell align="right">Сумма</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
+                {isSmall ? (
+                    <Stack spacing={1.2}>
                         {orders.map((order) => (
-                            <TableRow key={order.id}>
-                                <TableCell>{order.id}</TableCell>
-                                <TableCell>{formatDate(order.createdAt)}</TableCell>
-                                <TableCell>{order.customerName}</TableCell>
-                                <TableCell>{order.city}</TableCell>
-                                <TableCell>{order.status}</TableCell>
-                                <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
-                            </TableRow>
+                            <Card key={order.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">Заказ #{order.id}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{formatDate(order.createdAt)}</Typography>
+                                    <Typography variant="body2">Клиент: {order.customerName}</Typography>
+                                    <Typography variant="body2">Город: {order.city}</Typography>
+                                    <Typography variant="body2">Статус: {order.status}</Typography>
+                                    <Typography variant="body2">Счёт: {order.accountName || 'Без ссылки'}</Typography>
+                                    <Typography variant="body1" sx={{ mt: 0.5 }}>{formatMoney(order.totalPrice)}</Typography>
+                                </CardContent>
+                            </Card>
                         ))}
-                    </TableBody>
-                </Table>
+                    </Stack>
+                ) : (
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <Table size="small" sx={{ minWidth: 860 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>ID</TableCell>
+                                    <TableCell>Дата</TableCell>
+                                    <TableCell>Клиент</TableCell>
+                                    <TableCell>Город</TableCell>
+                                    <TableCell>Статус</TableCell>
+                                    <TableCell>Счёт</TableCell>
+                                    <TableCell align="right">Сумма</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {orders.map((order) => (
+                                    <TableRow key={order.id}>
+                                        <TableCell>{order.id}</TableCell>
+                                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                                        <TableCell>{order.customerName}</TableCell>
+                                        <TableCell>{order.city}</TableCell>
+                                        <TableCell>{order.status}</TableCell>
+                                        <TableCell>{order.accountName || 'Без ссылки'}</TableCell>
+                                        <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Box>
+                )}
+            </Paper>
+
+            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                    Расходы
+                </Typography>
+                {isSmall ? (
+                    <Stack spacing={1.2}>
+                        {expenses.map((expense) => (
+                            <Card key={expense.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">{expense.category}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{formatDate(expense.spentAt)}</Typography>
+                                    <Typography variant="body2">Кто потратил: {expense.spentByName}</Typography>
+                                    <Typography variant="body2">Комментарий: {expense.description || '-'}</Typography>
+                                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                                        <Typography variant="body1">{formatMoney(expense.amount)}</Typography>
+                                        <Button
+                                            color="error"
+                                            size="small"
+                                            onClick={() => onDeleteExpense(expense.id)}
+                                            disabled={deletingExpenseId === expense.id}
+                                        >
+                                            Удалить
+                                        </Button>
+                                    </Stack>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </Stack>
+                ) : (
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <Table size="small" sx={{ minWidth: 860 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Дата</TableCell>
+                                    <TableCell>Кто потратил</TableCell>
+                                    <TableCell>На что</TableCell>
+                                    <TableCell>Комментарий</TableCell>
+                                    <TableCell align="right">Сумма</TableCell>
+                                    <TableCell align="right">Действие</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {expenses.map((expense) => (
+                                    <TableRow key={expense.id}>
+                                        <TableCell>{formatDate(expense.spentAt)}</TableCell>
+                                        <TableCell>{expense.spentByName}</TableCell>
+                                        <TableCell>{expense.category}</TableCell>
+                                        <TableCell>{expense.description || '-'}</TableCell>
+                                        <TableCell align="right">{formatMoney(expense.amount)}</TableCell>
+                                        <TableCell align="right">
+                                            <Button
+                                                color="error"
+                                                size="small"
+                                                onClick={() => onDeleteExpense(expense.id)}
+                                                disabled={deletingExpenseId === expense.id}
+                                            >
+                                                Удалить
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Box>
+                )}
             </Paper>
         </Stack>
     );

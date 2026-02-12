@@ -45,6 +45,20 @@
     padding: 18px;
 }
 
+.admin-shell .RaDatagrid-root {
+    overflow-x: auto;
+}
+
+.admin-shell .RaDatagrid-table {
+    min-width: 860px;
+}
+
+.admin-shell .RaCreate-main .MuiFormControl-root,
+.admin-shell .RaEdit-main .MuiFormControl-root,
+.admin-shell .RaShow-main .MuiFormControl-root {
+    max-width: 100%;
+}
+
 .admin-topbar.MuiAppBar-root {
     margin: 0;
     border-radius: 0;
@@ -102,5 +116,27 @@
 
     .admin-topbar__subtitle {
         display: none;
+    }
+
+    .admin-topbar__inner {
+        min-height: 56px;
+        padding: 8px 10px;
+    }
+
+    .admin-topbar__actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .admin-shell .RaLayout-content .RaList-main,
+    .admin-shell .RaLayout-content .RaShow-main,
+    .admin-shell .RaLayout-content .RaEdit-main,
+    .admin-shell .RaLayout-content .RaCreate-main {
+        padding: 12px;
+    }
+
+    .admin-shell .RaDatagrid-table {
+        min-width: 700px;
     }
 }

@@ -1,10 +1,14 @@
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
+import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
-import { Box, Button, Chip, Typography } from '@mui/material';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
+import { Box, Button, Typography } from '@mui/material';
 import { Admin, AppBar, Layout, Menu, Resource, useLogout } from 'react-admin';
 import authProvider from './authProvider';
 import dataProvider from './dataProvider';
@@ -12,8 +16,12 @@ import adminTheme from './theme';
 import AdminLoginPage from './AdminLoginPage';
 import AdminDashboard from './AdminDashboard';
 import AccountingPage from './AccountingPage';
+import AdministratorsPage from './AdministratorsPage';
 import IncomingStockPage from './IncomingStockPage';
 import QrCodesPage from './QrCodesPage';
+import PaymentLinkConnectionsPage from './PaymentLinkConnectionsPage';
+import AddExpensePage from './AddExpensePage';
+import AliasesPage from './AliasesPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import './AdminApp.css';
@@ -39,7 +47,6 @@ const AdminAppBar = () => {
                     </Typography>
                 </Box>
                 <Box className="admin-topbar__actions">
-                    <Chip size="small" color="success" label="Система активна" />
                     <Button
                         size="small"
                         variant="outlined"
@@ -110,6 +117,30 @@ const AdminApp = () => (
             options={{ label: 'Бухгалтерия' }}
             list={AccountingPage}
             icon={AccountBalanceWalletOutlinedIcon}
+        />
+        <Resource
+            name="add-expense"
+            options={{ label: 'Добавить расход' }}
+            list={AddExpensePage}
+            icon={PointOfSaleOutlinedIcon}
+        />
+        <Resource
+            name="administrators"
+            options={{ label: 'Администраторы' }}
+            list={AdministratorsPage}
+            icon={ManageAccountsOutlinedIcon}
+        />
+        <Resource
+            name="payment-link-connections"
+            options={{ label: 'Связи клиент-ссылка' }}
+            list={PaymentLinkConnectionsPage}
+            icon={LinkOutlinedIcon}
+        />
+        <Resource
+            name="aliases"
+            options={{ label: 'Псевдонимы' }}
+            list={AliasesPage}
+            icon={LabelOutlinedIcon}
         />
         <Resource
             name="incoming"

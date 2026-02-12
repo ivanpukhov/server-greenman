@@ -16,11 +16,11 @@ const getErrorMessage = (responseBody, fallbackMessage) => {
 };
 
 const authProvider = {
-    login: async ({ phoneNumber, confirmationCode }) => {
+    login: async ({ iin, confirmationCode }) => {
         const response = await fetch(apiUrl('/admin/auth/confirm-code'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber, confirmationCode })
+            body: JSON.stringify({ iin, confirmationCode })
         });
 
         const body = await response.json().catch(() => ({}));

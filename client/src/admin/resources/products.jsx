@@ -15,7 +15,6 @@ import {
     ShowButton,
     SimpleForm,
     SimpleFormIterator,
-    SimpleList,
     SimpleShowLayout,
     TextField,
     TextInput,
@@ -24,7 +23,18 @@ import {
     useListContext,
 } from 'react-admin';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, InputAdornment, TextField as MuiTextField, useMediaQuery } from '@mui/material';
+import {
+    Box,
+    Button,
+    Card,
+    CardActionArea,
+    CardContent,
+    InputAdornment,
+    Stack,
+    TextField as MuiTextField,
+    Typography,
+    useMediaQuery
+} from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
 import { apiUrl } from '../../config/api';
@@ -221,17 +231,59 @@ const ProductListContent = ({ searchTerm }) => {
     return (
         <ListContextProvider value={filteredListContext}>
             {isSmall ? (
-                <SimpleList
-                    primaryText={(record) => record.name}
-                    secondaryText={(record) => `${record.types?.length || 0} типов`}
-                    tertiaryText={(record) => `ID: ${record.id}`}
-                    linkType="show"
-                />
+                <Stack spacing={1.2} sx={{ p: 1.2 }}>
+                    {filteredData.map((record) => {
+                        const types = Array.isArray(record?.types) ? record.types : [];
+                        const hasInfinite = types.some((typeItem) => typeItem?.stockQuantity === null);
+                        const totalStock = hasInfinite
+                            ? 'Бесконечность'
+                            : types.reduce((sum, typeItem) => sum + Math.max(0, Number(typeItem?.stockQuantity) || 0), 0);
+
+                        return (
+                            <Card key={record.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardActionArea href={`#/products/${record.id}/show`}>
+                                    <CardContent>
+                                        <Typography variant="subtitle2">{record.name}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Типов: {types.length}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Остаток: {totalStock === 'Бесконечность' ? totalStock : `${totalStock} шт.`}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            ID: {record.id}
+                                        </Typography>
+                                    </CardContent>
+                                </CardActionArea>
+                            </Card>
+                        );
+                    })}
+                </Stack>
             ) : (
                 <Datagrid rowClick="show" bulkActionButtons={false}>
                     <TextField source="id" label="ID" />
                     <TextField source="name" label="Название" />
                     <FunctionField label="Кол-во типов" render={(record) => record.types?.length || 0} />
+                    <FunctionField
+                        label="Остаток"
+                        render={(record) => {
+                            const types = Array.isArray(record?.types) ? record.types : [];
+                            if (types.length === 0) {
+                                return '0 шт.';
+                            }
+
+                            const hasInfinite = types.some((typeItem) => typeItem?.stockQuantity === null);
+                            if (hasInfinite) {
+                                return 'Бесконечность';
+                            }
+
+                            const totalStock = types.reduce(
+                                (sum, typeItem) => sum + Math.max(0, Number(typeItem?.stockQuantity) || 0),
+                                0
+                            );
+                            return `${totalStock} шт.`;
+                        }}
+                    />
                     <TextField source="videoUrl" label="Видео URL" />
                     <EditButton label="Изменить" />
                     <ShowButton label="Детали" />
@@ -255,8 +307,13 @@ const transformProduct = (data) => {
         diseases,
         types: Array.isArray(data.types)
             ? data.types.map((typeItem) => ({
+                  id: typeItem.id || undefined,
                   type: typeItem.type,
                   price: Number(typeItem.price) || 0,
+                  alias:
+                      typeItem.alias === undefined || typeItem.alias === null || String(typeItem.alias).trim() === ''
+                          ? null
+                          : String(typeItem.alias).trim(),
                   stockQuantity: typeItem.stockQuantity === '' || typeItem.stockQuantity === null || typeItem.stockQuantity === undefined
                       ? null
                       : Number(typeItem.stockQuantity)
@@ -342,6 +399,10 @@ const ProductFormFields = () => (
 
         <ArrayInput source="types" label="Варианты товара" validate={required()}>
             <SimpleFormIterator inline>
+                <Box sx={{ display: 'none' }}>
+                    <TextInput source="id" />
+                    <TextInput source="alias" />
+                </Box>
                 <TextInput source="type" label="Тип" validate={required()} />
                 <NumberInput source="price" label="Цена" validate={required()} min={0} />
                 <NumberInput
@@ -371,44 +432,75 @@ export const ProductEdit = () => (
     </Edit>
 );
 
-export const ProductShow = () => (
-    <Show>
-        <SimpleShowLayout>
-            <TextField source="id" label="ID" />
-            <TextField source="name" label="Название" />
-            <TextField source="description" label="Описание" />
-            <TextField source="applicationMethodChildren" label="Применение (дети)" />
-            <TextField source="applicationMethodAdults" label="Применение (взрослые)" />
-            <TextField source="contraindications" label="Противопоказания" />
-            <TextField source="videoUrl" label="Видео URL" />
-            <FunctionField
-                label="Заболевания"
-                render={(record) => (Array.isArray(record.diseases) ? record.diseases.join(', ') : '')}
-            />
-            <ArrayField source="types" label="Типы">
-                <Datagrid bulkActionButtons={false}>
-                    <TextField source="type" label="Тип" />
-                    <NumberField source="price" label="Цена" />
+export const ProductShow = () => {
+    const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+
+    return (
+        <Show>
+            <SimpleShowLayout>
+                <TextField source="id" label="ID" />
+                <TextField source="name" label="Название" />
+                <TextField source="description" label="Описание" />
+                <TextField source="applicationMethodChildren" label="Применение (дети)" />
+                <TextField source="applicationMethodAdults" label="Применение (взрослые)" />
+                <TextField source="contraindications" label="Противопоказания" />
+                <TextField source="videoUrl" label="Видео URL" />
+                <FunctionField
+                    label="Заболевания"
+                    render={(record) => (Array.isArray(record.diseases) ? record.diseases.join(', ') : '')}
+                />
+                {isSmall ? (
                     <FunctionField
-                        label="Остаток"
-                        render={(record) => (record.stockQuantity === null ? 'Бесконечность' : `${record.stockQuantity} шт.`)}
+                        label="Типы"
+                        render={(record) => {
+                            const rows = Array.isArray(record?.types) ? record.types : [];
+                            return (
+                                <Stack spacing={1}>
+                                    {rows.map((row, index) => (
+                                        <Card key={`${row.code || row.type}-${index}`} variant="outlined" sx={{ borderRadius: 2 }}>
+                                            <CardContent>
+                                                <Typography variant="subtitle2">{row.type}</Typography>
+                                                <Typography variant="body2">Цена: {row.price} ₸</Typography>
+                                                <Typography variant="body2">
+                                                    Остаток: {row.stockQuantity === null ? 'Бесконечность' : `${row.stockQuantity} шт.`}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+                                                    {row.code}
+                                                </Typography>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </Stack>
+                            );
+                        }}
                     />
-                    <TextField source="code" label="Код" />
-                    <FunctionField
-                        label="QR"
-                        render={(record) => (
-                            <img
-                                src={record.qrCodeUrl}
-                                alt={record.code}
-                                width={96}
-                                height={96}
-                                loading="lazy"
-                                style={{ borderRadius: 8, background: '#fff' }}
+                ) : (
+                    <ArrayField source="types" label="Типы">
+                        <Datagrid bulkActionButtons={false}>
+                            <TextField source="type" label="Тип" />
+                            <NumberField source="price" label="Цена" />
+                            <FunctionField
+                                label="Остаток"
+                                render={(record) => (record.stockQuantity === null ? 'Бесконечность' : `${record.stockQuantity} шт.`)}
                             />
-                        )}
-                    />
-                </Datagrid>
-            </ArrayField>
-        </SimpleShowLayout>
-    </Show>
-);
+                            <TextField source="code" label="Код" />
+                            <FunctionField
+                                label="QR"
+                                render={(record) => (
+                                    <img
+                                        src={record.qrCodeUrl}
+                                        alt={record.code}
+                                        width={96}
+                                        height={96}
+                                        loading="lazy"
+                                        style={{ borderRadius: 8, background: '#fff' }}
+                                    />
+                                )}
+                            />
+                        </Datagrid>
+                    </ArrayField>
+                )}
+            </SimpleShowLayout>
+        </Show>
+    );
+};

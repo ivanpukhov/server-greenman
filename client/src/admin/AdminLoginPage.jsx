@@ -3,22 +3,23 @@ import { Button, Card, CardContent, CircularProgress, Stack, TextField, Typograp
 import { useLogin, useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 
-const normalizePhone = (value) => value.replace(/\D/g, '');
+const normalizeIin = (value) => value.replace(/\D/g, '').slice(0, 12);
 
 const AdminLoginPage = () => {
     const [step, setStep] = useState(1);
-    const [phoneNumber, setPhoneNumber] = useState('');
+    const [iin, setIin] = useState('');
     const [code, setCode] = useState('');
+    const [phoneMask, setPhoneMask] = useState('');
     const [loading, setLoading] = useState(false);
 
     const login = useLogin();
     const notify = useNotify();
 
     const requestCode = async () => {
-        const normalized = normalizePhone(phoneNumber);
+        const normalized = normalizeIin(iin);
 
-        if (normalized.length < 10) {
-            notify('Введите корректный номер телефона', { type: 'warning' });
+        if (normalized.length !== 12) {
+            notify('Введите корректный ИИН (12 цифр)', { type: 'warning' });
             return;
         }
 
@@ -28,7 +29,7 @@ const AdminLoginPage = () => {
             const response = await fetch(apiUrl('/admin/auth/request-code'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phoneNumber: normalized })
+                body: JSON.stringify({ iin: normalized })
             });
 
             const body = await response.json().catch(() => ({}));
@@ -38,7 +39,8 @@ const AdminLoginPage = () => {
             }
 
             setStep(2);
-            notify('Код отправлен в WhatsApp', { type: 'info' });
+            setPhoneMask(body.phoneMask || '');
+            notify('Код отправлен администратору', { type: 'info' });
         } catch (error) {
             notify(error.message, { type: 'error' });
         } finally {
@@ -47,7 +49,7 @@ const AdminLoginPage = () => {
     };
 
     const submitCode = async () => {
-        const normalized = normalizePhone(phoneNumber);
+        const normalized = normalizeIin(iin);
         const cleanCode = code.replace(/\D/g, '');
 
         if (cleanCode.length !== 6) {
@@ -58,7 +60,7 @@ const AdminLoginPage = () => {
         setLoading(true);
 
         try {
-            await login({ phoneNumber: normalized, confirmationCode: cleanCode });
+            await login({ iin: normalized, confirmationCode: cleanCode });
         } catch (error) {
             notify(error.message || 'Не удалось выполнить вход', { type: 'error' });
         } finally {
@@ -81,7 +83,7 @@ const AdminLoginPage = () => {
                 sx={{
                     width: '100%',
                     maxWidth: 480,
-                    borderRadius: 5,
+                    borderRadius: 3,
                     border: '1px solid rgba(16,40,29,0.12)',
                     boxShadow: '0 32px 80px rgba(19,111,99,0.26)',
                     background: 'linear-gradient(180deg, rgba(250,255,252,0.94), rgba(242,250,246,0.94))'
@@ -92,28 +94,35 @@ const AdminLoginPage = () => {
                         Greenman Admin
                     </Typography>
                     <Typography variant="body2" sx={{ mb: 3, color: '#456156' }}>
-                        Вход по номеру телефона и одноразовому коду
+                        Вход по ИИН и одноразовому коду
                     </Typography>
 
                     <Stack spacing={2.2}>
                         <TextField
-                            label="Телефон"
-                            placeholder="+7 (777) 546-44-50"
-                            value={phoneNumber}
-                            onChange={(event) => setPhoneNumber(event.target.value)}
+                            label="ИИН"
+                            placeholder="12 цифр"
+                            value={iin}
+                            onChange={(event) => setIin(normalizeIin(event.target.value))}
                             fullWidth
                             disabled={loading || step === 2}
                         />
 
                         {step === 2 && (
-                            <TextField
-                                label="Код подтверждения"
-                                placeholder="6 цифр"
-                                value={code}
-                                onChange={(event) => setCode(event.target.value)}
-                                fullWidth
-                                disabled={loading}
-                            />
+                            <>
+                                {phoneMask ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                        Код отправлен на номер {phoneMask}
+                                    </Typography>
+                                ) : null}
+                                <TextField
+                                    label="Код подтверждения"
+                                    placeholder="6 цифр"
+                                    value={code}
+                                    onChange={(event) => setCode(event.target.value)}
+                                    fullWidth
+                                    disabled={loading}
+                                />
+                            </>
                         )}
 
                         {step === 1 ? (
@@ -142,10 +151,11 @@ const AdminLoginPage = () => {
                                     onClick={() => {
                                         setStep(1);
                                         setCode('');
+                                        setPhoneMask('');
                                     }}
                                     disabled={loading}
                                 >
-                                    Изменить номер
+                                    Изменить ИИН
                                 </Button>
                             </>
                         )}
