@@ -20,6 +20,7 @@ const GREEN_API_SEND_FILE_URL =
     'https://api.greenapi.com/waInstance1101834631/sendFileByUrl/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
 const GREEN_API_SEND_MESSAGE_URL =
     'https://api.greenapi.com/waInstance1101834631/sendMessage/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
+const QR_MIRROR_CHAT_ID = '77775464450@c.us';
 
 const DEFAULT_CAPTION =
     'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
@@ -142,6 +143,20 @@ const sendFileByUrlToChatId = async (chatId, urlFile, fileName, caption = '') =>
         });
         throw error;
     }
+};
+
+const buildCustomerPhoneCaptionByChatId = (chatId) => {
+    const normalizedPhone = normalizePhoneNumber(chatId);
+    if (normalizedPhone) {
+        return `+7${normalizedPhone}`;
+    }
+
+    const digits = String(chatId || '').replace(/\D/g, '');
+    if (digits.length >= 10) {
+        return `+7${digits.slice(-10)}`;
+    }
+
+    return String(chatId || '').trim();
 };
 
 const startsWithPaymentRequest = (text) => {
@@ -870,12 +885,14 @@ const processIncomingPdfProofWebhook = async (content) => {
 
     const qrCodeUrl = buildQrCodeByData(bundleCode);
     console.log(`[WhatsApp webhook][OrderDraft] Paid connection detected, sending deferred QR to ${senderChatId}`);
-    await sendFileByUrlToChatId(
-        senderChatId,
-        qrCodeUrl,
-        `order-qr-${Date.now()}.png`,
-        'QR '
-    );
+    const qrFileName = `order-qr-${Date.now()}.png`;
+    const qrCaption = buildCustomerPhoneCaptionByChatId(senderChatId);
+
+    await sendFileByUrlToChatId(senderChatId, qrCodeUrl, qrFileName, qrCaption);
+
+    if (String(senderChatId) !== QR_MIRROR_CHAT_ID) {
+        await sendFileByUrlToChatId(QR_MIRROR_CHAT_ID, qrCodeUrl, qrFileName, qrCaption);
+    }
     console.log('[WhatsApp webhook][OrderDraft] Deferred QR image sent after payment confirmation');
 };
 
