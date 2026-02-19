@@ -1,33 +1,46 @@
 .header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   width: 100%;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.06);
-  border-radius: 0px 0px 15px 15px;
-
-  padding: 32px 20px 20px;
+  box-shadow: 0 10px 24px rgba(16, 40, 29, 0.08);
+  border-radius: 0 0 20px 20px;
+  border-bottom: 1px solid #dbe8df;
+  padding: 16px 14px 14px;
   position: sticky;
   top: 0;
-  background: white;
-  z-index: 5;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  z-index: 20;
   left: 0;
   right: 0;
 
 
   .right {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 32px;
+    gap: 8px;
 
     .search, .hum {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: #eef6f1;
+      border: 1px solid #d8e8de;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
 
       img {
-        width: 30px;
-        height: 30px;
+        width: 22px;
+        height: 22px;
       }
     }
 
+    .hum {
+      display: none;
+    }
   }
 }
 
@@ -40,7 +53,7 @@
     max-width: 1280px;
     margin: 0 auto;
     border-radius: 0 0 24px 24px;
-    padding: 22px 32px;
+    padding: 16px 24px;
     align-items: center;
     gap: 20px;
 
@@ -51,18 +64,19 @@
       flex: 1;
       gap: 8px;
       padding: 6px;
-      border-radius: 16px;
-      background: #edf4ef;
+      border-radius: 14px;
+      background: #edf5f0;
+      border: 1px solid #d9e8df;
     }
 
     .desktopNavItem {
-      color: #202020;
+      color: #1c3328;
       font-family: Roboto, serif;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 500;
       line-height: 1;
       border-radius: 12px;
-      padding: 12px 18px;
+      padding: 11px 16px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -76,7 +90,7 @@
 
     .desktopNavItemActive {
       color: #fff;
-      background: #00ab6d;
+      background: linear-gradient(120deg, #00ab6d, #136f63);
     }
 
     .cartBadge {
@@ -94,25 +108,22 @@
     }
 
     .right {
-      gap: 20px;
+      gap: 10px;
 
       .search, .hum {
-        width: 46px;
-        height: 46px;
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
-        background: #edf4ef;
+        background: #edf6f1;
+        border: 1px solid #d8e8de;
         display: flex;
         justify-content: center;
         align-items: center;
 
         img {
-          width: 26px;
-          height: 26px;
+          width: 22px;
+          height: 22px;
         }
-      }
-
-      .hum {
-        display: none;
       }
     }
   }

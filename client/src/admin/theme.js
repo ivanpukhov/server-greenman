@@ -23,8 +23,8 @@ const adminTheme = createTheme({
             main: '#d1495b'
         },
         background: {
-            default: '#f2f7f4',
-            paper: '#fafffd'
+            default: '#edf5f0',
+            paper: '#f8fdf9'
         },
         text: {
             primary: '#10281d',
@@ -35,7 +35,7 @@ const adminTheme = createTheme({
         borderRadius: 18
     },
     typography: {
-        fontFamily: '"Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif',
+        fontFamily: '"Manrope", "Avenir Next", "Segoe UI", sans-serif',
         h4: {
             fontWeight: 750,
             letterSpacing: '-0.02em'
@@ -53,7 +53,7 @@ const adminTheme = createTheme({
             styleOverrides: {
                 body: {
                     background:
-                        'radial-gradient(circle at 0% 0%, rgba(88,196,142,0.15) 0%, rgba(88,196,142,0) 45%), radial-gradient(circle at 100% 100%, rgba(19,111,99,0.16) 0%, rgba(19,111,99,0) 50%), #f2f7f4'
+                        'radial-gradient(circle at 0% 0%, rgba(88,196,142,0.18) 0%, rgba(88,196,142,0) 45%), radial-gradient(circle at 100% 100%, rgba(19,111,99,0.2) 0%, rgba(19,111,99,0) 50%), #edf5f0'
                 }
             }
         },
@@ -62,7 +62,7 @@ const adminTheme = createTheme({
                 root: {
                     backgroundImage: 'none',
                     border: '1px solid rgba(16,40,29,0.07)',
-                    boxShadow: '0 18px 50px rgba(16,40,29,0.08)'
+                    boxShadow: '0 18px 42px rgba(16,40,29,0.08)'
                 }
             }
         },
@@ -86,7 +86,7 @@ const adminTheme = createTheme({
         MuiCard: {
             styleOverrides: {
                 root: {
-                    borderRadius: 22
+                    borderRadius: 20
                 }
             }
         },

@@ -80,18 +80,7 @@ const Main = () => {
             <h3 className="title__top"><span>Топ</span> товары</h3>
             <h4 className="subtitle__top">Часто покупаемые товары</h4>
             <CatalogTop/>
-            <Link to={'/catalog'} style={{
-                background: "#00AB6D",
-                borderRadius: "15px",
-                padding: "24px",
-                width: "100%",
-                display: "block",
-                color: "#fff",
-		fontWeight: 600,
-                fontSize: "18px",
-                marginTop: "24px"
-
-            }}>
+            <Link to={'/catalog'} className="main__catalog-link">
                 Смотреть все товары
             </Link>
             <Faq/>

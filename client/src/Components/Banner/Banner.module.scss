@@ -1,9 +1,30 @@
 .banner {
-  border-radius: 15px;
-  background: #00AB6D;
+  border-radius: 22px;
+  background: linear-gradient(130deg, #00ab6d 0%, #136f63 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   width: 100%;
-  padding: 32px 24px;
-  margin-top: 88px;
+  padding: 26px 20px;
+  margin-top: 58px;
+  box-shadow: 0 18px 36px rgba(19, 111, 99, 0.28);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0));
+    pointer-events: none;
+  }
+
+  & > * {
+    position: relative;
+    z-index: 1;
+  }
 
   a{
     display: block;
@@ -12,10 +33,10 @@
   .title {
     color: #FFF;
     font-family: Hagrid;
-    font-size: 24px;
+    font-size: clamp(24px, 6vw, 34px);
     font-style: normal;
     font-weight: 400;
-    line-height: 120%; /* 28.8px */
+    line-height: 1.15;
   }
 
   .icons {
@@ -29,8 +50,9 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      border-radius: 8px;
-      background: #ECF3EE;
+      border-radius: 12px;
+      background: rgba(236, 243, 238, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.52);
 
       img {
         width: 26px;
@@ -41,31 +63,32 @@
   .phone{
     color: #FFF;
     font-family: Hagrid;
-    font-size: 26px;
+    font-size: clamp(24px, 6.2vw, 36px);
     font-style: normal;
     font-weight: 400;
     line-height: normal;
+    letter-spacing: 0.01em;
   }
 
   .text{
     color: #FFF;
     font-family: Roboto;
-    font-size: 16px;
+    font-size: clamp(14px, 3.8vw, 20px);
     font-style: normal;
     font-weight: 400;
-    line-height: normal;
+    line-height: 1.35;
     margin-top: 8px;
+    opacity: 0.95;
   }
 }
 
 @media screen and (min-width: 1024px) {
   .banner {
-    margin-top: 104px;
+    margin-top: 84px;
     border-radius: 24px;
-    padding: 40px 36px;
+    padding: 34px 34px;
 
     .title {
-      font-size: 34px;
       max-width: 760px;
     }
 
@@ -82,4 +105,3 @@
     }
   }
 }
-

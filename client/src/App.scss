@@ -1346,3 +1346,463 @@ h6 {
     gap: 10px;
   }
 }
+
+/* Global redesign overrides */
+:root {
+  --gm-bg: #f3f8f4;
+  --gm-surface: #ffffff;
+  --gm-surface-soft: #f5faf7;
+  --gm-border: #dbe8df;
+  --gm-text: #182c22;
+  --gm-subtext: #577263;
+  --gm-primary: #00ab6d;
+  --gm-primary-2: #136f63;
+  --gm-radius-lg: 22px;
+  --gm-radius-md: 16px;
+}
+
+html,
+body,
+#root,
+.App {
+  background: radial-gradient(circle at 8% 2%, #dff3e7 0%, transparent 38%), radial-gradient(circle at 100% 98%, #d9ece5 0%, transparent 40%), var(--gm-bg);
+  color: var(--gm-text);
+}
+
+body {
+  font-family: Roboto, "Avenir Next", "Segoe UI", sans-serif;
+}
+
+a,
+button,
+input,
+textarea {
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+}
+
+.container {
+  width: min(1240px, 100% - 28px);
+  padding: 0 0 96px;
+  margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    width: min(1320px, 100% - 56px);
+    padding-bottom: 78px;
+  }
+}
+
+.logo span {
+  font-family: Hagrid, Roboto, sans-serif;
+  font-size: 24px;
+}
+
+.cart__n {
+  min-height: clamp(360px, 66vh, 760px);
+  height: auto;
+}
+
+.cart__null {
+  border-radius: 24px;
+  box-shadow: 0 18px 46px rgba(16, 40, 29, 0.2);
+  padding: 30px 24px;
+  gap: 12px;
+}
+
+.cart__null-title {
+  text-align: center;
+}
+
+.cart__null-text {
+  max-width: 560px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.cart__null--btn {
+  max-width: 340px;
+  border: 1px solid rgba(16, 40, 29, 0.08);
+}
+
+.cart__title {
+  margin-top: 28px;
+  padding: 6px 2px;
+}
+
+.cart__h2 {
+  font-size: clamp(30px, 8.2vw, 46px);
+}
+
+.cart__q {
+  color: var(--gm-subtext);
+}
+
+.cart {
+  gap: 12px;
+}
+
+.cart__subtitle {
+  font-weight: 600;
+  color: var(--gm-text);
+}
+
+.cart__item {
+  border: 1px solid var(--gm-border);
+  border-radius: 20px;
+  background: linear-gradient(160deg, var(--gm-surface), var(--gm-surface-soft));
+  box-shadow: 0 12px 28px rgba(16, 40, 29, 0.07);
+  padding: 16px;
+  min-height: 0;
+}
+
+.cart__content {
+  width: calc(100% - 58px);
+  gap: 6px;
+}
+
+.cart__name {
+  font-size: clamp(17px, 4.4vw, 22px);
+  line-height: 1.25;
+}
+
+.cart__desc {
+  line-height: 1.5;
+  color: #5b7063;
+}
+
+.cart__price {
+  font-size: clamp(20px, 5vw, 30px);
+}
+
+.cart__type {
+  max-width: 100%;
+  width: fit-content;
+  background: linear-gradient(120deg, #00ab6d, #17826d);
+  border-radius: 12px;
+  padding: 7px 11px;
+}
+
+.delivery {
+  margin-top: 18px;
+  border-radius: 24px;
+  border: 1px solid var(--gm-border);
+  background: linear-gradient(165deg, var(--gm-surface), #f2f9f5);
+  padding: 16px;
+  box-shadow: 0 12px 30px rgba(16, 40, 29, 0.07);
+}
+
+.delivery__form {
+  gap: 10px;
+}
+
+.delivery__form b {
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  margin-top: 8px;
+}
+
+.delivery__form input {
+  border-radius: 16px;
+  border: 1px solid #cdded3;
+  height: 58px;
+  font-size: 16px;
+  background: #ffffff;
+  padding-left: 60px;
+}
+
+.suggestions {
+  padding: 4px 0 0;
+  gap: 8px;
+}
+
+.suggestions li {
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #dbe8df;
+  box-shadow: none;
+  font-size: 15px;
+}
+
+.dway {
+  gap: 10px;
+  padding: 2px 2px 8px;
+}
+
+.dway label {
+  min-width: calc(50% - 5px);
+  height: 96px;
+  border: 1px solid #cee1d6;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.dway__logo span {
+  font-size: 14px;
+  color: #355446;
+}
+
+.dway__checkbox {
+  width: 20px;
+  height: 20px;
+}
+
+.total {
+  background: #ffffff;
+  border: 1px solid #dbe8df;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.total .total__sub-item,
+.total .total__main-item {
+  font-size: clamp(17px, 4.4vw, 24px);
+}
+
+.cart__btn {
+  border-radius: 16px;
+  background: linear-gradient(120deg, #00ab6d, #136f63);
+  box-shadow: 0 14px 26px rgba(0, 171, 109, 0.28);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.profile__top {
+  border: 1px solid var(--gm-border);
+  border-radius: 22px;
+  background: linear-gradient(150deg, #f7fcf9, #edf6f1);
+  box-shadow: 0 10px 24px rgba(16, 40, 29, 0.06);
+  margin-top: 28px;
+}
+
+.profile__title {
+  font-size: clamp(32px, 8vw, 46px);
+  margin-top: 28px;
+}
+
+.profile__orders {
+  gap: 12px;
+}
+
+.profile__order {
+  border: 1px solid var(--gm-border);
+  background: linear-gradient(160deg, #ffffff, #f4faf6);
+  border-radius: 18px;
+  max-height: 118px;
+  box-shadow: 0 10px 24px rgba(16, 40, 29, 0.06);
+}
+
+.profile__order.expanded {
+  background: linear-gradient(160deg, #f5fcf8, #edf6f1);
+}
+
+.profile__order-title {
+  color: #5a7566;
+}
+
+.profile-product__type {
+  width: fit-content;
+  padding: 7px 12px;
+  border-radius: 10px;
+}
+
+.product__typeTitle {
+  margin-top: 14px;
+  padding: 0 14px;
+  font-size: clamp(20px, 5vw, 30px);
+  text-align: left;
+}
+
+.product__typeBlock {
+  justify-content: flex-start;
+  padding: 8px 14px;
+  gap: 10px;
+}
+
+.product__type,
+.product__type-active {
+  min-width: 140px;
+  width: auto;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+.product__type {
+  background: linear-gradient(120deg, #00ab6d, #136f63);
+}
+
+.product__bottom {
+  padding: 14px;
+  gap: 14px;
+}
+
+.product__bottom button {
+  width: min(260px, 100%);
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.product__inCart {
+  min-width: 50px;
+  height: 108px;
+  border-radius: 12px;
+  border: 1px solid #d7e6dd;
+  background: #f8fbf9;
+}
+
+.product__inCart button {
+  border-radius: 12px;
+  background: #f8fbf9 !important;
+}
+
+.product__quantity {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.productInfo {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.productInfo__header {
+  margin: 18px 0;
+}
+
+.productInfo__header--back {
+  min-width: 54px;
+  height: 54px;
+  border-radius: 14px;
+}
+
+.productInfo__header--title {
+  font-size: clamp(24px, 6.4vw, 40px);
+  line-height: 1.12;
+}
+
+.productInfo__desc {
+  border: 1px solid #dbe8df;
+  background: linear-gradient(170deg, #ffffff, #f4faf6);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.productInfo__desc--title {
+  font-size: clamp(22px, 5.5vw, 32px);
+}
+
+.productInfo__desc--content {
+  font-size: clamp(15px, 3.8vw, 19px);
+  line-height: 1.55;
+}
+
+.productInfo__desc.contraindications {
+  border: 1px solid rgba(209, 73, 91, 0.24);
+  background: linear-gradient(165deg, #f8dbe0, #f2bec8);
+}
+
+.product__add {
+  width: calc(100% - 2px);
+  bottom: 90px;
+}
+
+.product__add .product__buy button {
+  width: 100% !important;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #00ab6d, #136f63);
+}
+
+.product__add .product__buy button.cardAdd__btn::before {
+  font-weight: 600;
+}
+
+.search-page,
+.catalog-page,
+.cart-page {
+  width: 100%;
+}
+
+.footer {
+  margin-top: 42px;
+  padding: 18px 0 120px;
+  border-top: 1px solid #dbe8df;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.footer__links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.footer__links a {
+  color: #2b4a3d;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d5e4da;
+  background: #ffffff;
+}
+
+.footer__copyright {
+  color: #587063;
+  font-size: 14px;
+}
+
+@media (min-width: 1024px) {
+  .footer {
+    padding-bottom: 24px;
+  }
+}
+
+.bar {
+  padding: 12px 0 calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid #d8e7dd;
+  border-radius: 20px 20px 0 0;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+}
+
+.bar__item {
+  min-width: 62px;
+}
+
+.bar__item .bar__icon img {
+  width: 26px;
+  height: 26px;
+}
+
+.bar__item .bar__text {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #6a8074;
+}
+
+.bar__item .bar__text-green {
+  color: #00ab6d;
+  font-weight: 600;
+}
+
+.link__cart {
+  width: calc(100% - 24px);
+  left: 12px;
+  border-radius: 16px;
+  top: -84px;
+  box-shadow: 0 14px 30px rgba(0, 171, 109, 0.28);
+  background: linear-gradient(120deg, #00ab6d, #136f63);
+}
+
+@media (max-width: 374px) {
+  .container {
+    width: calc(100% - 20px);
+  }
+
+  .dway label {
+    min-width: 100%;
+  }
+}

@@ -31,19 +31,43 @@ const formatMoney = (value) =>
 const metricCardSx = {
     height: '100%',
     border: '1px solid rgba(16,40,29,0.08)',
-    boxShadow: '0 14px 28px rgba(16,40,29,0.08)',
+    background: 'linear-gradient(155deg, rgba(255,255,255,0.98), rgba(244,251,247,0.96))',
+    boxShadow: '0 12px 26px rgba(16,40,29,0.08)',
     transition: 'transform 160ms ease, box-shadow 160ms ease',
     '&:hover': {
         transform: 'translateY(-2px)',
-        boxShadow: '0 20px 40px rgba(16,40,29,0.12)'
+        boxShadow: '0 18px 34px rgba(16,40,29,0.12)'
     }
 };
 
 const chartColors = {
-    turnover: '#1f9a60',
-    expenses: '#d1495b',
-    profit: '#136f63',
-    orders: '#2b78c2'
+    turnover: '#10a778',
+    expenses: '#d96a7c',
+    profit: '#247d63',
+    orders: '#2c7ed6'
+};
+
+const toChartSafeId = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+
+const buildSmoothPath = (points = []) => {
+    if (!points.length) {
+        return '';
+    }
+    if (points.length === 1) {
+        return `M ${points[0].x} ${points[0].y}`;
+    }
+
+    return points.reduce((acc, point, index) => {
+        if (index === 0) {
+            return `M ${point.x} ${point.y}`;
+        }
+        const prev = points[index - 1];
+        const cp1x = prev.x + (point.x - prev.x) / 2;
+        const cp1y = prev.y;
+        const cp2x = prev.x + (point.x - prev.x) / 2;
+        const cp2y = point.y;
+        return `${acc} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${point.x} ${point.y}`;
+    }, '');
 };
 
 const useElementSize = () => {
@@ -90,7 +114,7 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
     const [activeIndex, setActiveIndex] = useState(null);
 
     const height = 280;
-    const padding = { top: 16, right: 12, bottom: 48, left: 12 };
+    const padding = { top: 16, right: 14, bottom: 48, left: 14 };
     const pointCount = labels.length;
 
     const geometry = useMemo(() => {
@@ -112,27 +136,23 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
 
         const lines = series.map((line) => {
             const points = line.values.map((value, index) => ({ x: xForIndex(index), y: yForValue(value), value: Number(value || 0) }));
-            const path = points
-                .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-                .join(' ');
+            const path = buildSmoothPath(points);
+            const areaPath = points.length
+                ? `${path} L ${points[points.length - 1].x} ${height - padding.bottom} L ${points[0].x} ${height - padding.bottom} Z`
+                : '';
 
             return {
                 ...line,
                 points,
-                path
+                path,
+                areaPath
             };
         });
-
-        const firstLine = lines[0];
-        const areaPath = firstLine
-            ? `${firstLine.path} L ${firstLine.points[firstLine.points.length - 1].x} ${height - padding.bottom} L ${firstLine.points[0].x} ${height - padding.bottom} Z`
-            : '';
 
         return {
             minValue,
             maxValue,
             lines,
-            areaPath,
             xForIndex
         };
     }, [height, labels.length, padding.bottom, padding.left, padding.right, padding.top, pointCount, series, width]);
@@ -159,6 +179,11 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
     };
 
     const labelTickIndices = pickLabelIndices(pointCount, width < 420 ? 4 : 7);
+
+    const idBase = toChartSafeId(title);
+    const yAxisLabels = geometry
+        ? [geometry.maxValue, geometry.maxValue * 0.75, geometry.maxValue * 0.5, geometry.maxValue * 0.25, geometry.minValue]
+        : [];
 
     return (
         <Card sx={metricCardSx}>
@@ -197,10 +222,12 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
                 >
                     <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={title}>
                         <defs>
-                            <linearGradient id={`${title}-area`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="rgba(31,154,96,0.26)" />
-                                <stop offset="100%" stopColor="rgba(31,154,96,0.02)" />
-                            </linearGradient>
+                            {series.map((line) => (
+                                <linearGradient key={`area-${line.key}`} id={`${idBase}-${line.key}-area`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor={line.color} stopOpacity="0.26" />
+                                    <stop offset="100%" stopColor={line.color} stopOpacity="0.02" />
+                                </linearGradient>
+                            ))}
                         </defs>
 
                         {[0, 0.25, 0.5, 0.75, 1].map((step) => {
@@ -217,6 +244,19 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
                             );
                         })}
 
+                        {yAxisLabels.map((value, index) => (
+                            <text
+                                key={`y-axis-${index}`}
+                                x={width - padding.right}
+                                y={padding.top + (height - padding.top - padding.bottom) * (index / 4) - 4}
+                                fontSize="10"
+                                textAnchor="end"
+                                fill="#6a8578"
+                            >
+                                {formatValue(value)}
+                            </text>
+                        ))}
+
                         <line
                             x1={padding.left}
                             y1={height - padding.bottom}
@@ -225,11 +265,10 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
                             stroke="rgba(16,40,29,0.2)"
                         />
 
-                        {geometry?.areaPath ? <path d={geometry.areaPath} fill={`url(#${title}-area)`} /> : null}
-
                         {geometry?.lines.map((line) => (
                             <g key={line.key}>
-                                <path d={line.path} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" />
+                                {line.areaPath ? <path d={line.areaPath} fill={`url(#${idBase}-${line.key}-area)`} /> : null}
+                                <path d={line.path} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinecap="round" />
                                 {activeIndex !== null && line.points[activeIndex] ? (
                                     <circle cx={line.points[activeIndex].x} cy={line.points[activeIndex].y} r="4" fill={line.color} />
                                 ) : null}
@@ -431,18 +470,19 @@ const AdminDashboard = () => {
                 sx={{
                     p: { xs: 2, md: 3 },
                     borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
+                    border: '1px solid rgba(16,40,29,0.1)',
+                    boxShadow: '0 14px 32px rgba(16,40,29,0.12)',
                     background:
-                        'radial-gradient(circle at 12% 12%, rgba(136,219,169,0.32), transparent 36%), linear-gradient(135deg, rgba(31,154,96,0.2) 0%, rgba(19,111,99,0.22) 100%)'
+                        'radial-gradient(circle at 12% 12%, rgba(136,219,169,0.36), transparent 36%), linear-gradient(135deg, rgba(31,154,96,0.26) 0%, rgba(19,111,99,0.24) 100%)'
                 }}
             >
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2}>
                     <Box>
-                        <Typography variant="h5" sx={{ mb: 0.8 }}>
+                        <Typography variant="h5" sx={{ mb: 0.8, fontWeight: 760 }}>
                             Оперативная панель
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Адаптивная аналитика заказов, оборота, расходов и прибыли.
+                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 620 }}>
+                            Наглядная аналитика: динамика заказов, оборот, расходы и прибыль в одном экране.
                         </Typography>
                     </Box>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

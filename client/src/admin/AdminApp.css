@@ -1,5 +1,5 @@
 .admin-shell .RaLayout-appFrame {
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
     margin-top: 0 !important;
 }
 
@@ -7,12 +7,12 @@
     margin: 0;
     border-radius: 0;
     overflow: hidden;
-    border-right: 1px solid rgba(16, 40, 29, 0.08);
+    border-right: 1px solid rgba(16, 40, 29, 0.09);
     border-top: 0;
     border-left: 0;
     border-bottom: 0;
     box-shadow: none;
-    background: linear-gradient(180deg, rgba(250, 255, 252, 0.96), rgba(239, 248, 243, 0.92));
+    background: linear-gradient(180deg, rgba(252, 255, 253, 0.98), rgba(240, 248, 243, 0.94));
 }
 
 .admin-shell .RaSidebar-fixed {
@@ -25,17 +25,17 @@
 
 .admin-shell .RaLayout-content {
     margin: 0;
-    padding: 18px;
+    padding: 16px;
 }
 
 .admin-shell .RaLayout-content .RaList-root,
 .admin-shell .RaLayout-content .RaShow-root,
 .admin-shell .RaLayout-content .RaEdit-root,
 .admin-shell .RaLayout-content .RaCreate-root {
-    background: rgba(249, 255, 252, 0.88);
-    border-radius: 22px;
-    border: 1px solid rgba(16, 40, 29, 0.07);
-    box-shadow: 0 20px 48px rgba(16, 40, 29, 0.09);
+    background: rgba(249, 255, 252, 0.92);
+    border-radius: 20px;
+    border: 1px solid rgba(16, 40, 29, 0.08);
+    box-shadow: 0 16px 34px rgba(16, 40, 29, 0.09);
 }
 
 .admin-shell .RaLayout-content .RaList-main,
@@ -47,6 +47,7 @@
 
 .admin-shell .RaDatagrid-root {
     overflow-x: auto;
+    border-radius: 14px;
 }
 
 .admin-shell .RaDatagrid-table {
@@ -64,15 +65,15 @@
     border-radius: 0;
     left: 0 !important;
     width: 100% !important;
-    background: linear-gradient(130deg, rgba(24, 145, 101, 0.95), rgba(19, 111, 99, 0.94));
+    background: linear-gradient(130deg, rgba(24, 145, 101, 0.98), rgba(19, 111, 99, 0.98));
     color: #f5fffa;
     border: 0;
-    box-shadow: 0 8px 20px rgba(13, 79, 63, 0.22);
+    box-shadow: 0 8px 20px rgba(13, 79, 63, 0.28);
 }
 
 .admin-topbar__inner {
     width: 100%;
-    min-height: 66px;
+    min-height: 62px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -82,10 +83,11 @@
 
 .admin-topbar__title {
     line-height: 1.1;
+    font-weight: 700;
 }
 
 .admin-topbar__subtitle {
-    opacity: 0.9;
+    opacity: 0.94;
 }
 
 .admin-topbar__actions {
@@ -95,7 +97,20 @@
 }
 
 .admin-menu .RaMenu-open {
-    padding: 14px 12px;
+    padding: 12px 10px;
+}
+
+.admin-shell .RaMenuItemLink-root {
+    border: 1px solid rgba(16, 40, 29, 0.06);
+    background: rgba(255, 255, 255, 0.56);
+}
+
+.admin-shell .RaMenuItemLink-active {
+    box-shadow: 0 8px 18px rgba(19, 111, 99, 0.16);
+}
+
+.admin-shell .MuiToolbar-root {
+    min-height: 52px;
 }
 
 @media (max-width: 900px) {
@@ -137,6 +152,6 @@
     }
 
     .admin-shell .RaDatagrid-table {
-        min-width: 700px;
+        min-width: 660px;
     }
 }
