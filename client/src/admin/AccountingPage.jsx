@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Box,
     Button,
@@ -154,6 +154,36 @@ const AccountingPage = () => {
 
     const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
     const hasHiddenOrders = orders.length > 5;
+    const allocationWithExpenses = useMemo(() => {
+        const byAccount = Array.isArray(summary.allocations?.byAccount) ? summary.allocations.byAccount : [];
+        const withoutLink = summary.allocations?.withoutLink || {};
+        const withoutLinkName = withoutLink.accountName || 'Без ссылки';
+        const expenseByAccount = new Map();
+        const knownAccountNames = new Set(byAccount.map((item) => String(item.accountName || '').trim()).filter(Boolean));
+        knownAccountNames.add(withoutLinkName);
+
+        expenses.forEach((expense) => {
+            const rawName = String(expense?.spentByName || '').trim();
+            const targetName = rawName && knownAccountNames.has(rawName) ? rawName : withoutLinkName;
+            const amount = Number(expense?.amount || 0);
+            expenseByAccount.set(targetName, (expenseByAccount.get(targetName) || 0) + amount);
+        });
+
+        return {
+            byAccount: byAccount.map((item) => {
+                const income = Number(item.total || 0);
+                const expense = Number(expenseByAccount.get(item.accountName) || 0);
+                return {
+                    ...item,
+                    totalWithExpense: income - expense
+                };
+            }),
+            withoutLink: {
+                ...withoutLink,
+                totalWithExpense: Number(withoutLink.total || 0) - Number(expenseByAccount.get(withoutLinkName) || 0)
+            }
+        };
+    }, [expenses, summary.allocations]);
 
     return (
         <Stack spacing={2.5}>
@@ -216,11 +246,11 @@ const AccountingPage = () => {
                 </Typography>
                 {isSmall ? (
                     <Stack spacing={1.2}>
-                        {(summary.allocations?.byAccount || []).map((item) => (
+                        {(allocationWithExpenses.byAccount || []).map((item) => (
                             <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
                                 <CardContent>
                                     <Typography variant="subtitle2">
-                                        {item.accountName} - {formatMoney(item.total)}
+                                        {item.accountName} - {formatMoney(item.totalWithExpense)}
                                     </Typography>
                                 </CardContent>
                             </Card>
@@ -228,8 +258,8 @@ const AccountingPage = () => {
                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                             <CardContent>
                                 <Typography variant="subtitle2">
-                                    {(summary.allocations?.withoutLink?.accountName || 'Без ссылки')} -{' '}
-                                    {formatMoney(summary.allocations?.withoutLink?.total || 0)}
+                                    {(allocationWithExpenses.withoutLink?.accountName || 'Без ссылки')} -{' '}
+                                    {formatMoney(allocationWithExpenses.withoutLink?.totalWithExpense || 0)}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -244,15 +274,15 @@ const AccountingPage = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(summary.allocations?.byAccount || []).map((item) => (
+                                {(allocationWithExpenses.byAccount || []).map((item) => (
                                     <TableRow key={item.accountName}>
                                         <TableCell>{item.accountName}</TableCell>
-                                        <TableCell align="right">{formatMoney(item.total)}</TableCell>
+                                        <TableCell align="right">{formatMoney(item.totalWithExpense)}</TableCell>
                                     </TableRow>
                                 ))}
                                 <TableRow>
-                                    <TableCell>{summary.allocations?.withoutLink?.accountName || 'Без ссылки'}</TableCell>
-                                    <TableCell align="right">{formatMoney(summary.allocations?.withoutLink?.total || 0)}</TableCell>
+                                    <TableCell>{allocationWithExpenses.withoutLink?.accountName || 'Без ссылки'}</TableCell>
+                                    <TableCell align="right">{formatMoney(allocationWithExpenses.withoutLink?.totalWithExpense || 0)}</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
