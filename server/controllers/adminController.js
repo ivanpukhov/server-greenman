@@ -5,6 +5,7 @@ const Order = require('../models/orders/Order');
 const Expense = require('../models/orders/Expense');
 const AdminUser = require('../models/orders/AdminUser');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
+const OrderBundle = require('../models/orders/OrderBundle');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
 const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
@@ -29,6 +30,7 @@ const { Op } = Sequelize;
 const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Доставлено'];
 const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
 const EXCLUDED_ACCOUNT_NAME_TOKENS = new Set(['иван', 'даша']);
+const ORDER_BUNDLE_CODE_REGEX = /^ob_[A-Za-z0-9]{6,24}$/;
 
 const filterRestrictedAdmins = (items, currentAdminPhone, getItemPhone) => {
     return items.filter((item) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, getItemPhone(item)));
@@ -110,6 +112,43 @@ const parseStockQuantity = (rawValue) => {
     }
 
     return Math.floor(numeric);
+};
+
+const parseOrderBundlePayload = (rawPayload) => {
+    if (!rawPayload) {
+        return null;
+    }
+
+    try {
+        const payload = JSON.parse(rawPayload);
+        const deliveryPrice = Number(payload?.deliveryPrice);
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+
+        if (Number(payload?.v) !== 1 || !Number.isFinite(deliveryPrice) || deliveryPrice < 0 || items.length === 0) {
+            return null;
+        }
+
+        const normalizedItems = items
+            .map((item) => ({
+                productId: Number(item?.productId),
+                typeId: Number(item?.typeId),
+                quantity: Math.max(1, Math.floor(Number(item?.quantity) || 1))
+            }))
+            .filter((item) => Number.isFinite(item.productId) && Number.isFinite(item.typeId) && item.quantity > 0);
+
+        if (normalizedItems.length === 0) {
+            return null;
+        }
+
+        return {
+            v: 1,
+            deliveryPrice,
+            noteText: String(payload?.noteText || '').trim(),
+            items: normalizedItems
+        };
+    } catch (_error) {
+        return null;
+    }
 };
 
 const parseTypes = (typesRaw) => {
@@ -2159,6 +2198,41 @@ ${productDetails}`;
             return res.json({ data: rows, total: rows.length });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить QR-коды', error: error.message });
+        }
+    },
+
+    async getOrderBundle(req, res) {
+        try {
+            const code = String(req.params.code || '').trim();
+
+            if (!ORDER_BUNDLE_CODE_REGEX.test(code)) {
+                return res.status(400).json({ message: 'Некорректный код заказа из QR' });
+            }
+
+            const bundleRow = await OrderBundle.findOne({
+                where: { code },
+                attributes: ['id', 'code', 'payload', 'createdAt']
+            });
+
+            if (!bundleRow) {
+                return res.status(404).json({ message: 'QR-пакет заказа не найден' });
+            }
+
+            const parsed = parseOrderBundlePayload(bundleRow.payload);
+            if (!parsed) {
+                return res.status(422).json({ message: 'QR-пакет заказа повреждён или имеет неверный формат' });
+            }
+
+            return res.json({
+                data: {
+                    id: bundleRow.id,
+                    code: bundleRow.code,
+                    createdAt: bundleRow.createdAt,
+                    ...parsed
+                }
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить данные заказа из QR', error: error.message });
         }
     },
 

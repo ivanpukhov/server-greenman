@@ -68,6 +68,8 @@ const deliveryMethodChoices = [
 
 const normalizeScannerCode = (value) => String(value || '').trim().toLowerCase();
 const ORDER_BUNDLE_PREFIX = 'https://greenman.kz/order-bundle#';
+const ORDER_BUNDLE_PATH_PREFIX = 'https://greenman.kz/order-bundle/';
+const ORDER_BUNDLE_CODE_REGEX = /^ob_[A-Za-z0-9]{6,24}$/;
 
 const decodeBase64Url = (value) => {
     const normalized = String(value || '')
@@ -122,6 +124,24 @@ const parseOrderBundleFromCode = (rawCode) => {
     } catch (_error) {
         return null;
     }
+};
+
+const extractShortOrderBundleCode = (rawCode) => {
+    const code = String(rawCode || '').trim();
+    if (!code) {
+        return null;
+    }
+
+    if (ORDER_BUNDLE_CODE_REGEX.test(code)) {
+        return code;
+    }
+
+    if (code.startsWith(ORDER_BUNDLE_PATH_PREFIX)) {
+        const candidate = code.slice(ORDER_BUNDLE_PATH_PREFIX.length).trim();
+        return ORDER_BUNDLE_CODE_REGEX.test(candidate) ? candidate : null;
+    }
+
+    return null;
 };
 
 const calculateDeliveryCostFromProducts = (products, deliveryMethod) => {
@@ -362,13 +382,50 @@ const OrderProductsInput = () => {
         setScannerHint(`${row.productName} / ${row.typeName} добавлен`);
     };
 
-    const addByCode = (rawCode) => {
+    const loadOrderBundleByCode = async (bundleCode) => {
+        const token = adminAuthStorage.getToken();
+        const response = await fetch(apiUrl(`/admin/order-bundles/${encodeURIComponent(bundleCode)}`), {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(body.message || 'Не удалось загрузить заказ из QR');
+        }
+
+        const data = body?.data || {};
+        const deliveryPrice = Number(data.deliveryPrice);
+        const items = Array.isArray(data.items) ? data.items : [];
+        const normalizedItems = items
+            .map((item) => ({
+                productId: Number(item?.productId),
+                typeId: Number(item?.typeId),
+                quantity: Math.max(1, Math.floor(Number(item?.quantity) || 1))
+            }))
+            .filter((item) => Number.isFinite(item.productId) && Number.isFinite(item.typeId) && item.quantity > 0);
+
+        if (!Number.isFinite(deliveryPrice) || deliveryPrice < 0 || normalizedItems.length === 0) {
+            throw new Error('QR-пакет заказа повреждён или пуст');
+        }
+
+        return {
+            deliveryPrice,
+            items: normalizedItems,
+            noteText: String(data.noteText || '').trim()
+        };
+    };
+
+    const addByCode = async (rawCode) => {
         const raw = String(rawCode || '').trim();
         if (!raw) {
             return;
         }
 
-        const bundle = parseOrderBundleFromCode(raw);
+        const legacyBundle = parseOrderBundleFromCode(raw);
+        const shortBundleCode = extractShortOrderBundleCode(raw);
+        const bundle = legacyBundle || (shortBundleCode ? await loadOrderBundleByCode(shortBundleCode) : null);
         if (bundle) {
             const currentProducts = Array.isArray(getValues('products')) ? getValues('products') : [];
             const nextProductsMap = new Map();
@@ -503,7 +560,9 @@ const OrderProductsInput = () => {
                     return;
                 }
 
-                addByCode(scanValue);
+                addByCode(scanValue).catch((error) => {
+                    notify(error.message || 'Не удалось обработать скан QR', { type: 'error' });
+                });
                 return;
             }
 
@@ -551,7 +610,9 @@ const OrderProductsInput = () => {
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                             event.preventDefault();
-                            addByCode(manualCode);
+                            addByCode(manualCode).catch((error) => {
+                                notify(error.message || 'Не удалось добавить код', { type: 'error' });
+                            });
                             setManualCode('');
                         }
                     }}
@@ -560,7 +621,9 @@ const OrderProductsInput = () => {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => {
-                        addByCode(manualCode);
+                        addByCode(manualCode).catch((error) => {
+                            notify(error.message || 'Не удалось добавить код', { type: 'error' });
+                        });
                         setManualCode('');
                     }}
                 >

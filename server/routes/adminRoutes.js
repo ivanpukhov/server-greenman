@@ -47,6 +47,7 @@ router.delete('/expenses/:id', adminController.deleteExpense);
 router.get('/inventory/types', adminController.getInventoryTypes);
 router.post('/inventory/receive', adminController.receiveInventory);
 router.get('/inventory/qr-codes', adminController.getQrCodes);
+router.get('/order-bundles/:code', adminController.getOrderBundle);
 router.put('/inventory/types/:id/alias', adminController.updateInventoryTypeAlias);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const Sequelize = require('sequelize');
 const pdfParse = require('pdf-parse');
 const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
+const OrderBundle = require('../models/orders/OrderBundle');
 const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const Product = require('../models/Product');
@@ -28,6 +29,7 @@ const PAYMENT_LINK_DUPLICATE_WINDOW_MS = 1000 * 60 * 3;
 const pendingOrderDraftByChatId = new Map();
 const PAYMENT_LINK_FOOTER =
     'После оплаты скиньте пожалуйста чек\n‼️Без чека отправки не будет';
+const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 const safeStringify = (value) => {
     const seen = new WeakSet();
@@ -488,10 +490,37 @@ const resolveOrderAliases = async (aliases) => {
     };
 };
 
-const buildOrderBundleCode = (bundlePayload) => {
+const generateOrderBundleCode = (length = 10) => {
+    let result = '';
+    for (let index = 0; index < length; index += 1) {
+        const randomIndex = Math.floor(Math.random() * ORDER_BUNDLE_CODE_ALPHABET.length);
+        result += ORDER_BUNDLE_CODE_ALPHABET[randomIndex];
+    }
+    return `ob_${result}`;
+};
+
+const saveOrderBundle = async (bundlePayload) => {
     const serialized = JSON.stringify(bundlePayload);
-    const encoded = Buffer.from(serialized, 'utf8').toString('base64url');
-    return `https://greenman.kz/order-bundle#${encoded}`;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+        const code = generateOrderBundleCode();
+        try {
+            const row = await OrderBundle.create({
+                code,
+                payload: serialized
+            });
+
+            return row;
+        } catch (error) {
+            if (error?.name === 'SequelizeUniqueConstraintError') {
+                continue;
+            }
+
+            throw error;
+        }
+    }
+
+    throw new Error('Не удалось сгенерировать уникальный код QR-пакета заказа');
 };
 
 const buildQrCodeByData = (value) =>
@@ -985,9 +1014,10 @@ const processIncomingMessageWebhook = async (content) => {
             }))
         };
 
-        const bundleCode = buildOrderBundleCode(bundlePayload);
+        const bundleRow = await saveOrderBundle(bundlePayload);
+        const bundleCode = String(bundleRow.code || '').trim();
         console.log(
-            `[WhatsApp webhook][OrderDraft] Bundle built: codeLength=${bundleCode.length}`
+            `[WhatsApp webhook][OrderDraft] Bundle saved: id=${bundleRow.id}, codeLength=${bundleCode.length}`
         );
 
         setPendingOrderDraft(recipientChatId, {

@@ -17,6 +17,7 @@ const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
 require('./models/orders/SentPaymentLink');
+require('./models/orders/OrderBundle');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
