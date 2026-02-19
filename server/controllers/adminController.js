@@ -647,9 +647,12 @@ const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн'
 
 const getDashboardRanges = (periodRaw) => {
     const now = new Date();
-    const selectedPeriod = ['week', 'month', 'year'].includes(String(periodRaw || '').toLowerCase())
+    const selectedPeriod = ['today', 'week', 'month', 'year'].includes(String(periodRaw || '').toLowerCase())
         ? String(periodRaw || '').toLowerCase()
         : 'month';
+
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
     const weekStart = new Date(now);
     weekStart.setHours(0, 0, 0, 0);
@@ -668,6 +671,7 @@ const getDashboardRanges = (periodRaw) => {
 
     return {
         selectedPeriod,
+        today: { start: todayStart, end: now },
         week: { start: weekStart, end: now },
         month: { start: monthStart, end: now },
         year: { start: yearStart, end: now },
@@ -713,6 +717,7 @@ const buildMonthlyAxis = (range) => {
 const withinRange = (date, range) => date >= range.start && date <= range.end;
 
 const buildDashboardSeries = (orders, expenses, ranges) => {
+    const todayAxis = buildDailyAxis(ranges.today);
     const weekAxis = buildDailyAxis(ranges.week);
     const monthAxis = buildDailyAxis(ranges.month);
     const yearAxis = buildMonthlyAxis(ranges.year);
@@ -730,11 +735,13 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
         );
 
     const orderCountMaps = {
+        today: initOrderMap(todayAxis),
         week: initOrderMap(weekAxis),
         month: initOrderMap(monthAxis),
         year: initOrderMap(yearAxis)
     };
     const financeMaps = {
+        today: initFinanceMap(todayAxis),
         week: initFinanceMap(weekAxis),
         month: initFinanceMap(monthAxis),
         year: initFinanceMap(yearAxis)
@@ -758,6 +765,11 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
         const amount = safeAmount(order.totalPrice);
         const dayKey = formatDayKey(createdAt);
         const monthKey = formatMonthKey(createdAt);
+
+        if (withinRange(createdAt, ranges.today)) {
+            orderCountMaps.today.set(dayKey, (orderCountMaps.today.get(dayKey) || 0) + 1);
+            upsertFinanceValue(financeMaps.today, dayKey, 'turnover', amount);
+        }
 
         if (withinRange(createdAt, ranges.week)) {
             orderCountMaps.week.set(dayKey, (orderCountMaps.week.get(dayKey) || 0) + 1);
@@ -784,6 +796,10 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
         const amount = safeAmount(expense.amount);
         const dayKey = formatDayKey(spentAt);
         const monthKey = formatMonthKey(spentAt);
+
+        if (withinRange(spentAt, ranges.today)) {
+            upsertFinanceValue(financeMaps.today, dayKey, 'expenses', amount);
+        }
 
         if (withinRange(spentAt, ranges.week)) {
             upsertFinanceValue(financeMaps.week, dayKey, 'expenses', amount);
@@ -817,11 +833,13 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
 
     return {
         orderSeries: {
+            today: buildOrderSeries(todayAxis, orderCountMaps.today),
             week: buildOrderSeries(weekAxis, orderCountMaps.week),
             month: buildOrderSeries(monthAxis, orderCountMaps.month),
             year: buildOrderSeries(yearAxis, orderCountMaps.year)
         },
         financeSeries: {
+            today: buildFinanceSeries(todayAxis, financeMaps.today),
             week: buildFinanceSeries(weekAxis, financeMaps.week),
             month: buildFinanceSeries(monthAxis, financeMaps.month),
             year: buildFinanceSeries(yearAxis, financeMaps.year)
@@ -829,7 +847,7 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
     };
 };
 
-const buildTopProducts = (orders, productNameById = new Map(), limit = 5) => {
+const buildTopProducts = (orders, productNameById = new Map(), limit = null) => {
     const productStats = new Map();
 
     orders.forEach((order) => {
@@ -844,10 +862,15 @@ const buildTopProducts = (orders, productNameById = new Map(), limit = 5) => {
         });
     });
 
-    return [...productStats.entries()]
+    const sorted = [...productStats.entries()]
         .sort((a, b) => b[1] - a[1])
-        .slice(0, limit)
         .map(([name, count]) => ({ name, count }));
+
+    if (Number.isFinite(limit) && limit > 0) {
+        return sorted.slice(0, limit);
+    }
+
+    return sorted;
 };
 
 const adminController = {
@@ -1565,7 +1588,12 @@ ${productDetails}`;
             const selectedTurnover = selectedFinance.reduce((sum, point) => sum + safeAmount(point.turnover), 0);
             const selectedExpenses = selectedFinance.reduce((sum, point) => sum + safeAmount(point.expenses), 0);
             const selectedProfit = selectedTurnover - selectedExpenses;
-            const topProducts = buildTopProducts(orderRows, productNameById, 5);
+            const selectedRange = ranges[ranges.selectedPeriod];
+            const selectedOrders = orderRows.filter((order) => {
+                const createdAt = new Date(order.createdAt);
+                return !Number.isNaN(createdAt.getTime()) && withinRange(createdAt, selectedRange);
+            });
+            const topProducts = buildTopProducts(selectedOrders, productNameById);
 
             return res.json({
                 data: {
@@ -1576,8 +1604,10 @@ ${productDetails}`;
                     financialSummary: {
                         revenue: selectedTurnover,
                         expenses: selectedExpenses,
-                        profit: selectedProfit
-                    }
+                        profit: selectedProfit,
+                        ordersCount: selectedOrders.length
+                    },
+                    productSales: topProducts
                 }
             });
         } catch (error) {

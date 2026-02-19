@@ -32,7 +32,7 @@ const adminTheme = createTheme({
         }
     },
     shape: {
-        borderRadius: 18
+        borderRadius: 6
     },
     typography: {
         fontFamily: '"Manrope", "Avenir Next", "Segoe UI", sans-serif',

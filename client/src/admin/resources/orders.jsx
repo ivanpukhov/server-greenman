@@ -41,6 +41,7 @@ import {
 } from '@mui/material';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import { useLocation } from 'react-router-dom';
 import { apiUrl } from '../../config/api';
 import { adminAuthStorage } from '../authProvider';
@@ -201,6 +202,144 @@ const getStatusLabel = (value) =>
     orderStatusChoices.find((item) => String(item.id) === String(value))?.name || String(value || '—');
 const getDeliveryMethodLabel = (value) =>
     deliveryMethodChoices.find((item) => String(item.id) === String(value))?.name || String(value || '—');
+
+const CODE39_PATTERNS = {
+    '0': 'nnnwwnwnn',
+    '1': 'wnnwnnnnw',
+    '2': 'nnwwnnnnw',
+    '3': 'wnwwnnnnn',
+    '4': 'nnnwwnnnw',
+    '5': 'wnnwwnnnn',
+    '6': 'nnwwwnnnn',
+    '7': 'nnnwnnwnw',
+    '8': 'wnnwnnwnn',
+    '9': 'nnwwnnwnn',
+    A: 'wnnnnwnnw',
+    B: 'nnwnnwnnw',
+    C: 'wnwnnwnnn',
+    D: 'nnnnwwnnw',
+    E: 'wnnnwwnnn',
+    F: 'nnwnwwnnn',
+    G: 'nnnnnwwnw',
+    H: 'wnnnnwwnn',
+    I: 'nnwnnwwnn',
+    J: 'nnnnwwwnn',
+    K: 'wnnnnnnww',
+    L: 'nnwnnnnww',
+    M: 'wnwnnnnwn',
+    N: 'nnnnwnnww',
+    O: 'wnnnwnnwn',
+    P: 'nnwnwnnwn',
+    Q: 'nnnnnnwww',
+    R: 'wnnnnnwwn',
+    S: 'nnwnnnwwn',
+    T: 'nnnnwnwwn',
+    U: 'wwnnnnnnw',
+    V: 'nwwnnnnnw',
+    W: 'wwwnnnnnn',
+    X: 'nwnnwnnnw',
+    Y: 'wwnnwnnnn',
+    Z: 'nwwnwnnnn',
+    '-': 'nwnnnnwnw',
+    '.': 'wwnnnnwnn',
+    ' ': 'nwwnnnwnn',
+    $: 'nwnwnwnnn',
+    '/': 'nwnwnnnwn',
+    '+': 'nwnnnwnwn',
+    '%': 'nnnwnwnwn',
+    '*': 'nwnnwnwnn'
+};
+
+const sanitizeTrackingNumber = (value) => {
+    const normalized = String(value || '').toUpperCase().replace(/\*/g, '').trim();
+    if (!normalized) {
+        return '';
+    }
+
+    return normalized
+        .split('')
+        .filter((char) => Boolean(CODE39_PATTERNS[char]))
+        .join('');
+};
+
+const buildCode39Bars = (value) => {
+    const encodedValue = sanitizeTrackingNumber(value);
+    if (!encodedValue) {
+        return [];
+    }
+
+    const withStartStop = `*${encodedValue}*`;
+    const bars = [];
+
+    withStartStop.split('').forEach((char, charIndex) => {
+        const pattern = CODE39_PATTERNS[char];
+        if (!pattern) {
+            return;
+        }
+
+        pattern.split('').forEach((token, tokenIndex) => {
+            bars.push({
+                isBar: tokenIndex % 2 === 0,
+                width: token === 'w' ? 3 : 1
+            });
+        });
+
+        if (charIndex < withStartStop.length - 1) {
+            bars.push({
+                isBar: false,
+                width: 1
+            });
+        }
+    });
+
+    return bars;
+};
+
+const renderCode39SvgMarkup = (value) => {
+    const bars = buildCode39Bars(value);
+    if (!bars.length) {
+        return '';
+    }
+
+    const height = 80;
+    const totalUnits = bars.reduce((sum, item) => sum + item.width, 0);
+    const quietZone = 12;
+    const width = totalUnits + quietZone * 2;
+    let position = quietZone;
+    const rects = bars
+        .map((item) => {
+            if (!item.isBar) {
+                position += item.width;
+                return '';
+            }
+
+            const rect = `<rect x="${position}" y="0" width="${item.width}" height="${height}" fill="#111111" />`;
+            position += item.width;
+            return rect;
+        })
+        .join('');
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${rects}</svg>`;
+};
+
+const BarcodePreview = ({ value }) => {
+    const markup = renderCode39SvgMarkup(value);
+
+    if (!markup) {
+        return (
+            <Typography variant="body2" color="text.secondary">
+                Трек-номер не задан
+            </Typography>
+        );
+    }
+
+    return (
+        <Box
+            sx={{ width: '100%', maxWidth: 520, border: '1px solid rgba(16,40,29,0.15)', borderRadius: 1.5, p: 1, backgroundColor: '#fff' }}
+            dangerouslySetInnerHTML={{ __html: markup }}
+        />
+    );
+};
 
 const normalizePhoneForServer = (value) => {
     const digits = String(value || '').replace(/\D/g, '');
@@ -1218,6 +1357,100 @@ const OrderPhotoSender = () => {
     );
 };
 
+const senderLines = [
+    'Пухова Наталья Васильевна',
+    '87775464450',
+    'T01P1C8, 150003',
+    'Область Северо-Казахстанская',
+    'город Петропавловск',
+    'Улица Лазутина, 240'
+];
+
+const escapeHtml = (value) =>
+    String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+const buildReceiverLines = (record) => {
+    return [
+        String(record.customerName || '—').trim() || '—',
+        record.phoneNumber ? `+7${record.phoneNumber}` : '—',
+        `${String(record.addressIndex || '—').trim() || '—'}, ${String(record.city || '—').trim() || '—'}`,
+        `${String(record.street || '—').trim() || '—'}, ${String(record.houseNumber || '—').trim() || '—'}`
+    ];
+};
+
+const printTrackingLabel = (record) => {
+    const trackingNumber = sanitizeTrackingNumber(record?.trackingNumber);
+    if (!trackingNumber) {
+        window.alert('Сначала укажите трек-номер');
+        return;
+    }
+
+    const barcodeMarkup = renderCode39SvgMarkup(trackingNumber);
+    if (!barcodeMarkup) {
+        window.alert('Не удалось сформировать штрихкод');
+        return;
+    }
+
+    const receiverLines = buildReceiverLines(record);
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=980,height=700');
+    if (!printWindow) {
+        window.alert('Браузер заблокировал окно печати');
+        return;
+    }
+
+    const html = `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Трек-номер ${escapeHtml(trackingNumber)}</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
+.sheet { width: 100%; max-width: 920px; margin: 0 auto; }
+.barcode { margin-bottom: 20px; }
+.track-number { margin-top: 8px; font-weight: 700; letter-spacing: 1px; }
+.blocks { display: flex; gap: 24px; align-items: stretch; }
+.block { flex: 1; border: 1px solid #111; border-radius: 8px; padding: 14px; min-height: 180px; }
+.title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.line { font-size: 14px; line-height: 1.5; margin: 0; }
+@media print { body { margin: 10mm; } }
+</style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="barcode">
+            ${barcodeMarkup}
+            <div class="track-number">${escapeHtml(trackingNumber)}</div>
+        </div>
+        <div class="blocks">
+            <div class="block">
+                <h2 class="title">Отправитель</h2>
+                ${senderLines.map((line) => `<p class="line">${escapeHtml(line)}</p>`).join('')}
+            </div>
+            <div class="block">
+                <h2 class="title">Получатель</h2>
+                ${receiverLines.map((line) => `<p class="line">${escapeHtml(line)}</p>`).join('')}
+            </div>
+        </div>
+    </div>
+    <script>
+        window.onload = function () {
+            window.focus();
+            window.print();
+        };
+    </script>
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+};
+
 const OrderShowContent = () => {
     const record = useRecordContext();
     if (!record) {
@@ -1288,7 +1521,26 @@ const OrderShowContent = () => {
                                 Оплата и логистика
                             </Typography>
                             <Typography variant="body2">Оплата: {record.paymentMethod || '—'}</Typography>
-                            <Typography variant="body2">Трек-номер: {record.trackingNumber || '—'}</Typography>
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                Штрихкод трек-номера
+                            </Typography>
+                            <Box sx={{ mt: 0.8 }}>
+                                <BarcodePreview value={record.trackingNumber} />
+                            </Box>
+                            {record.trackingNumber ? (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.6, display: 'block' }}>
+                                    {sanitizeTrackingNumber(record.trackingNumber)}
+                                </Typography>
+                            ) : null}
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<PrintOutlinedIcon />}
+                                sx={{ mt: 1.2 }}
+                                onClick={() => printTrackingLabel(record)}
+                            >
+                                Распечатать трек-номер
+                            </Button>
                             <Typography variant="body2">Сумма: {formatMoney(record.totalPrice)}</Typography>
                         </Paper>
                     </Grid>

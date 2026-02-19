@@ -4,7 +4,6 @@ import {
     Button,
     Card,
     CardContent,
-    Grid,
     Paper,
     Stack,
     Table,
@@ -52,6 +51,7 @@ const AccountingPage = () => {
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingExpenseId, setDeletingExpenseId] = useState(null);
+    const [showAllOrders, setShowAllOrders] = useState(false);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -110,6 +110,10 @@ const AccountingPage = () => {
         loadData();
     }, [loadData]);
 
+    useEffect(() => {
+        setShowAllOrders(false);
+    }, [period]);
+
     const onDeleteExpense = async (expenseId) => {
         if (deletingExpenseId) {
             return;
@@ -148,14 +152,17 @@ const AccountingPage = () => {
         return <Typography>Загрузка бухгалтерии...</Typography>;
     }
 
+    const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
+    const hasHiddenOrders = orders.length > 5;
+
     return (
         <Stack spacing={2.5}>
             <Box
                 sx={{
                     p: { xs: 2, md: 3 },
-                    borderRadius: 3,
+                    borderRadius: 2.5,
                     border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'linear-gradient(135deg, rgba(19,111,99,0.15) 0%, rgba(31,154,96,0.12) 100%)'
+                    background: 'rgba(248,253,250,0.96)'
                 }}
             >
                 <Typography variant="h5">Бухгалтерия</Typography>
@@ -175,44 +182,33 @@ const AccountingPage = () => {
                 </Stack>
             </Box>
 
-            <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                    <Card sx={cardSx}>
-                        <CardContent>
+            <Card sx={cardSx}>
+                <CardContent>
+                    <Typography variant="h6" sx={{ mb: 1.4 }}>
+                        Приход / Расход денег
+                    </Typography>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                        <Box sx={{ flex: 1 }}>
                             <Typography variant="body2" color="text.secondary">
-                                Приход (заказы)
+                                Приход
                             </Typography>
                             <Typography variant="h5">{formatMoney(summary.ordersTotal)}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Оплаченных заказов: {summary.ordersCount}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={cardSx}>
-                        <CardContent>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
                             <Typography variant="body2" color="text.secondary">
                                 Расход
                             </Typography>
                             <Typography variant="h5">{formatMoney(summary.expensesTotal)}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Операций: {summary.expensesCount}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={cardSx}>
-                        <CardContent>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
                             <Typography variant="body2" color="text.secondary">
-                                Денег сейчас (приход - расход)
+                                Остаток
                             </Typography>
                             <Typography variant="h5">{formatMoney(summary.balance)}</Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+                        </Box>
+                    </Stack>
+                </CardContent>
+            </Card>
 
             <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
@@ -223,21 +219,18 @@ const AccountingPage = () => {
                         {(summary.allocations?.byAccount || []).map((item) => (
                             <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
                                 <CardContent>
-                                    <Typography variant="subtitle2">{item.accountName}</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Заказов: {item.ordersCount}
+                                    <Typography variant="subtitle2">
+                                        {item.accountName} - {formatMoney(item.total)}
                                     </Typography>
-                                    <Typography variant="body1">{formatMoney(item.total)}</Typography>
                                 </CardContent>
                             </Card>
                         ))}
                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                             <CardContent>
-                                <Typography variant="subtitle2">{summary.allocations?.withoutLink?.accountName || 'Без ссылки'}</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Заказов: {summary.allocations?.withoutLink?.ordersCount || 0}
+                                <Typography variant="subtitle2">
+                                    {(summary.allocations?.withoutLink?.accountName || 'Без ссылки')} -{' '}
+                                    {formatMoney(summary.allocations?.withoutLink?.total || 0)}
                                 </Typography>
-                                <Typography variant="body1">{formatMoney(summary.allocations?.withoutLink?.total || 0)}</Typography>
                             </CardContent>
                         </Card>
                     </Stack>
@@ -247,7 +240,6 @@ const AccountingPage = () => {
                             <TableHead>
                                 <TableRow>
                                     <TableCell>Счёт</TableCell>
-                                    <TableCell align="right">Заказов</TableCell>
                                     <TableCell align="right">Сумма</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -255,67 +247,13 @@ const AccountingPage = () => {
                                 {(summary.allocations?.byAccount || []).map((item) => (
                                     <TableRow key={item.accountName}>
                                         <TableCell>{item.accountName}</TableCell>
-                                        <TableCell align="right">{item.ordersCount}</TableCell>
                                         <TableCell align="right">{formatMoney(item.total)}</TableCell>
                                     </TableRow>
                                 ))}
                                 <TableRow>
                                     <TableCell>{summary.allocations?.withoutLink?.accountName || 'Без ссылки'}</TableCell>
-                                    <TableCell align="right">{summary.allocations?.withoutLink?.ordersCount || 0}</TableCell>
                                     <TableCell align="right">{formatMoney(summary.allocations?.withoutLink?.total || 0)}</TableCell>
                                 </TableRow>
-                            </TableBody>
-                        </Table>
-                    </Box>
-                )}
-            </Paper>
-
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    Оплаченные заказы (учтены в приходе)
-                </Typography>
-                {isSmall ? (
-                    <Stack spacing={1.2}>
-                        {orders.map((order) => (
-                            <Card key={order.id} variant="outlined" sx={{ borderRadius: 2 }}>
-                                <CardContent>
-                                    <Typography variant="subtitle2">Заказ #{order.id}</Typography>
-                                    <Typography variant="body2" color="text.secondary">{formatDate(order.createdAt)}</Typography>
-                                    <Typography variant="body2">Клиент: {order.customerName}</Typography>
-                                    <Typography variant="body2">Город: {order.city}</Typography>
-                                    <Typography variant="body2">Статус: {order.status}</Typography>
-                                    <Typography variant="body2">Счёт: {order.accountName || 'Без ссылки'}</Typography>
-                                    <Typography variant="body1" sx={{ mt: 0.5 }}>{formatMoney(order.totalPrice)}</Typography>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </Stack>
-                ) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 860 }}>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>ID</TableCell>
-                                    <TableCell>Дата</TableCell>
-                                    <TableCell>Клиент</TableCell>
-                                    <TableCell>Город</TableCell>
-                                    <TableCell>Статус</TableCell>
-                                    <TableCell>Счёт</TableCell>
-                                    <TableCell align="right">Сумма</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {orders.map((order) => (
-                                    <TableRow key={order.id}>
-                                        <TableCell>{order.id}</TableCell>
-                                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                                        <TableCell>{order.customerName}</TableCell>
-                                        <TableCell>{order.city}</TableCell>
-                                        <TableCell>{order.status}</TableCell>
-                                        <TableCell>{order.accountName || 'Без ссылки'}</TableCell>
-                                        <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
-                                    </TableRow>
-                                ))}
                             </TableBody>
                         </Table>
                     </Box>
@@ -355,12 +293,13 @@ const AccountingPage = () => {
                         <Table size="small" sx={{ minWidth: 860 }}>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell>ID</TableCell>
                                     <TableCell>Дата</TableCell>
-                                    <TableCell>Кто потратил</TableCell>
-                                    <TableCell>На что</TableCell>
-                                    <TableCell>Комментарий</TableCell>
+                                    <TableCell>Клиент</TableCell>
+                                    <TableCell>Город</TableCell>
+                                    <TableCell>Статус</TableCell>
+                                    <TableCell>Счёт</TableCell>
                                     <TableCell align="right">Сумма</TableCell>
-                                    <TableCell align="right">Действие</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -387,6 +326,64 @@ const AccountingPage = () => {
                         </Table>
                     </Box>
                 )}
+            </Paper>
+
+            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                    Оплаченные заказы (учтены в приходе)
+                </Typography>
+                {isSmall ? (
+                    <Stack spacing={1.2}>
+                        {ordersToShow.map((order) => (
+                            <Card key={order.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">Заказ #{order.id}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{formatDate(order.createdAt)}</Typography>
+                                    <Typography variant="body2">Клиент: {order.customerName}</Typography>
+                                    <Typography variant="body2">Город: {order.city}</Typography>
+                                    <Typography variant="body2">Статус: {order.status}</Typography>
+                                    <Typography variant="body2">Счёт: {order.accountName || 'Без ссылки'}</Typography>
+                                    <Typography variant="body1" sx={{ mt: 0.5 }}>{formatMoney(order.totalPrice)}</Typography>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </Stack>
+                ) : (
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <Table size="small" sx={{ minWidth: 860 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Дата</TableCell>
+                                    <TableCell>Кто потратил</TableCell>
+                                    <TableCell>На что</TableCell>
+                                    <TableCell>Комментарий</TableCell>
+                                    <TableCell align="right">Сумма</TableCell>
+                                    <TableCell align="right">Действие</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {ordersToShow.map((order) => (
+                                    <TableRow key={order.id}>
+                                        <TableCell>{order.id}</TableCell>
+                                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                                        <TableCell>{order.customerName}</TableCell>
+                                        <TableCell>{order.city}</TableCell>
+                                        <TableCell>{order.status}</TableCell>
+                                        <TableCell>{order.accountName || 'Без ссылки'}</TableCell>
+                                        <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Box>
+                )}
+                {hasHiddenOrders ? (
+                    <Box sx={{ mt: 1.6 }}>
+                        <Button variant="outlined" onClick={() => setShowAllOrders((prev) => !prev)}>
+                            {showAllOrders ? 'Скрыть лишние заказы' : 'Смотреть все заказы'}
+                        </Button>
+                    </Box>
+                ) : null}
             </Paper>
         </Stack>
     );

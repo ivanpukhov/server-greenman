@@ -1,7 +1,6 @@
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import {
     Box,
@@ -20,6 +19,7 @@ import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
 const periodLabels = {
+    today: 'Сегодня',
     week: 'За неделю',
     month: 'За месяц',
     year: 'За год'
@@ -72,7 +72,7 @@ const buildSmoothPath = (points = []) => {
 
 const useElementSize = () => {
     const elementRef = useRef(null);
-    const [size, setSize] = useState({ width: 640, height: 0 });
+    const [size, setSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
         const element = elementRef.current;
@@ -85,7 +85,7 @@ const useElementSize = () => {
             if (!entry) {
                 return;
             }
-            const nextWidth = Math.max(320, Math.floor(entry.contentRect.width));
+            const nextWidth = Math.max(0, Math.floor(entry.contentRect.width));
             setSize({ width: nextWidth, height: Math.floor(entry.contentRect.height) });
         });
 
@@ -93,7 +93,7 @@ const useElementSize = () => {
         return () => observer.disconnect();
     }, []);
 
-    return { elementRef, width: size.width };
+    return { elementRef, width: Math.max(1, size.width) };
 };
 
 const pickLabelIndices = (total, maxTicks = 7) => {
@@ -186,7 +186,7 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
         : [];
 
     return (
-        <Card sx={metricCardSx}>
+        <Card sx={{ ...metricCardSx, overflow: 'hidden' }}>
             <CardContent>
                 <Typography variant="h6" sx={{ mb: 0.5 }}>
                     {title}
@@ -197,7 +197,7 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
 
                 <Box
                     ref={elementRef}
-                    sx={{ position: 'relative', width: '100%', touchAction: 'none' }}
+                    sx={{ position: 'relative', width: '100%', touchAction: 'none', overflow: 'hidden' }}
                     onMouseLeave={() => setActiveIndex(null)}
                     onMouseMove={(event) => {
                         const rect = event.currentTarget.getBoundingClientRect();
@@ -355,16 +355,73 @@ const InteractiveLineChart = ({ title, subtitle, labels, series, formatValue }) 
     );
 };
 
+const ProductSalesChart = ({ rows }) => {
+    const maxCount = rows.reduce((max, row) => Math.max(max, Number(row.count || 0)), 1);
+
+    return (
+        <Card sx={metricCardSx}>
+            <CardContent>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.4 }}>
+                    <BarChartOutlinedIcon />
+                    <Typography variant="h6">Продажи товаров за период</Typography>
+                </Stack>
+                {!rows.length ? (
+                    <Typography variant="body2" color="text.secondary">
+                        Нет данных за выбранный период
+                    </Typography>
+                ) : (
+                    <Stack spacing={1.1}>
+                        {rows.map((row, index) => {
+                            const widthPercent = Math.max(4, Math.round((Number(row.count || 0) / maxCount) * 100));
+                            return (
+                                <Box key={`${row.name}-${index}`}>
+                                    <Stack direction="row" justifyContent="space-between" spacing={1}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {row.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {row.count} шт.
+                                        </Typography>
+                                    </Stack>
+                                    <Box
+                                        sx={{
+                                            mt: 0.5,
+                                            height: 8,
+                                            width: '100%',
+                                            borderRadius: 5,
+                                            backgroundColor: 'rgba(16,40,29,0.08)'
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                height: '100%',
+                                                width: `${widthPercent}%`,
+                                                borderRadius: 5,
+                                                background: 'linear-gradient(90deg, #1f9a60, #2c7ed6)'
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+                            );
+                        })}
+                    </Stack>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 const useDashboardAnalytics = (period) => {
     const [data, setData] = useState({
-        topProducts: [],
+        productSales: [],
         financialSummary: {
             revenue: 0,
             expenses: 0,
-            profit: 0
+            profit: 0,
+            ordersCount: 0
         },
-        orderSeries: { week: [], month: [], year: [] },
-        financeSeries: { week: [], month: [], year: [] }
+        orderSeries: { today: [], week: [], month: [], year: [] },
+        financeSeries: { today: [], week: [], month: [], year: [] }
     });
     const [loading, setLoading] = useState(true);
     const notify = useNotify();
@@ -388,10 +445,12 @@ const useDashboardAnalytics = (period) => {
 
                 if (isMounted) {
                     setData({
-                        topProducts: Array.isArray(body?.data?.topProducts) ? body.data.topProducts : [],
-                        financialSummary: body?.data?.financialSummary || { revenue: 0, expenses: 0, profit: 0 },
-                        orderSeries: body?.data?.orderSeries || { week: [], month: [], year: [] },
-                        financeSeries: body?.data?.financeSeries || { week: [], month: [], year: [] }
+                        productSales: Array.isArray(body?.data?.productSales)
+                            ? body.data.productSales
+                            : (Array.isArray(body?.data?.topProducts) ? body.data.topProducts : []),
+                        financialSummary: body?.data?.financialSummary || { revenue: 0, expenses: 0, profit: 0, ordersCount: 0 },
+                        orderSeries: body?.data?.orderSeries || { today: [], week: [], month: [], year: [] },
+                        financeSeries: body?.data?.financeSeries || { today: [], week: [], month: [], year: [] }
                     });
                 }
             } catch (error) {
@@ -469,11 +528,10 @@ const AdminDashboard = () => {
             <Box
                 sx={{
                     p: { xs: 2, md: 3 },
-                    borderRadius: 3,
+                    borderRadius: 2.5,
                     border: '1px solid rgba(16,40,29,0.1)',
-                    boxShadow: '0 14px 32px rgba(16,40,29,0.12)',
-                    background:
-                        'radial-gradient(circle at 12% 12%, rgba(136,219,169,0.36), transparent 36%), linear-gradient(135deg, rgba(31,154,96,0.26) 0%, rgba(19,111,99,0.24) 100%)'
+                    boxShadow: '0 10px 22px rgba(16,40,29,0.08)',
+                    background: 'rgba(248,253,250,0.96)'
                 }}
             >
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2}>
@@ -501,7 +559,7 @@ const AdminDashboard = () => {
             </Box>
 
             <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={8}>
                     <Card sx={metricCardSx}>
                         <CardContent>
                             <Stack spacing={1.1}>
@@ -510,27 +568,14 @@ const AdminDashboard = () => {
                                     {loading && <CircularProgress size={18} />}
                                 </Stack>
                                 <Typography variant="body2" color="text.secondary">
-                                    Выручка ({periodLabels[period]})
+                                    Выручка и финансовая сводка ({periodLabels[period]})
                                 </Typography>
                                 <Typography variant="h5">{formatMoney(analytics.financialSummary.revenue)}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    Данные обновляются при смене периода
-                                </Typography>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={metricCardSx}>
-                        <CardContent>
-                            <Stack spacing={0.9}>
-                                <ShoppingCartOutlinedIcon />
-                                <Typography variant="body2" color="text.secondary">
-                                    Финансовая сводка
-                                </Typography>
-                                <Typography variant="body2">Выручка: {formatMoney(analytics.financialSummary.revenue)}</Typography>
                                 <Typography variant="body2">Расходы: {formatMoney(analytics.financialSummary.expenses)}</Typography>
                                 <Typography variant="body2">Прибыль: {formatMoney(analytics.financialSummary.profit)}</Typography>
+                                <Typography variant="body2">
+                                    Количество заказов: {Number(analytics.financialSummary.ordersCount || 0)}
+                                </Typography>
                             </Stack>
                         </CardContent>
                     </Card>
@@ -538,22 +583,12 @@ const AdminDashboard = () => {
                 <Grid item xs={12} md={4}>
                     <Card sx={metricCardSx}>
                         <CardContent>
-                            <Stack spacing={0.8}>
-                                <BarChartOutlinedIcon />
+                            <Stack spacing={1}>
+                                <Inventory2OutlinedIcon />
                                 <Typography variant="body2" color="text.secondary">
-                                    Топ 5 частых товаров
+                                    Товаров в каталоге
                                 </Typography>
-                                {analytics.topProducts.length ? (
-                                    analytics.topProducts.map((item, index) => (
-                                        <Typography key={`${item.name}-${index}`} variant="body2" sx={{ lineHeight: 1.4 }}>
-                                            {index + 1}. {item.name} - {item.count} шт.
-                                        </Typography>
-                                    ))
-                                ) : (
-                                    <Typography variant="body2" color="text.secondary">
-                                        Нет данных
-                                    </Typography>
-                                )}
+                                <Typography variant="h4">{totalProducts}</Typography>
                             </Stack>
                         </CardContent>
                     </Card>
@@ -576,21 +611,10 @@ const AdminDashboard = () => {
                 formatValue={(value) => formatMoney(value)}
             />
 
+            <ProductSalesChart rows={analytics.productSales || []} />
+
             <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                    <Card sx={metricCardSx}>
-                        <CardContent>
-                            <Stack spacing={1}>
-                                <Inventory2OutlinedIcon />
-                                <Typography variant="body2" color="text.secondary">
-                                    Товаров в каталоге
-                                </Typography>
-                                <Typography variant="h4">{totalProducts}</Typography>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={6}>
                     <Card sx={metricCardSx}>
                         <CardContent>
                             <Typography variant="h6" sx={{ mb: 1 }}>
@@ -610,7 +634,7 @@ const AdminDashboard = () => {
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={6}>
                     <Card sx={metricCardSx}>
                         <CardContent>
                             <Typography variant="h6" sx={{ mb: 1 }}>
