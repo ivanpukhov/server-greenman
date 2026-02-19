@@ -919,9 +919,13 @@ const processIncomingAdminExpenseWebhook = async (content) => {
 
 const processIncomingMessageWebhook = async (content) => {
     const webhookType = String(content.typeWebhook || '').trim();
-    const supportedOutgoingTypes = new Set(['outgoingMessageReceived', 'outgoingAPIMessageReceived']);
+    const supportedMessageTypes = new Set([
+        'incomingMessageReceived',
+        'outgoingMessageReceived',
+        'outgoingAPIMessageReceived'
+    ]);
 
-    if (!supportedOutgoingTypes.has(webhookType)) {
+    if (!supportedMessageTypes.has(webhookType)) {
         return;
     }
 
