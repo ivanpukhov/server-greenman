@@ -21,22 +21,9 @@ const CodeConfirm = ({ phoneNumber, onPhoneNumberChange }) => {
                 phoneNumber,
                 confirmationCode: cleanedCode
             });
-            console.log("Сохраняем token и userId в localStorage");
-            localStorage.setItem('token', response.data.token);
+            login(response.data.token);
             localStorage.setItem('userId', String(response.data.userId));
-
-            console.log("Состояние localStorage после сохранения:", localStorage.getItem('token'), localStorage.getItem('userId'));
-
-// Добавьте логирование перед любым удалением или очищением данных
-            window.addEventListener('storage', (event) => {
-                console.log('Изменение localStorage:', event.key, event.oldValue, event.newValue);
-            });
-
-// Проверка вызова navigate
-            window.location.reload();
             navigate('/profile');
-            console.log("Переход на /profile");
-
         } catch (error) {
             console.error('Ошибка при подтверждении кода:', error);
         }

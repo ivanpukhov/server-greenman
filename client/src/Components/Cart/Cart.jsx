@@ -2,7 +2,7 @@ import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import Sheet from "react-modal-sheet";
 import MaskedInput from "react-text-mask";
-import {useAuth} from '../../AuthContext.jsx';
+import {hasValidSiteSession, useAuth} from '../../AuthContext.jsx';
 import {useCart} from '../../CartContext.jsx';
 import iconMinus from "../../images/bottom_bar/Icon-minus.svg";
 import iconPlus from "../../images/bottom_bar/Icon-plus.svg";
@@ -43,8 +43,7 @@ const Cart = () => {
     const navigate = useNavigate();
     const [isFormValid, setIsFormValid] = useState(false);
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
+        if (!hasValidSiteSession()) {
             navigate('/auth');
         }
     }, [navigate]);

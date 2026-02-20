@@ -2,13 +2,13 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hasValidSiteSession } from '../../AuthContext.jsx';
 
 const AuthRedirect = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
+        if (hasValidSiteSession()) {
             navigate('/profile');
         } else {
             navigate('/auth');

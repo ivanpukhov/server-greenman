@@ -6,14 +6,14 @@ import CodeConfirm from './CodeConfirm.jsx';
 import s from './scss/Login.module.scss'
 import {Helmet} from "react-helmet";
 import {useNavigate} from "react-router-dom";
+import { hasValidSiteSession } from "../../AuthContext.jsx";
 
 const Auth = () => {
     const [step, setStep] = useState(1); // 1 для PhoneAuth, 2 для CodeConfirm
     const [phoneNumber, setPhoneNumber] = useState('');
     const navigate = useNavigate();
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
+        if (hasValidSiteSession()) {
             navigate('/profile');
         }
     }, [navigate]);
