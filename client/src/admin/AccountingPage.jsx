@@ -148,12 +148,6 @@ const AccountingPage = () => {
         }
     };
 
-    if (loading) {
-        return <Typography>Загрузка бухгалтерии...</Typography>;
-    }
-
-    const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
-    const hasHiddenOrders = orders.length > 5;
     const allocationWithExpenses = useMemo(() => {
         const byAccount = Array.isArray(summary.allocations?.byAccount) ? summary.allocations.byAccount : [];
         const withoutLink = summary.allocations?.withoutLink || {};
@@ -184,6 +178,12 @@ const AccountingPage = () => {
             }
         };
     }, [expenses, summary.allocations]);
+    const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
+    const hasHiddenOrders = orders.length > 5;
+
+    if (loading) {
+        return <Typography>Загрузка бухгалтерии...</Typography>;
+    }
 
     return (
         <Stack spacing={2.5}>
