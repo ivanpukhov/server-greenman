@@ -27,6 +27,7 @@ const {
 } = require('../utilities/paymentLinkDispatchPlan');
 
 const { Op } = Sequelize;
+const IVAN_ADMIN_PHONE = '7073670497';
 const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Доставлено'];
 const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
 const EXCLUDED_ACCOUNT_NAME_TOKENS = new Set(['иван', 'даша']);
@@ -34,6 +35,28 @@ const ORDER_BUNDLE_CODE_REGEX = /^ob_[A-Za-z0-9]{6,24}$/;
 
 const filterRestrictedAdmins = (items, currentAdminPhone, getItemPhone) => {
     return items.filter((item) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, getItemPhone(item)));
+};
+
+const isIvanPhone = (phone) => normalizeAdminPhone(phone) === IVAN_ADMIN_PHONE;
+
+const canCurrentAdminManageIvanSiteOrdersToggle = (currentAdminPhone) => isIvanPhone(currentAdminPhone);
+
+const serializeAdminForResponse = (admin, currentAdminPhone) => {
+    const plainAdmin = admin && typeof admin.toJSON === 'function' ? admin.toJSON() : admin;
+    if (!plainAdmin) {
+        return null;
+    }
+
+    const canSeeIvanToggle = canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(plainAdmin.phoneNumber);
+    const { siteOrdersToNataliaEnabled, ...rest } = plainAdmin;
+    if (!canSeeIvanToggle) {
+        return rest;
+    }
+
+    return {
+        ...rest,
+        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled)
+    };
 };
 
 const parseJsonParam = (value, fallback) => {
@@ -365,7 +388,14 @@ const toVirtualPaidOrderFromConnection = (connection) => {
     };
 };
 
-const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) => {
+const isWebsiteOrder = (order) => {
+    const paymentMethod = String(order?.paymentMethod || '')
+        .trim()
+        .toLowerCase();
+    return paymentMethod === 'kaspi' || paymentMethod === 'money';
+};
+
+const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName, siteOrdersToNataliaEnabled = true) => {
     const paymentSellerName = String(order.paymentSellerName || '').trim();
     if (paymentSellerName) {
         return paymentSellerName;
@@ -379,7 +409,7 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) =>
     }
 
     if (paymentMethod === 'kaspi' || paymentMethod === 'money') {
-        return defaultAccountName;
+        return siteOrdersToNataliaEnabled ? defaultAccountName : WITHOUT_LINK_ACCOUNT_NAME;
     }
 
     if (paymentMethod === 'link') {
@@ -392,7 +422,12 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName) =>
 const buildAccountingContext = async () => {
     const activeAdmins = await getActiveAdmins();
     const nataliaAdmin = activeAdmins.find((item) => String(item.fullName || '').trim().toLowerCase() === 'наталья');
+    const ivanAdmin = activeAdmins.find((item) => isIvanPhone(item.phoneNumber));
     const defaultAccountName = nataliaAdmin ? nataliaAdmin.fullName : 'Наталья';
+    const siteOrdersToNataliaEnabled =
+        ivanAdmin && typeof ivanAdmin.siteOrdersToNataliaEnabled === 'boolean'
+            ? Boolean(ivanAdmin.siteOrdersToNataliaEnabled)
+            : true;
     const paymentLinks = await PaymentLink.findAll({
         attributes: ['url', 'adminName']
     });
@@ -403,7 +438,8 @@ const buildAccountingContext = async () => {
     return {
         activeAdmins,
         defaultAccountName,
-        linkToAccountMap
+        linkToAccountMap,
+        siteOrdersToNataliaEnabled
     };
 };
 
@@ -412,7 +448,12 @@ const resolveOrderAccountNameByContext = (order, context) => {
         return WITHOUT_LINK_ACCOUNT_NAME;
     }
 
-    return resolveOrderAccountName(order, context.linkToAccountMap, context.defaultAccountName);
+    return resolveOrderAccountName(
+        order,
+        context.linkToAccountMap,
+        context.defaultAccountName,
+        context.siteOrdersToNataliaEnabled
+    );
 };
 
 const isExcludedAccountingAccountName = (accountName) => {
@@ -427,6 +468,9 @@ const isExcludedAccountingAccountName = (accountName) => {
 
 const excludeOrdersByAccountingAccounts = (orders, context) => {
     return (Array.isArray(orders) ? orders : []).filter((order) => {
+        if (isWebsiteOrder(order) && !context?.siteOrdersToNataliaEnabled) {
+            return false;
+        }
         const accountName = resolveOrderAccountNameByContext(order, context);
         return !isExcludedAccountingAccountName(accountName);
     });
@@ -1677,7 +1721,10 @@ ${productDetails}`;
                     id: admin.id,
                     phoneNumber: admin.phoneNumber,
                     fullName: admin.fullName,
-                    iin: admin.iin
+                    iin: admin.iin,
+                    ...(canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(admin.phoneNumber)
+                        ? { siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled) }
+                        : {})
                 }))
             });
         } catch (error) {
@@ -1692,7 +1739,7 @@ ${productDetails}`;
             const visibleAdmins = filterRestrictedAdmins(admins, currentAdminPhone, (item) => item.phoneNumber);
 
             return res.json({
-                data: visibleAdmins,
+                data: visibleAdmins.map((admin) => serializeAdminForResponse(admin, currentAdminPhone)),
                 total: visibleAdmins.length
             });
         } catch (error) {
@@ -1740,7 +1787,7 @@ ${productDetails}`;
                     isActive: true
                 });
 
-                return res.status(200).json({ data: existing.toJSON() });
+                return res.status(200).json({ data: serializeAdminForResponse(existing, req.admin?.phoneNumber) });
             }
 
             const created = await AdminUser.create({
@@ -1750,7 +1797,7 @@ ${productDetails}`;
                 isActive: true
             });
 
-            return res.status(201).json({ data: created.toJSON() });
+            return res.status(201).json({ data: serializeAdminForResponse(created, req.admin?.phoneNumber) });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось добавить администратора', error: error.message });
         }
@@ -1806,13 +1853,21 @@ ${productDetails}`;
                 return res.status(400).json({ message: 'Этот ИИН уже привязан к другому администратору' });
             }
 
-            await adminUser.update({
+            const payload = {
                 fullName,
                 phoneNumber,
                 iin
-            });
+            };
 
-            return res.json({ data: adminUser.toJSON() });
+            if (isIvanPhone(adminUser.phoneNumber) && canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone)) {
+                if (req.body.siteOrdersToNataliaEnabled !== undefined) {
+                    payload.siteOrdersToNataliaEnabled = Boolean(req.body.siteOrdersToNataliaEnabled);
+                }
+            }
+
+            await adminUser.update(payload);
+
+            return res.json({ data: serializeAdminForResponse(adminUser, currentAdminPhone) });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось обновить администратора', error: error.message });
         }

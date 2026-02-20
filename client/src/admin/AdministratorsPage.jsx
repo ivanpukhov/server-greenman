@@ -4,6 +4,7 @@ import {
     Button,
     Card,
     CardContent,
+    FormControlLabel,
     FormControl,
     IconButton,
     InputLabel,
@@ -16,6 +17,7 @@ import {
     TableCell,
     TableHead,
     TableRow,
+    Switch,
     TextField,
     Typography,
     useMediaQuery
@@ -78,7 +80,8 @@ const AdministratorsPage = () => {
     const [editAdminForm, setEditAdminForm] = useState({
         fullName: '',
         phoneNumber: '',
-        iin: ''
+        iin: '',
+        siteOrdersToNataliaEnabled: true
     });
     const [paymentLinkForm, setPaymentLinkForm] = useState({
         url: '',
@@ -101,6 +104,12 @@ const AdministratorsPage = () => {
     const visiblePaymentLinks = useMemo(
         () => paymentLinks.filter((item) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, item.adminPhone)),
         [paymentLinks, currentAdminPhone]
+    );
+    const canEditIvanSiteOrdersToggle = useCallback(
+        (admin) =>
+            normalizeAdminPhone(currentAdminPhone) === IVAN_ADMIN_PHONE &&
+            normalizeAdminPhone(admin?.phoneNumber) === IVAN_ADMIN_PHONE,
+        [currentAdminPhone]
     );
     const dispatchPlanPreview = useMemo(() => {
         if (!dispatchPlan.length) {
@@ -383,7 +392,8 @@ const AdministratorsPage = () => {
         setEditAdminForm({
             fullName: String(admin.fullName || ''),
             phoneNumber: String(admin.phoneNumber || ''),
-            iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12)
+            iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12),
+            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
         });
     };
 
@@ -395,7 +405,8 @@ const AdministratorsPage = () => {
         setEditAdminForm({
             fullName: '',
             phoneNumber: '',
-            iin: ''
+            iin: '',
+            siteOrdersToNataliaEnabled: true
         });
     };
 
@@ -407,6 +418,7 @@ const AdministratorsPage = () => {
         const fullName = editAdminForm.fullName.trim();
         const phoneNumber = editAdminForm.phoneNumber.trim();
         const iin = String(editAdminForm.iin || '').replace(/\D/g, '');
+        const editingAdmin = admins.find((admin) => admin.id === editingAdminId);
 
         if (!fullName) {
             notify('Укажите имя администратора', { type: 'warning' });
@@ -430,7 +442,10 @@ const AdministratorsPage = () => {
                 body: JSON.stringify({
                     fullName,
                     phoneNumber,
-                    iin
+                    iin,
+                    ...(canEditIvanSiteOrdersToggle(editingAdmin)
+                        ? { siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled) }
+                        : {})
                 })
             });
 
@@ -628,9 +643,25 @@ const AdministratorsPage = () => {
                                                                 iin: String(event.target.value || '')
                                                                     .replace(/\D/g, '')
                                                                     .slice(0, 12)
-                                                            }))
+                                                                }))
                                                         }
                                                     />
+                                                    {canEditIvanSiteOrdersToggle(admin) && (
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
+                                                                    onChange={(event) =>
+                                                                        setEditAdminForm((prev) => ({
+                                                                            ...prev,
+                                                                            siteOrdersToNataliaEnabled: event.target.checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                            }
+                                                            label="Заказы с сайта учитывать в приход Наталье"
+                                                        />
+                                                    )}
                                                 </>
                                             ) : (
                                                 <>
@@ -717,18 +748,37 @@ const AdministratorsPage = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {editingAdminId === admin.id ? (
-                                                    <TextField
-                                                        size="small"
-                                                        value={editAdminForm.iin}
-                                                        onChange={(event) =>
-                                                            setEditAdminForm((prev) => ({
-                                                                ...prev,
-                                                                iin: String(event.target.value || '')
-                                                                    .replace(/\D/g, '')
-                                                                    .slice(0, 12)
-                                                            }))
-                                                        }
-                                                    />
+                                                    <Stack spacing={0.5}>
+                                                        <TextField
+                                                            size="small"
+                                                            value={editAdminForm.iin}
+                                                            onChange={(event) =>
+                                                                setEditAdminForm((prev) => ({
+                                                                    ...prev,
+                                                                    iin: String(event.target.value || '')
+                                                                        .replace(/\D/g, '')
+                                                                        .slice(0, 12)
+                                                                }))
+                                                            }
+                                                        />
+                                                        {canEditIvanSiteOrdersToggle(admin) && (
+                                                            <FormControlLabel
+                                                                sx={{ ml: 0 }}
+                                                                control={
+                                                                    <Switch
+                                                                        checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
+                                                                        onChange={(event) =>
+                                                                            setEditAdminForm((prev) => ({
+                                                                                ...prev,
+                                                                                siteOrdersToNataliaEnabled: event.target.checked
+                                                                            }))
+                                                                        }
+                                                                    />
+                                                                }
+                                                                label="Заказы с сайта учитывать в приход Наталье"
+                                                            />
+                                                        )}
+                                                    </Stack>
                                                 ) : (
                                                     String(admin.iin || '').padStart(12, '0')
                                                 )}

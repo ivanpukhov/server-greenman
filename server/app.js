@@ -247,6 +247,14 @@ const ensureAdminUsersSchema = async () => {
                 defaultValue: DEFAULT_ADMIN_IIN
             });
         }
+
+        if (!tableDefinition.siteOrdersToNataliaEnabled) {
+            await queryInterface.addColumn('admin_users', 'siteOrdersToNataliaEnabled', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: true
+            });
+        }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы admin_users:', error);
     }
@@ -256,8 +264,15 @@ const ensureAdminUsersSchema = async () => {
         await Promise.all(
             admins.map(async (admin) => {
                 const normalizedIin = normalizeAdminIin(admin.iin);
+                const patch = {};
                 if (!normalizedIin || normalizedIin !== admin.iin) {
-                    await admin.update({ iin: normalizedIin || DEFAULT_ADMIN_IIN });
+                    patch.iin = normalizedIin || DEFAULT_ADMIN_IIN;
+                }
+                if (typeof admin.siteOrdersToNataliaEnabled !== 'boolean') {
+                    patch.siteOrdersToNataliaEnabled = true;
+                }
+                if (Object.keys(patch).length > 0) {
+                    await admin.update(patch);
                 }
             })
         );

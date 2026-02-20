@@ -27,6 +27,11 @@ const AdminUser = orderDB.define(
             type: Sequelize.BOOLEAN,
             allowNull: false,
             defaultValue: true
+        },
+        siteOrdersToNataliaEnabled: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
         }
     },
     {
