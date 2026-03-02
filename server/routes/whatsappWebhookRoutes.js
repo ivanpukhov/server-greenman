@@ -311,35 +311,68 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
         throw new Error('После строки "доставка" отсутствует текст с данными клиента');
     }
 
-    const response = await axios.post(
-        ORDER_DRAFT_AI_URL,
-        {
-            model: ORDER_DRAFT_AI_MODEL,
-            temperature: 0,
-            messages: [
-                {
-                    role: 'system',
-                    content: ORDER_DRAFT_AI_SYSTEM_PROMPT
-                },
-                {
-                    role: 'user',
-                    content: normalizedNote
-                }
-            ]
-        },
-        {
-            headers: {
-                Authorization: `Bearer ${ORDER_DRAFT_AI_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://greenman.kz',
-                'X-Title': 'Order Processor'
+    const aiRequestBody = {
+        model: ORDER_DRAFT_AI_MODEL,
+        temperature: 0,
+        messages: [
+            {
+                role: 'system',
+                content: ORDER_DRAFT_AI_SYSTEM_PROMPT
             },
-            timeout: 30000
-        }
-    );
+            {
+                role: 'user',
+                content: normalizedNote
+            }
+        ]
+    };
+
+    console.log('[WhatsApp webhook][AI] Preparing OpenRouter request:\n' + safeStringify({
+        url: ORDER_DRAFT_AI_URL,
+        model: ORDER_DRAFT_AI_MODEL,
+        fallbackChatId,
+        hasApiKey: Boolean(ORDER_DRAFT_AI_API_KEY),
+        request: aiRequestBody
+    }));
+
+    let response;
+    try {
+        response = await axios.post(
+            ORDER_DRAFT_AI_URL,
+            aiRequestBody,
+            {
+                headers: {
+                    Authorization: `Bearer ${ORDER_DRAFT_AI_API_KEY}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://greenman.kz',
+                    'X-Title': 'Order Processor'
+                },
+                timeout: 30000
+            }
+        );
+    } catch (error) {
+        console.error('[WhatsApp webhook][AI] OpenRouter request failed:\n' + safeStringify({
+            status: error?.response?.status || null,
+            statusText: error?.response?.statusText || null,
+            responseData: error?.response?.data || null,
+            message: error?.message || null
+        }));
+        throw error;
+    }
+
+    console.log('[WhatsApp webhook][AI] OpenRouter raw response:\n' + safeStringify({
+        status: response?.status,
+        statusText: response?.statusText,
+        data: response?.data
+    }));
 
     const content = response?.data?.choices?.[0]?.message?.content;
+    console.log('[WhatsApp webhook][AI] OpenRouter content:\n' + safeStringify({
+        content
+    }));
     const parsed = parseJsonFromAiContent(content);
+    console.log('[WhatsApp webhook][AI] Parsed content JSON:\n' + safeStringify({
+        parsed
+    }));
     if (!parsed) {
         throw new Error('ИИ вернул невалидный JSON');
     }
@@ -371,6 +404,15 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
         number: phoneNumber
     });
 
+    console.log('[WhatsApp webhook][AI] Normalized client fields from AI:\n' + safeStringify({
+        customerName,
+        addressIndex,
+        city: address.city,
+        street: address.street,
+        houseNumber: address.houseNumber,
+        phoneNumber
+    }));
+
     return {
         customerName,
         addressIndex,
@@ -391,8 +433,17 @@ const createOrderFromOrderDraft = async ({
     const decreasedStocks = [];
 
     try {
+        console.log('[WhatsApp webhook][OrderDraft][Create] Start creating order from draft:\n' + safeStringify({
+            chatId,
+            deliveryPrice,
+            noteText,
+            resolvedItems
+        }));
         const clientFields = await parseOrderClientDataByAi(noteText, chatId);
         const uniqueTypeIds = [...new Set(resolvedItems.map((item) => Number(item.typeId)).filter(Number.isFinite))];
+        console.log('[WhatsApp webhook][OrderDraft][Create] Type ids selected:\n' + safeStringify({
+            uniqueTypeIds
+        }));
         const typeRows = await ProductType.findAll({
             where: {
                 id: {
@@ -401,6 +452,10 @@ const createOrderFromOrderDraft = async ({
             }
         });
         const typeById = new Map(typeRows.map((row) => [Number(row.id), row]));
+        console.log('[WhatsApp webhook][OrderDraft][Create] Type rows loaded:\n' + safeStringify({
+            count: typeRows.length,
+            ids: typeRows.map((row) => Number(row.id))
+        }));
 
         const products = resolvedItems.map((item) => {
             const typeId = Number(item.typeId);
@@ -432,6 +487,9 @@ const createOrderFromOrderDraft = async ({
                 unitPrice
             };
         });
+        console.log('[WhatsApp webhook][OrderDraft][Create] Normalized order products:\n' + safeStringify({
+            products
+        }));
 
         for (const item of products) {
             const typeRow = typeById.get(Number(item.typeId));
@@ -448,9 +506,17 @@ const createOrderFromOrderDraft = async ({
                 quantity: item.quantity
             });
         }
+        console.log('[WhatsApp webhook][OrderDraft][Create] Stock decreased for types:\n' + safeStringify({
+            decreasedStocks
+        }));
 
         const productsTotal = products.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
         const totalPrice = productsTotal + Math.max(0, Number(deliveryPrice) || 0);
+        console.log('[WhatsApp webhook][OrderDraft][Create] Totals calculated:\n' + safeStringify({
+            productsTotal,
+            deliveryPrice: Math.max(0, Number(deliveryPrice) || 0),
+            totalPrice
+        }));
 
         const orderPayload = {
             customerName: clientFields.customerName,
@@ -469,32 +535,63 @@ const createOrderFromOrderDraft = async ({
             })),
             totalPrice
         };
+        console.log('[WhatsApp webhook][OrderDraft][Create] Initial order payload:\n' + safeStringify(orderPayload));
 
         const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
+        console.log('[WhatsApp webhook][OrderDraft][Create] Payment connection attached:\n' + safeStringify({
+            paymentConnectionId: paymentLinkConnection?.id || null,
+            paymentConnectionIsPaid: paymentLinkConnection?.isPaid || false,
+            paymentConnectionExpectedAmount: paymentLinkConnection?.expectedAmount || null,
+            paymentConnectionPaidAmount: paymentLinkConnection?.paidAmount || null,
+            finalOrderPayload: orderPayload
+        }));
         if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
             orderPayload.status = 'Оплачено';
+            console.log('[WhatsApp webhook][OrderDraft][Create] Order marked as paid by payment connection match');
         }
 
         const createdOrder = await Order.create(orderPayload);
+        console.log('[WhatsApp webhook][OrderDraft][Create] Order row created:\n' + safeStringify({
+            orderId: createdOrder.id,
+            status: createdOrder.status,
+            totalPrice: createdOrder.totalPrice
+        }));
         if (paymentLinkConnection?.id) {
             const isLinked = await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, createdOrder.id);
             if (!isLinked) {
                 await createdOrder.destroy();
+                console.error('[WhatsApp webhook][OrderDraft][Create] Failed to link payment connection to created order, order rolled back:\n' + safeStringify({
+                    paymentConnectionId: paymentLinkConnection.id,
+                    createdOrderId: createdOrder.id
+                }));
                 throw new Error('Эта связь оплаты уже привязана к другому заказу');
             }
+            console.log('[WhatsApp webhook][OrderDraft][Create] Payment connection linked to order:\n' + safeStringify({
+                paymentConnectionId: paymentLinkConnection.id,
+                orderId: createdOrder.id
+            }));
         }
 
         try {
             await sendMessageToChannel(createdOrder);
+            console.log(`[WhatsApp webhook][OrderDraft][Create] Order #${createdOrder.id} notification sent to channel`);
         } catch (_error) {
             // Не блокируем создание заказа, если уведомление в канал не отправилось.
+            console.log(`[WhatsApp webhook][OrderDraft][Create] Order #${createdOrder.id} notification to channel failed, ignored`);
         }
 
+        console.log('[WhatsApp webhook][OrderDraft][Create] Finished successfully:\n' + safeStringify({
+            orderId: createdOrder.id
+        }));
         return {
             order: createdOrder,
             aiJsonText: clientFields.aiJsonText
         };
     } catch (error) {
+        console.error('[WhatsApp webhook][OrderDraft][Create] Failed with error:\n' + safeStringify({
+            message: error?.message || null,
+            stack: error?.stack || null
+        }));
         if (decreasedStocks.length > 0) {
             await Promise.all(
                 decreasedStocks.map(async (item) => {
@@ -508,6 +605,9 @@ const createOrderFromOrderDraft = async ({
                     });
                 })
             );
+            console.log('[WhatsApp webhook][OrderDraft][Create] Restored decreased stocks after failure:\n' + safeStringify({
+                decreasedStocks
+            }));
         }
 
         throw error;
