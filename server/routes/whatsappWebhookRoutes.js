@@ -406,7 +406,6 @@ const createOrderFromOrderDraft = async ({
             const typeId = Number(item.typeId);
             const productId = Number(item.productId);
             const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
-            const unitPrice = Number(item.unitPrice) || 0;
             const typeRow = typeById.get(typeId);
 
             if (!typeRow) {
@@ -420,6 +419,11 @@ const createOrderFromOrderDraft = async ({
             if (typeRow.stockQuantity !== null && Number(typeRow.stockQuantity) < quantity) {
                 throw new Error(`Недостаточно остатка для типа ${typeId}`);
             }
+
+            const itemUnitPrice = Number(item.unitPrice);
+            const unitPrice = Number.isFinite(itemUnitPrice) && itemUnitPrice >= 0
+                ? itemUnitPrice
+                : Number(typeRow.price) || 0;
 
             return {
                 productId,
@@ -872,6 +876,95 @@ const saveOrderBundle = async (bundlePayload) => {
     throw new Error('Не удалось сгенерировать уникальный код QR-пакета заказа');
 };
 
+const parseOrderBundlePayload = (rawPayload) => {
+    let parsedPayload;
+    try {
+        parsedPayload = JSON.parse(String(rawPayload || '{}'));
+    } catch (_error) {
+        throw new Error('QR-пакет заказа содержит невалидный JSON');
+    }
+
+    const items = Array.isArray(parsedPayload?.items) ? parsedPayload.items : [];
+    if (items.length === 0) {
+        throw new Error('QR-пакет заказа не содержит товары');
+    }
+
+    return {
+        deliveryPrice: Math.max(0, Number(parsedPayload?.deliveryPrice) || 0),
+        noteText: String(parsedPayload?.noteText || '').trim(),
+        items
+    };
+};
+
+const createOrderFromPaidBundle = async ({
+    connection,
+    senderChatId,
+    bundleCode,
+    paidAmount,
+    sellerAdmin
+}) => {
+    if (!connection || !bundleCode) {
+        return null;
+    }
+
+    if (connection.linkedOrderId) {
+        const linkedOrder = await Order.findByPk(connection.linkedOrderId);
+        if (linkedOrder) {
+            return linkedOrder;
+        }
+    }
+
+    const bundleRow = await OrderBundle.findOne({
+        where: {
+            code: bundleCode
+        }
+    });
+    if (!bundleRow) {
+        throw new Error(`QR-пакет заказа с кодом "${bundleCode}" не найден`);
+    }
+
+    const bundlePayload = parseOrderBundlePayload(bundleRow.payload);
+    const resolvedItems = bundlePayload.items.map((item) => ({
+        productId: Number(item?.productId),
+        typeId: Number(item?.typeId),
+        quantity: Math.max(1, Math.floor(Number(item?.quantity) || 1)),
+        unitPrice: Number(item?.unitPrice)
+    }));
+    const hasAnyUnitPrice = resolvedItems.some((item) => Number.isFinite(item.unitPrice));
+    if (hasAnyUnitPrice) {
+        const productsTotal = resolvedItems.reduce((sum, item) => sum + (Number.isFinite(item.unitPrice) ? item.unitPrice : 0) * item.quantity, 0);
+        const bundleTotal = productsTotal + bundlePayload.deliveryPrice;
+        if (!isSameRoundedAmount(bundleTotal, paidAmount)) {
+            throw new Error(`Сумма оплаты ${paidAmount} не совпадает с суммой пакета ${Math.round(bundleTotal)}`);
+        }
+    }
+
+    const createdOrderMeta = await createOrderFromOrderDraft({
+        resolvedItems,
+        deliveryPrice: bundlePayload.deliveryPrice,
+        noteText: bundlePayload.noteText,
+        chatId: senderChatId
+    });
+    const createdOrder = createdOrderMeta.order;
+
+    const paymentUpdate = {
+        status: 'Оплачено',
+        paymentSellerIin: normalizeAdminIin(sellerAdmin?.iin),
+        paymentSellerName: String(sellerAdmin?.fullName || '').trim() || null
+    };
+    await createdOrder.update(paymentUpdate);
+
+    const linked = await markPaymentLinkConnectionAsUsed(connection.id, createdOrder.id);
+    if (!linked) {
+        const refreshedConnection = await SentPaymentLink.findByPk(connection.id);
+        if (Number(refreshedConnection?.linkedOrderId) !== Number(createdOrder.id)) {
+            throw new Error('Оплата уже привязана к другому заказу');
+        }
+    }
+
+    return createdOrder;
+};
+
 const buildQrCodeByData = (value) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(value || ''))}`;
 
@@ -1171,13 +1264,6 @@ const processIncomingPdfProofWebhook = async (content) => {
         );
     }
 
-    const isOrderAssigned = await assignOrderToSellerFromPdf(connection, paidAmount, sellerAdmin);
-    if (!isOrderAssigned) {
-        console.log(
-            `[WhatsApp webhook] PDF connection #${connection.id} saved, but matching order was not assigned (phone=${customerPhone}, amount=${paidAmount}).`
-        );
-    }
-
     let bundleCode = parseOrderDraftSourceMeta(connection.sourceDescription)?.bundleCode || null;
     if (!bundleCode) {
         const relatedConnections = await SentPaymentLink.findAll({
@@ -1214,6 +1300,32 @@ const processIncomingPdfProofWebhook = async (content) => {
 
     if (!bundleCode) {
         console.log('[WhatsApp webhook][OrderDraft] Paid connection has no deferred bundle metadata, QR will not be sent.');
+    } else {
+        try {
+            const orderFromBundle = await createOrderFromPaidBundle({
+                connection,
+                senderChatId,
+                bundleCode,
+                paidAmount,
+                sellerAdmin
+            });
+            if (orderFromBundle) {
+                console.log(`[WhatsApp webhook][OrderDraft] Auto-created paid order #${orderFromBundle.id} from bundle ${bundleCode}.`);
+            }
+        } catch (error) {
+            console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order after payment:', error.message);
+            await sendMessageByChatId(senderChatId, `Не удалось автоматически создать заказ после оплаты: ${error.message}`);
+        }
+    }
+
+    const isOrderAssigned = await assignOrderToSellerFromPdf(connection, paidAmount, sellerAdmin);
+    if (!isOrderAssigned) {
+        console.log(
+            `[WhatsApp webhook] PDF connection #${connection.id} saved, but matching order was not assigned (phone=${customerPhone}, amount=${paidAmount}).`
+        );
+    }
+
+    if (!bundleCode) {
         return;
     }
 
@@ -1355,34 +1467,15 @@ const processIncomingMessageWebhook = async (content) => {
             `[WhatsApp webhook][OrderDraft] Totals: products=${productsTotal}, delivery=${parsedOrderDraft.deliveryPrice}, total=${totalToPay}`
         );
 
-        let createdOrderMeta = null;
-        try {
-            createdOrderMeta = await createOrderFromOrderDraft({
-                resolvedItems: resolved.items,
-                deliveryPrice: parsedOrderDraft.deliveryPrice,
-                noteText: parsedOrderDraft.noteText,
-                chatId: recipientChatId
-            });
-            console.log(
-                `[WhatsApp webhook][OrderDraft] Auto-created order #${createdOrderMeta.order.id} with deliveryMethod=kazpost`
-            );
-        } catch (error) {
-            console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order:', error.message);
-            await sendMessageByChatId(
-                recipientChatId,
-                `Не удалось автоматически создать заказ: ${error.message}`
-            );
-            return;
-        }
-
         const bundlePayload = {
             v: 1,
             deliveryPrice: parsedOrderDraft.deliveryPrice,
-            noteText: createdOrderMeta?.aiJsonText || buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
+            noteText: buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
             items: resolved.items.map((item) => ({
                 productId: item.productId,
                 typeId: item.typeId,
-                quantity: item.quantity
+                quantity: item.quantity,
+                unitPrice: item.unitPrice
             }))
         };
 
