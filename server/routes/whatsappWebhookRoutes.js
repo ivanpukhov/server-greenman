@@ -1319,7 +1319,8 @@ const processIncomingMessageWebhook = async (content) => {
         return;
     }
 
-    const parsedOrderDraft = webhookType === 'incomingMessageReceived' ? parseOrderDraftMessage(textMessage) : null;
+    const shouldParseOrderDraft = webhookType === 'incomingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const parsedOrderDraft = shouldParseOrderDraft ? parseOrderDraftMessage(textMessage) : null;
     if (parsedOrderDraft) {
         console.log(
             `[WhatsApp webhook] Order draft detected. chatId=${recipientChatId}, aliases=${parsedOrderDraft.aliases.length}, delivery=${parsedOrderDraft.deliveryPrice}`
