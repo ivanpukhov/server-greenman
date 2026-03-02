@@ -70,19 +70,11 @@ const extractSystemPromptFromIdeaFile = (source) => {
     return String(match[1]).trim();
 };
 
-const extractOpenRouterKeyFromIdeaFile = (source) => {
-    const match = String(source || '').match(/sk-or-v1-[A-Za-z0-9]+/);
-    if (!match || !match[0]) {
-        return null;
-    }
-    return match[0];
-};
-
 const ideaForAiSource = loadIdeaForAiFile();
 const ORDER_DRAFT_AI_SYSTEM_PROMPT =
     extractSystemPromptFromIdeaFile(ideaForAiSource) || ORDER_DRAFT_AI_FALLBACK_PROMPT;
 const ORDER_DRAFT_AI_API_KEY =
-    String(process.env.OPENROUTER_API_KEY || '').trim() || extractOpenRouterKeyFromIdeaFile(ideaForAiSource) || '';
+    String(process.env.OPENROUTER_API_KEY || '').trim();
 
 const safeStringify = (value) => {
     const seen = new WeakSet();
