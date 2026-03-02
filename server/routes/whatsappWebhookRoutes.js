@@ -1,6 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const Sequelize = require('sequelize');
+const fs = require('fs');
+const path = require('path');
 const pdfParse = require('pdf-parse');
 const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
@@ -9,7 +11,14 @@ const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
-const { findMatchedLinkInDescription, normalizePhoneNumber } = require('../utilities/paymentLinkUtils');
+const sendMessageToChannel = require('../utilities/sendMessageToChannel');
+const {
+    findMatchedLinkInDescription,
+    normalizePhoneNumber,
+    attachRecentPaymentLinkToOrder,
+    markPaymentLinkConnectionAsUsed,
+    canAutoMarkOrderAsPaidByConnection
+} = require('../utilities/paymentLinkUtils');
 const { pickNextPaymentLinkByDispatchPlan } = require('../utilities/paymentLinkDispatchPlan');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminIin } = require('../utilities/adminUsers');
 
@@ -31,6 +40,49 @@ const pendingOrderDraftByChatId = new Map();
 const PAYMENT_LINK_FOOTER =
     'После оплаты скиньте пожалуйста чек\n‼️Без чека отправки не будет';
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
+const ORDER_DRAFT_AI_FALLBACK_PROMPT = `
+GPT принимает одно сообщение = один заказ и возвращает строго один JSON-объект.
+Верни только JSON:
+{"kot":"Имя Фамилия","user_input":"индекс","street":"полный адрес","number":"номер телефона"}
+Правила:
+- kot: имя и фамилия клиента.
+- user_input: почтовый индекс (6 цифр).
+- street: полный адрес строкой.
+- number: телефон клиента.
+`;
+
+const loadIdeaForAiFile = () => {
+    try {
+        const filePath = path.resolve(__dirname, '../../idea_for_ai.js');
+        return fs.readFileSync(filePath, 'utf8');
+    } catch (_error) {
+        return '';
+    }
+};
+
+const extractSystemPromptFromIdeaFile = (source) => {
+    const match = String(source || '').match(/const SYSTEM_PROMPT = `([\s\S]*?)`;\s*export default/);
+    if (!match || !match[1]) {
+        return null;
+    }
+    return String(match[1]).trim();
+};
+
+const extractOpenRouterKeyFromIdeaFile = (source) => {
+    const match = String(source || '').match(/sk-or-v1-[A-Za-z0-9]+/);
+    if (!match || !match[0]) {
+        return null;
+    }
+    return match[0];
+};
+
+const ideaForAiSource = loadIdeaForAiFile();
+const ORDER_DRAFT_AI_SYSTEM_PROMPT =
+    extractSystemPromptFromIdeaFile(ideaForAiSource) || ORDER_DRAFT_AI_FALLBACK_PROMPT;
+const ORDER_DRAFT_AI_API_KEY =
+    String(process.env.OPENROUTER_API_KEY || '').trim() || extractOpenRouterKeyFromIdeaFile(ideaForAiSource) || '';
 
 const safeStringify = (value) => {
     const seen = new WeakSet();
@@ -175,6 +227,288 @@ const normalizeAlias = (value) =>
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();
+
+const normalizePhoneToTenDigits = (value) => {
+    const normalized = normalizePhoneNumber(value);
+    if (normalized) {
+        return normalized;
+    }
+
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length >= 10) {
+        return digits.slice(-10);
+    }
+
+    return '';
+};
+
+const parseJsonFromAiContent = (content) => {
+    const raw = String(content || '').trim();
+    if (!raw) {
+        return null;
+    }
+
+    const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    const jsonString = fenced && fenced[1] ? String(fenced[1]).trim() : raw;
+    try {
+        return JSON.parse(jsonString);
+    } catch (_error) {
+        return null;
+    }
+};
+
+const splitAddressToOrderFields = (streetRaw) => {
+    const cleaned = String(streetRaw || '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!cleaned) {
+        return {
+            city: 'Не указан',
+            street: 'Не указан',
+            houseNumber: '1'
+        };
+    }
+
+    const commaParts = cleaned
+        .split(',')
+        .map((part) => String(part || '').trim())
+        .filter(Boolean);
+
+    if (commaParts.length >= 2) {
+        const city = commaParts[0] || 'Не указан';
+        const houseNumber = commaParts[commaParts.length - 1] || '1';
+        const street =
+            commaParts.length > 2 ? commaParts.slice(1, -1).join(', ') : commaParts[1] || cleaned;
+
+        return {
+            city: city || 'Не указан',
+            street: street || cleaned,
+            houseNumber: houseNumber || '1'
+        };
+    }
+
+    const tokens = cleaned.split(' ').filter(Boolean);
+    const city = tokens[0] || 'Не указан';
+    const houseNumber = tokens.length > 1 ? tokens[tokens.length - 1] : '1';
+    const street = tokens.length > 2 ? tokens.slice(1, -1).join(' ') : cleaned;
+
+    return {
+        city: city || 'Не указан',
+        street: street || cleaned,
+        houseNumber: houseNumber || '1'
+    };
+};
+
+const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
+    if (!ORDER_DRAFT_AI_API_KEY) {
+        throw new Error('OpenRouter API key не найден');
+    }
+
+    const normalizedNote = String(noteText || '').trim();
+    if (!normalizedNote) {
+        throw new Error('После строки "доставка" отсутствует текст с данными клиента');
+    }
+
+    const response = await axios.post(
+        ORDER_DRAFT_AI_URL,
+        {
+            model: ORDER_DRAFT_AI_MODEL,
+            temperature: 0,
+            messages: [
+                {
+                    role: 'system',
+                    content: ORDER_DRAFT_AI_SYSTEM_PROMPT
+                },
+                {
+                    role: 'user',
+                    content: normalizedNote
+                }
+            ]
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${ORDER_DRAFT_AI_API_KEY}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://greenman.kz',
+                'X-Title': 'Order Processor'
+            },
+            timeout: 30000
+        }
+    );
+
+    const content = response?.data?.choices?.[0]?.message?.content;
+    const parsed = parseJsonFromAiContent(content);
+    if (!parsed) {
+        throw new Error('ИИ вернул невалидный JSON');
+    }
+
+    const customerName = String(parsed.kot || '').trim();
+    const addressIndexMatch = String(parsed.user_input || '').replace(/\D/g, '').match(/\d{6}/);
+    const addressIndex = addressIndexMatch ? addressIndexMatch[0] : '';
+    const fullStreet = String(parsed.street || '').trim();
+    const phoneNumber = normalizePhoneToTenDigits(parsed.number) || normalizePhoneToTenDigits(fallbackChatId);
+
+    if (!customerName) {
+        throw new Error('ИИ не вернул ФИО (kot)');
+    }
+    if (!addressIndex) {
+        throw new Error('ИИ не вернул индекс (user_input)');
+    }
+    if (!fullStreet) {
+        throw new Error('ИИ не вернул адрес (street)');
+    }
+    if (!phoneNumber || phoneNumber.length !== 10) {
+        throw new Error('ИИ не вернул корректный телефон (number)');
+    }
+
+    const address = splitAddressToOrderFields(fullStreet);
+    const aiJsonText = JSON.stringify({
+        kot: customerName,
+        user_input: addressIndex,
+        street: fullStreet,
+        number: phoneNumber
+    });
+
+    return {
+        customerName,
+        addressIndex,
+        city: address.city,
+        street: address.street,
+        houseNumber: address.houseNumber,
+        phoneNumber,
+        aiJsonText
+    };
+};
+
+const createOrderFromOrderDraft = async ({
+    resolvedItems,
+    deliveryPrice,
+    noteText,
+    chatId
+}) => {
+    const decreasedStocks = [];
+
+    try {
+        const clientFields = await parseOrderClientDataByAi(noteText, chatId);
+        const uniqueTypeIds = [...new Set(resolvedItems.map((item) => Number(item.typeId)).filter(Number.isFinite))];
+        const typeRows = await ProductType.findAll({
+            where: {
+                id: {
+                    [Op.in]: uniqueTypeIds
+                }
+            }
+        });
+        const typeById = new Map(typeRows.map((row) => [Number(row.id), row]));
+
+        const products = resolvedItems.map((item) => {
+            const typeId = Number(item.typeId);
+            const productId = Number(item.productId);
+            const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+            const unitPrice = Number(item.unitPrice) || 0;
+            const typeRow = typeById.get(typeId);
+
+            if (!typeRow) {
+                throw new Error(`Тип товара с ID ${typeId} не найден`);
+            }
+
+            if (Number(typeRow.productId) !== productId) {
+                throw new Error(`Тип товара ${typeId} не принадлежит товару ${productId}`);
+            }
+
+            if (typeRow.stockQuantity !== null && Number(typeRow.stockQuantity) < quantity) {
+                throw new Error(`Недостаточно остатка для типа ${typeId}`);
+            }
+
+            return {
+                productId,
+                typeId,
+                quantity,
+                unitPrice
+            };
+        });
+
+        for (const item of products) {
+            const typeRow = typeById.get(Number(item.typeId));
+            if (!typeRow || typeRow.stockQuantity === null) {
+                continue;
+            }
+
+            await typeRow.update({
+                stockQuantity: Number(typeRow.stockQuantity) - item.quantity
+            });
+
+            decreasedStocks.push({
+                typeId: Number(typeRow.id),
+                quantity: item.quantity
+            });
+        }
+
+        const productsTotal = products.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+        const totalPrice = productsTotal + Math.max(0, Number(deliveryPrice) || 0);
+
+        const orderPayload = {
+            customerName: clientFields.customerName,
+            addressIndex: clientFields.addressIndex,
+            city: clientFields.city,
+            street: clientFields.street,
+            houseNumber: clientFields.houseNumber,
+            phoneNumber: clientFields.phoneNumber,
+            kaspiNumber: clientFields.phoneNumber,
+            deliveryMethod: 'kazpost',
+            paymentMethod: 'link',
+            products: products.map((item) => ({
+                productId: item.productId,
+                typeId: item.typeId,
+                quantity: item.quantity
+            })),
+            totalPrice
+        };
+
+        const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
+        if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
+            orderPayload.status = 'Оплачено';
+        }
+
+        const createdOrder = await Order.create(orderPayload);
+        if (paymentLinkConnection?.id) {
+            const isLinked = await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, createdOrder.id);
+            if (!isLinked) {
+                await createdOrder.destroy();
+                throw new Error('Эта связь оплаты уже привязана к другому заказу');
+            }
+        }
+
+        try {
+            await sendMessageToChannel(createdOrder);
+        } catch (_error) {
+            // Не блокируем создание заказа, если уведомление в канал не отправилось.
+        }
+
+        return {
+            order: createdOrder,
+            aiJsonText: clientFields.aiJsonText
+        };
+    } catch (error) {
+        if (decreasedStocks.length > 0) {
+            await Promise.all(
+                decreasedStocks.map(async (item) => {
+                    const typeRow = await ProductType.findByPk(item.typeId);
+                    if (!typeRow || typeRow.stockQuantity === null) {
+                        return;
+                    }
+
+                    await typeRow.update({
+                        stockQuantity: Number(typeRow.stockQuantity) + item.quantity
+                    });
+                })
+            );
+        }
+
+        throw error;
+    }
+};
 
 const buildBundleNoteText = (noteText, chatId) => {
     const normalizedNote = String(noteText || '').trim();
@@ -985,7 +1319,7 @@ const processIncomingMessageWebhook = async (content) => {
         return;
     }
 
-    const parsedOrderDraft = parseOrderDraftMessage(textMessage);
+    const parsedOrderDraft = webhookType === 'incomingMessageReceived' ? parseOrderDraftMessage(textMessage) : null;
     if (parsedOrderDraft) {
         console.log(
             `[WhatsApp webhook] Order draft detected. chatId=${recipientChatId}, aliases=${parsedOrderDraft.aliases.length}, delivery=${parsedOrderDraft.deliveryPrice}`
@@ -1020,10 +1354,30 @@ const processIncomingMessageWebhook = async (content) => {
             `[WhatsApp webhook][OrderDraft] Totals: products=${productsTotal}, delivery=${parsedOrderDraft.deliveryPrice}, total=${totalToPay}`
         );
 
+        let createdOrderMeta = null;
+        try {
+            createdOrderMeta = await createOrderFromOrderDraft({
+                resolvedItems: resolved.items,
+                deliveryPrice: parsedOrderDraft.deliveryPrice,
+                noteText: parsedOrderDraft.noteText,
+                chatId: recipientChatId
+            });
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Auto-created order #${createdOrderMeta.order.id} with deliveryMethod=kazpost`
+            );
+        } catch (error) {
+            console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order:', error.message);
+            await sendMessageByChatId(
+                recipientChatId,
+                `Не удалось автоматически создать заказ: ${error.message}`
+            );
+            return;
+        }
+
         const bundlePayload = {
             v: 1,
             deliveryPrice: parsedOrderDraft.deliveryPrice,
-            noteText: buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
+            noteText: createdOrderMeta?.aiJsonText || buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
             items: resolved.items.map((item) => ({
                 productId: item.productId,
                 typeId: item.typeId,
