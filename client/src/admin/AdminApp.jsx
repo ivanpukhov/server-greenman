@@ -16,6 +16,7 @@ import adminTheme from './theme';
 import AdminLoginPage from './AdminLoginPage';
 import AdminDashboard from './AdminDashboard';
 import AccountingPage from './AccountingPage';
+import AccountingFullAccessPage from './AccountingFullAccessPage';
 import AdministratorsPage from './AdministratorsPage';
 import IncomingStockPage from './IncomingStockPage';
 import QrCodesPage from './QrCodesPage';
@@ -24,6 +25,7 @@ import AddExpensePage from './AddExpensePage';
 import AliasesPage from './AliasesPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
+import { adminAuthStorage } from './authProvider';
 import './AdminApp.css';
 
 const AdminAppBar = () => {
@@ -83,16 +85,19 @@ const AdminLayout = (props) => (
     />
 );
 
-const AdminApp = () => (
-    <Admin
-        title="Greenman Admin"
-        layout={AdminLayout}
-        dashboard={AdminDashboard}
-        authProvider={authProvider}
-        dataProvider={dataProvider}
-        loginPage={AdminLoginPage}
-        theme={adminTheme}
-    >
+const AdminApp = () => {
+    const isIvan = adminAuthStorage.isIvan();
+
+    return (
+        <Admin
+            title="Greenman Admin"
+            layout={AdminLayout}
+            dashboard={AdminDashboard}
+            authProvider={authProvider}
+            dataProvider={dataProvider}
+            loginPage={AdminLoginPage}
+            theme={adminTheme}
+        >
         <Resource
             name="products"
             options={{ label: 'Товары' }}
@@ -118,6 +123,14 @@ const AdminApp = () => (
             list={AccountingPage}
             icon={AccountBalanceWalletOutlinedIcon}
         />
+        {isIvan ? (
+            <Resource
+                name="accounting-full"
+                options={{ label: 'Полная сводка счетов' }}
+                list={AccountingFullAccessPage}
+                icon={AccountBalanceWalletOutlinedIcon}
+            />
+        ) : null}
         <Resource
             name="add-expense"
             options={{ label: 'Добавить расход' }}
@@ -154,7 +167,8 @@ const AdminApp = () => (
             list={QrCodesPage}
             icon={QrCode2OutlinedIcon}
         />
-    </Admin>
-);
+        </Admin>
+    );
+};
 
 export default AdminApp;

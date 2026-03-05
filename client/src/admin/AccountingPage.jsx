@@ -148,36 +148,10 @@ const AccountingPage = () => {
         }
     };
 
-    const allocationWithExpenses = useMemo(() => {
-        const byAccount = Array.isArray(summary.allocations?.byAccount) ? summary.allocations.byAccount : [];
-        const withoutLink = summary.allocations?.withoutLink || {};
-        const withoutLinkName = withoutLink.accountName || 'Без ссылки';
-        const expenseByAccount = new Map();
-        const knownAccountNames = new Set(byAccount.map((item) => String(item.accountName || '').trim()).filter(Boolean));
-        knownAccountNames.add(withoutLinkName);
-
-        expenses.forEach((expense) => {
-            const rawName = String(expense?.spentByName || '').trim();
-            const targetName = rawName && knownAccountNames.has(rawName) ? rawName : withoutLinkName;
-            const amount = Number(expense?.amount || 0);
-            expenseByAccount.set(targetName, (expenseByAccount.get(targetName) || 0) + amount);
-        });
-
-        return {
-            byAccount: byAccount.map((item) => {
-                const income = Number(item.total || 0);
-                const expense = Number(expenseByAccount.get(item.accountName) || 0);
-                return {
-                    ...item,
-                    totalWithExpense: income - expense
-                };
-            }),
-            withoutLink: {
-                ...withoutLink,
-                totalWithExpense: Number(withoutLink.total || 0) - Number(expenseByAccount.get(withoutLinkName) || 0)
-            }
-        };
-    }, [expenses, summary.allocations]);
+    const accountFinancialRows = useMemo(
+        () => (Array.isArray(summary.accountFinancials?.byAccount) ? summary.accountFinancials.byAccount : []),
+        [summary.accountFinancials]
+    );
     const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
     const hasHiddenOrders = orders.length > 5;
 
@@ -197,7 +171,7 @@ const AccountingPage = () => {
             >
                 <Typography variant="h5">Бухгалтерия</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    В приходе учитываются только оплаченные заказы.
+                    В приходе учитываются все оплаченные связи клиент-ссылка (кроме счетов Иван и Даша).
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap' }}>
                     {periodOptions.map((option) => (
@@ -246,44 +220,39 @@ const AccountingPage = () => {
                 </Typography>
                 {isSmall ? (
                     <Stack spacing={1.2}>
-                        {(allocationWithExpenses.byAccount || []).map((item) => (
+                        {accountFinancialRows.map((item) => (
                             <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
                                 <CardContent>
-                                    <Typography variant="subtitle2">
-                                        {item.accountName} - {formatMoney(item.totalWithExpense)}
+                                    <Typography variant="subtitle2">{item.accountName}</Typography>
+                                    <Typography variant="body2">Пришло: {formatMoney(item.income)}</Typography>
+                                    <Typography variant="body2">Потрачено: {formatMoney(item.expenses)}</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                        Сейчас: {formatMoney(item.current)}
                                     </Typography>
                                 </CardContent>
                             </Card>
                         ))}
-                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                            <CardContent>
-                                <Typography variant="subtitle2">
-                                    {(allocationWithExpenses.withoutLink?.accountName || 'Без ссылки')} -{' '}
-                                    {formatMoney(allocationWithExpenses.withoutLink?.totalWithExpense || 0)}
-                                </Typography>
-                            </CardContent>
-                        </Card>
                     </Stack>
                 ) : (
                     <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 640 }}>
+                        <Table size="small" sx={{ minWidth: 740 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell>Счёт</TableCell>
-                                    <TableCell align="right">Сумма</TableCell>
+                                    <TableCell align="right">Пришло</TableCell>
+                                    <TableCell align="right">Потрачено</TableCell>
+                                    <TableCell align="right">Сейчас</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {(allocationWithExpenses.byAccount || []).map((item) => (
+                                {accountFinancialRows.map((item) => (
                                     <TableRow key={item.accountName}>
                                         <TableCell>{item.accountName}</TableCell>
-                                        <TableCell align="right">{formatMoney(item.totalWithExpense)}</TableCell>
+                                        <TableCell align="right">{formatMoney(item.income)}</TableCell>
+                                        <TableCell align="right">{formatMoney(item.expenses)}</TableCell>
+                                        <TableCell align="right">{formatMoney(item.current)}</TableCell>
                                     </TableRow>
                                 ))}
-                                <TableRow>
-                                    <TableCell>{allocationWithExpenses.withoutLink?.accountName || 'Без ссылки'}</TableCell>
-                                    <TableCell align="right">{formatMoney(allocationWithExpenses.withoutLink?.totalWithExpense || 0)}</TableCell>
-                                </TableRow>
                             </TableBody>
                         </Table>
                     </Box>
@@ -323,13 +292,12 @@ const AccountingPage = () => {
                         <Table size="small" sx={{ minWidth: 860 }}>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>ID</TableCell>
                                     <TableCell>Дата</TableCell>
-                                    <TableCell>Клиент</TableCell>
-                                    <TableCell>Город</TableCell>
-                                    <TableCell>Статус</TableCell>
-                                    <TableCell>Счёт</TableCell>
+                                    <TableCell>Кто потратил</TableCell>
+                                    <TableCell>Категория</TableCell>
+                                    <TableCell>Комментарий</TableCell>
                                     <TableCell align="right">Сумма</TableCell>
+                                    <TableCell align="right">Действие</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -360,14 +328,14 @@ const AccountingPage = () => {
 
             <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                    Оплаченные заказы (учтены в приходе)
+                    Оплаченные связи клиент-ссылка (учтены в приходе)
                 </Typography>
                 {isSmall ? (
                     <Stack spacing={1.2}>
                         {ordersToShow.map((order) => (
                             <Card key={order.id} variant="outlined" sx={{ borderRadius: 2 }}>
                                 <CardContent>
-                                    <Typography variant="subtitle2">Заказ #{order.id}</Typography>
+                                    <Typography variant="subtitle2">Связь/заказ #{order.id}</Typography>
                                     <Typography variant="body2" color="text.secondary">{formatDate(order.createdAt)}</Typography>
                                     <Typography variant="body2">Клиент: {order.customerName}</Typography>
                                     <Typography variant="body2">Город: {order.city}</Typography>
@@ -383,12 +351,13 @@ const AccountingPage = () => {
                         <Table size="small" sx={{ minWidth: 860 }}>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell>ID</TableCell>
                                     <TableCell>Дата</TableCell>
-                                    <TableCell>Кто потратил</TableCell>
-                                    <TableCell>На что</TableCell>
-                                    <TableCell>Комментарий</TableCell>
+                                    <TableCell>Клиент</TableCell>
+                                    <TableCell>Город</TableCell>
+                                    <TableCell>Статус</TableCell>
+                                    <TableCell>Счёт</TableCell>
                                     <TableCell align="right">Сумма</TableCell>
-                                    <TableCell align="right">Действие</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>

@@ -37,6 +37,10 @@ const User = orderDB.define('user', {
     resetPasswordExpires: {
         type: Sequelize.DATE,
         allowNull: true
+    },
+    lastIncomingMessageAt: {
+        type: Sequelize.DATE,
+        allowNull: true
     }
 });
 

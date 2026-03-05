@@ -1,7 +1,5 @@
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
-import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import {
     Box,
     Button,
@@ -14,7 +12,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { useCreatePath, useGetList, useNotify } from 'react-admin';
+import { useCreatePath, useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
@@ -411,6 +409,132 @@ const ProductSalesChart = ({ rows }) => {
     );
 };
 
+const FinancialSummaryPanel = ({ periodLabel, financialSummary, accountFinancials, loading }) => {
+    const rows = Array.isArray(accountFinancials?.byAccount) ? accountFinancials.byAccount : [];
+
+    return (
+        <Card
+            sx={{
+                ...metricCardSx,
+                background:
+                    'radial-gradient(circle at 15% 10%, rgba(38,173,124,0.2), transparent 35%), linear-gradient(150deg, rgba(8,68,48,0.96), rgba(14,95,67,0.92))',
+                color: '#eefaf4',
+                border: '1px solid rgba(193,244,220,0.22)'
+            }}
+        >
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Stack spacing={2}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                            <Typography variant="h6">Финансовая сводка</Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(233,251,243,0.86)' }}>
+                                {periodLabel}
+                            </Typography>
+                        </Box>
+                        {loading ? <CircularProgress size={18} sx={{ color: '#eefaf4' }} /> : null}
+                    </Stack>
+
+                    <Grid container spacing={1.2}>
+                        <Grid item xs={12} sm={4}>
+                            <Card sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'inherit' }}>
+                                <CardContent sx={{ py: 1.2, '&:last-child': { pb: 1.2 } }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(233,251,243,0.82)' }}>
+                                        Общий доход
+                                    </Typography>
+                                    <Typography variant="h6">{formatMoney(financialSummary.revenue)}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Card sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'inherit' }}>
+                                <CardContent sx={{ py: 1.2, '&:last-child': { pb: 1.2 } }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(233,251,243,0.82)' }}>
+                                        Общий расход
+                                    </Typography>
+                                    <Typography variant="h6">{formatMoney(financialSummary.expenses)}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                            <Card sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'inherit' }}>
+                                <CardContent sx={{ py: 1.2, '&:last-child': { pb: 1.2 } }}>
+                                    <Typography variant="caption" sx={{ color: 'rgba(233,251,243,0.82)' }}>
+                                        Сейчас
+                                    </Typography>
+                                    <Typography variant="h6">{formatMoney(financialSummary.profit)}</Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    </Grid>
+
+                    <Box
+                        sx={{
+                            borderRadius: 2,
+                            border: '1px solid rgba(220,255,240,0.2)',
+                            bgcolor: 'rgba(255,255,255,0.05)',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                px: 1.5,
+                                py: 1,
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1.3fr 1fr', md: '1.3fr 1fr 1fr 1fr' },
+                                gap: 1,
+                                borderBottom: '1px solid rgba(220,255,240,0.16)'
+                            }}
+                        >
+                            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                Счет
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textAlign: 'right' }}>
+                                Пришло
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
+                                Потрачено
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
+                                Сейчас
+                            </Typography>
+                        </Box>
+
+                        <Stack spacing={0}>
+                            {rows.slice(0, 8).map((item, index) => (
+                                <Box
+                                    key={`${item.accountName}-${index}`}
+                                    sx={{
+                                        px: 1.5,
+                                        py: 1,
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1.3fr 1fr', md: '1.3fr 1fr 1fr 1fr' },
+                                        gap: 1,
+                                        borderBottom:
+                                            index < rows.slice(0, 8).length - 1
+                                                ? '1px solid rgba(220,255,240,0.12)'
+                                                : 'none'
+                                    }}
+                                >
+                                    <Typography variant="body2">{item.accountName}</Typography>
+                                    <Typography variant="body2" sx={{ textAlign: 'right' }}>
+                                        {formatMoney(item.income)}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
+                                        {formatMoney(item.expenses)}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
+                                        {formatMoney(item.current)}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Stack>
+                    </Box>
+                </Stack>
+            </CardContent>
+        </Card>
+    );
+};
+
 const useDashboardAnalytics = (period) => {
     const [data, setData] = useState({
         productSales: [],
@@ -419,6 +543,12 @@ const useDashboardAnalytics = (period) => {
             expenses: 0,
             profit: 0,
             ordersCount: 0
+        },
+        accountFinancials: {
+            totalIncome: 0,
+            totalExpenses: 0,
+            totalCurrent: 0,
+            byAccount: []
         },
         orderSeries: { today: [], week: [], month: [], year: [] },
         financeSeries: { today: [], week: [], month: [], year: [] }
@@ -449,6 +579,12 @@ const useDashboardAnalytics = (period) => {
                             ? body.data.productSales
                             : (Array.isArray(body?.data?.topProducts) ? body.data.topProducts : []),
                         financialSummary: body?.data?.financialSummary || { revenue: 0, expenses: 0, profit: 0, ordersCount: 0 },
+                        accountFinancials: body?.data?.accountFinancials || {
+                            totalIncome: 0,
+                            totalExpenses: 0,
+                            totalCurrent: 0,
+                            byAccount: []
+                        },
                         orderSeries: body?.data?.orderSeries || { today: [], week: [], month: [], year: [] },
                         financeSeries: body?.data?.financeSeries || { today: [], week: [], month: [], year: [] }
                     });
@@ -475,10 +611,6 @@ const useDashboardAnalytics = (period) => {
 const AdminDashboard = () => {
     const [period, setPeriod] = useState('month');
     const createPath = useCreatePath();
-    const { total: totalProducts = 0 } = useGetList('products', {
-        pagination: { page: 1, perPage: 1 },
-        sort: { field: 'id', order: 'DESC' }
-    });
     const { data: analytics, loading } = useDashboardAnalytics(period);
 
     const orderChartData = useMemo(() => {
@@ -488,7 +620,7 @@ const AdminDashboard = () => {
             lines: [
                 {
                     key: 'orders',
-                    label: 'Количество заказов',
+                    label: 'Оплаченные связи',
                     color: chartColors.orders,
                     values: points.map((point) => Number(point.orders || 0))
                 }
@@ -540,7 +672,7 @@ const AdminDashboard = () => {
                             Оперативная панель
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 620 }}>
-                            Наглядная аналитика: динамика заказов, оборот, расходы и прибыль в одном экране.
+                            Наглядная аналитика: динамика оплаченных связей, оборот, расходы и остаток в одном экране.
                         </Typography>
                     </Box>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -558,45 +690,15 @@ const AdminDashboard = () => {
                 </Stack>
             </Box>
 
-            <Grid container spacing={2}>
-                <Grid item xs={12} md={8}>
-                    <Card sx={metricCardSx}>
-                        <CardContent>
-                            <Stack spacing={1.1}>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                    <TrendingUpOutlinedIcon />
-                                    {loading && <CircularProgress size={18} />}
-                                </Stack>
-                                <Typography variant="body2" color="text.secondary">
-                                    Выручка и финансовая сводка ({periodLabels[period]})
-                                </Typography>
-                                <Typography variant="h5">{formatMoney(analytics.financialSummary.revenue)}</Typography>
-                                <Typography variant="body2">Расходы: {formatMoney(analytics.financialSummary.expenses)}</Typography>
-                                <Typography variant="body2">Прибыль: {formatMoney(analytics.financialSummary.profit)}</Typography>
-                                <Typography variant="body2">
-                                    Количество заказов: {Number(analytics.financialSummary.ordersCount || 0)}
-                                </Typography>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={metricCardSx}>
-                        <CardContent>
-                            <Stack spacing={1}>
-                                <Inventory2OutlinedIcon />
-                                <Typography variant="body2" color="text.secondary">
-                                    Товаров в каталоге
-                                </Typography>
-                                <Typography variant="h4">{totalProducts}</Typography>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+            <FinancialSummaryPanel
+                periodLabel={`${periodLabels[period]} · ${Number(analytics.financialSummary.ordersCount || 0)} оплаченных связей`}
+                financialSummary={analytics.financialSummary || { revenue: 0, expenses: 0, profit: 0 }}
+                accountFinancials={analytics.accountFinancials || { byAccount: [] }}
+                loading={loading}
+            />
 
             <InteractiveLineChart
-                title="Количество заказов"
+                title="Количество оплаченных связей клиент-ссылка"
                 subtitle="Наведите курсор или коснитесь графика, чтобы увидеть значения"
                 labels={orderChartData.labels}
                 series={orderChartData.lines}

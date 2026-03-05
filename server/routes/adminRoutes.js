@@ -32,6 +32,7 @@ router.post('/admins', adminController.createAdmin);
 router.put('/admins/:id', adminController.updateAdmin);
 router.delete('/admins/:id', adminController.deleteAdmin);
 router.get('/accounting/summary', adminController.getAccountingSummary);
+router.get('/accounting/full-summary', adminController.getAccountingFullSummary);
 router.get('/accounting/admins', adminController.getAccountingAdmins);
 router.get('/accounting/payment-links', adminController.getAccountingPaymentLinks);
 router.get('/accounting/payment-link-dispatch-plan', adminController.getPaymentLinkDispatchPlan);

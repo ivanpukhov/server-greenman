@@ -523,6 +523,92 @@ const buildAccountingAllocation = async (orders, currentAdminPhone, preloadedCon
     };
 };
 
+const buildAccountFinancialSummary = async ({
+    orders,
+    expenses,
+    currentAdminPhone,
+    preloadedContext = null,
+    includeAllAccounts = false
+}) => {
+    const context = preloadedContext || (await buildAccountingContext());
+    const normalizedCurrentAdminPhone = normalizeAdminPhone(currentAdminPhone);
+    const visibleAccountNames = new Set(
+        includeAllAccounts || !normalizedCurrentAdminPhone
+            ? []
+            : context.activeAdmins
+                  .filter((item) => canCurrentAdminSeeTargetAdmin(normalizedCurrentAdminPhone, item.phoneNumber))
+                  .map((item) => String(item.fullName || '').trim())
+                  .filter(Boolean)
+    );
+    const hiddenAccountNames = new Set(
+        includeAllAccounts || !normalizedCurrentAdminPhone
+            ? []
+            : context.activeAdmins
+                  .filter((item) => !canCurrentAdminSeeTargetAdmin(normalizedCurrentAdminPhone, item.phoneNumber))
+                  .map((item) => String(item.fullName || '').trim())
+                  .filter(Boolean)
+    );
+    const accountRowsMap = new Map();
+    const registerAccount = (rawAccountName) => {
+        const normalizedName = String(rawAccountName || '').trim() || WITHOUT_LINK_ACCOUNT_NAME;
+        const accountName =
+            !includeAllAccounts && hiddenAccountNames.has(normalizedName) ? WITHOUT_LINK_ACCOUNT_NAME : normalizedName;
+
+        if (!accountRowsMap.has(accountName)) {
+            accountRowsMap.set(accountName, {
+                accountName,
+                income: 0,
+                expenses: 0,
+                current: 0
+            });
+        }
+
+        return accountRowsMap.get(accountName);
+    };
+
+    context.activeAdmins.forEach((admin) => {
+        const adminName = String(admin.fullName || '').trim();
+        if (!adminName) {
+            return;
+        }
+
+        if (!includeAllAccounts && visibleAccountNames.size && !visibleAccountNames.has(adminName)) {
+            return;
+        }
+
+        registerAccount(adminName);
+    });
+    registerAccount(WITHOUT_LINK_ACCOUNT_NAME);
+
+    (Array.isArray(orders) ? orders : []).forEach((order) => {
+        const accountName = resolveOrderAccountNameByContext(order, context);
+        const target = registerAccount(accountName);
+        target.income += safeAmount(order.totalPrice);
+    });
+
+    (Array.isArray(expenses) ? expenses : []).forEach((expense) => {
+        const spentByName = String(expense?.spentByName || '').trim();
+        const accountName =
+            spentByName && (includeAllAccounts || !hiddenAccountNames.has(spentByName)) ? spentByName : WITHOUT_LINK_ACCOUNT_NAME;
+        const target = registerAccount(accountName);
+        target.expenses += safeAmount(expense.amount);
+    });
+
+    const byAccount = [...accountRowsMap.values()]
+        .map((item) => ({
+            ...item,
+            current: safeAmount(item.income) - safeAmount(item.expenses)
+        }))
+        .sort((a, b) => b.current - a.current);
+
+    return {
+        totalIncome: byAccount.reduce((sum, item) => sum + safeAmount(item.income), 0),
+        totalExpenses: byAccount.reduce((sum, item) => sum + safeAmount(item.expenses), 0),
+        totalCurrent: byAccount.reduce((sum, item) => sum + safeAmount(item.current), 0),
+        byAccount
+    };
+};
+
 const getPaidConnectionsWithoutOrder = async (range, phoneQuery = '') => {
     const where = {
         isPaid: true,
@@ -888,6 +974,54 @@ const buildDashboardSeries = (orders, expenses, ranges) => {
             month: buildFinanceSeries(monthAxis, financeMaps.month),
             year: buildFinanceSeries(yearAxis, financeMaps.year)
         }
+    };
+};
+
+const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAllAccounts = false }) => {
+    const range = getOrderPeriodRange(period);
+    const ordersWhere = {
+        status: { [Op.in]: PAID_ORDER_STATUSES }
+    };
+    const expensesWhere = {};
+
+    if (range) {
+        ordersWhere.createdAt = {
+            [Op.gte]: range.start,
+            [Op.lte]: range.end
+        };
+        expensesWhere.spentAt = {
+            [Op.gte]: range.start,
+            [Op.lte]: range.end
+        };
+    }
+
+    const [orders, expenses, virtualPaidOrders] = await Promise.all([
+        Order.findAll({ where: ordersWhere, order: [['createdAt', 'DESC']] }),
+        Expense.findAll({ where: expensesWhere, order: [['spentAt', 'DESC']] }),
+        getPaidConnectionsWithoutOrder(range)
+    ]);
+
+    const accountingContext = await buildAccountingContext();
+    const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
+    const filteredPaidOrders = includeAllAccounts ? allPaidOrders : excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
+    const allocation = await buildAccountingAllocation(filteredPaidOrders, currentAdminPhone, accountingContext);
+    const accountFinancials = await buildAccountFinancialSummary({
+        orders: filteredPaidOrders,
+        expenses,
+        currentAdminPhone,
+        preloadedContext: accountingContext,
+        includeAllAccounts
+    });
+
+    return {
+        ordersTotal: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0),
+        expensesTotal: expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
+        balance: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0) -
+            expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
+        ordersCount: filteredPaidOrders.length,
+        expensesCount: expenses.length,
+        allocations: allocation,
+        accountFinancials
     };
 };
 
@@ -1600,7 +1734,7 @@ ${productDetails}`;
     async getDashboardAnalytics(req, res) {
         try {
             const ranges = getDashboardRanges(req.query.period);
-            const [orders, expenses, products] = await Promise.all([
+            const [orders, expenses, products, virtualPaidOrders] = await Promise.all([
                 Order.findAll({
                     where: {
                         status: { [Op.in]: PAID_ORDER_STATUSES },
@@ -1620,24 +1754,39 @@ ${productDetails}`;
                     },
                     order: [['spentAt', 'DESC']]
                 }),
-                Product.findAll({ attributes: ['id', 'name'] })
+                Product.findAll({ attributes: ['id', 'name'] }),
+                getPaidConnectionsWithoutOrder({
+                    start: ranges.maxStart,
+                    end: ranges.now
+                })
             ]);
 
+            const accountingContext = await buildAccountingContext();
             const orderRows = orders.map((order) => order.toJSON());
+            const mergedPaidRows = excludeOrdersByAccountingAccounts([...orderRows, ...virtualPaidOrders], accountingContext);
             const expenseRows = expenses.map((expense) => expense.toJSON());
             const productNameById = new Map(products.map((item) => [item.id, item.name]));
-            const { orderSeries, financeSeries } = buildDashboardSeries(orderRows, expenseRows, ranges);
+            const { orderSeries, financeSeries } = buildDashboardSeries(mergedPaidRows, expenseRows, ranges);
 
             const selectedFinance = financeSeries[ranges.selectedPeriod] || [];
             const selectedTurnover = selectedFinance.reduce((sum, point) => sum + safeAmount(point.turnover), 0);
             const selectedExpenses = selectedFinance.reduce((sum, point) => sum + safeAmount(point.expenses), 0);
             const selectedProfit = selectedTurnover - selectedExpenses;
             const selectedRange = ranges[ranges.selectedPeriod];
-            const selectedOrders = orderRows.filter((order) => {
+            const selectedOrders = mergedPaidRows.filter((order) => {
                 const createdAt = new Date(order.createdAt);
                 return !Number.isNaN(createdAt.getTime()) && withinRange(createdAt, selectedRange);
             });
             const topProducts = buildTopProducts(selectedOrders, productNameById);
+            const accountFinancials = await buildAccountFinancialSummary({
+                orders: selectedOrders,
+                expenses: expenseRows.filter((expense) => {
+                    const spentAt = new Date(expense.spentAt);
+                    return !Number.isNaN(spentAt.getTime()) && withinRange(spentAt, selectedRange);
+                }),
+                currentAdminPhone: req.admin?.phoneNumber,
+                preloadedContext: accountingContext
+            });
 
             return res.json({
                 data: {
@@ -1651,6 +1800,7 @@ ${productDetails}`;
                         profit: selectedProfit,
                         ordersCount: selectedOrders.length
                     },
+                    accountFinancials,
                     productSales: topProducts
                 }
             });
@@ -1663,50 +1813,38 @@ ${productDetails}`;
         try {
             const filter = parseJsonParam(req.query.filter, {});
             const period = req.query.period || filter.period;
-            const range = getOrderPeriodRange(period);
-
-            const ordersWhere = {
-                status: { [Op.in]: PAID_ORDER_STATUSES }
-            };
-            const expensesWhere = {};
-
-            if (range) {
-                ordersWhere.createdAt = {
-                    [Op.gte]: range.start,
-                    [Op.lte]: range.end
-                };
-                expensesWhere.spentAt = {
-                    [Op.gte]: range.start,
-                    [Op.lte]: range.end
-                };
-            }
-
-            const [orders, expenses, virtualPaidOrders] = await Promise.all([
-                Order.findAll({ where: ordersWhere, order: [['createdAt', 'DESC']] }),
-                Expense.findAll({ where: expensesWhere, order: [['spentAt', 'DESC']] }),
-                getPaidConnectionsWithoutOrder(range)
-            ]);
-
-            const accountingContext = await buildAccountingContext();
-            const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
-            const filteredPaidOrders = excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
-            const ordersTotal = filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0);
-            const expensesTotal = expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0);
-            const balance = ordersTotal - expensesTotal;
-            const allocation = await buildAccountingAllocation(filteredPaidOrders, req.admin?.phoneNumber, accountingContext);
+            const summaryData = await buildAccountingSummaryData({
+                period,
+                currentAdminPhone: req.admin?.phoneNumber,
+                includeAllAccounts: false
+            });
 
             return res.json({
-                data: {
-                    ordersTotal,
-                    expensesTotal,
-                    balance,
-                    ordersCount: filteredPaidOrders.length,
-                    expensesCount: expenses.length,
-                    allocations: allocation
-                }
+                data: summaryData
             });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить сводку бухгалтерии', error: error.message });
+        }
+    },
+
+    async getAccountingFullSummary(req, res) {
+        try {
+            const currentAdminPhone = normalizeAdminPhone(req.admin?.phoneNumber);
+            if (!isIvanPhone(currentAdminPhone)) {
+                return res.status(403).json({ message: 'Доступ только для администратора Иван' });
+            }
+
+            const filter = parseJsonParam(req.query.filter, {});
+            const period = req.query.period || filter.period;
+            const summaryData = await buildAccountingSummaryData({
+                period,
+                currentAdminPhone: req.admin?.phoneNumber,
+                includeAllAccounts: true
+            });
+
+            return res.json({ data: summaryData });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить полную сводку бухгалтерии', error: error.message });
         }
     },
 

@@ -281,10 +281,28 @@ const ensureAdminUsersSchema = async () => {
     }
 };
 
+const ensureUsersSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('users');
+
+        if (!tableDefinition.lastIncomingMessageAt) {
+            await queryInterface.addColumn('users', 'lastIncomingMessageAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы users:', error);
+    }
+};
+
 sequelize.sync().then(async () => {
     await ensureProductSchema();
     await ensureProductTypeSchema();
     orderDB.sync().then(async () => {
+        await ensureUsersSchema();
         await ensureAdminUsersSchema();
         await ensureDefaultAdmins();
         await ensureOrderSchema();

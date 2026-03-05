@@ -2,6 +2,7 @@ import { apiUrl } from '../config/api';
 
 const ADMIN_TOKEN_KEY = 'admin_token';
 const ADMIN_USER_KEY = 'admin_user';
+const IVAN_ADMIN_PHONE = '7073670497';
 
 const getErrorMessage = (responseBody, fallbackMessage) => {
     if (!responseBody) {
@@ -74,7 +75,20 @@ const authProvider = {
 };
 
 export const adminAuthStorage = {
-    getToken: () => localStorage.getItem(ADMIN_TOKEN_KEY)
+    getToken: () => localStorage.getItem(ADMIN_TOKEN_KEY),
+    getUser: () => {
+        const storedUser = localStorage.getItem(ADMIN_USER_KEY);
+        if (!storedUser) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(storedUser);
+        } catch (_error) {
+            return null;
+        }
+    },
+    isIvan: () => String(adminAuthStorage.getUser()?.phoneNumber || '').replace(/\D/g, '') === IVAN_ADMIN_PHONE
 };
 
 export default authProvider;

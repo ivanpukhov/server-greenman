@@ -9,9 +9,11 @@ const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const OrderBundle = require('../models/orders/OrderBundle');
 const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
+const User = require('../models/orders/User');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
+const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
 const {
     findMatchedLinkInDescription,
     normalizePhoneNumber,
@@ -42,6 +44,42 @@ const PAYMENT_LINK_FOOTER =
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
+const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 36;
+const INCOMING_MESSAGE_GREETING =
+    'Вас приветствует команда травника Greenman 🌿\n\n' +
+    '‼️Чтобы получить качественную консультацию и быстро оформить заказ,          внимательно заполните анкету.\n\n' +
+    '📋 Для консультации по подбору трав укажите:\n\n' +
+    '1️⃣ Возраст\n' +
+    '2️⃣ Вес\n' +
+    '3️⃣ Хронические заболевания\n' +
+    '4️⃣ Что вас беспокоит\n' +
+    '5️⃣ Поставленный диагноз\n' +
+    '6️⃣ Результаты обследований (УЗИ, анализы и др.)\n\n' +
+    '📎 Если есть обследования — прикрепляйте сразу.\n' +
+    '❗️Особенно важно чётко указать диагноз.\n\n' +
+    '⸻\n\n' +
+    '📦 Для отправки заказа по почте сразу оставьте:\n\n' +
+    '• Фамилия, имя, отчество\n' +
+    '• Город\n' +
+    '• Полный адрес\n' +
+    '• Индекс почтового отделения\n' +
+    '• Номер телефона\n\n' +
+    '⸻\n\n' +
+    '🛒 Если консультация не нужна и вы уже определились:\n\n' +
+    'Обязательно укажите:\n\n' +
+    '• Название продукции\n' +
+    '• Форму — на мёду / на водно-спиртовой основе / в пакетиках для заваривания\n' +
+    '• Количество\n' +
+    '• Данные для отправки\n\n' +
+    'Также вы можете оформить заказ напрямую на сайте:\n' +
+    '🌍 Сайт для Казахстана\n' +
+    'https://greenman.kz\n\n' +
+    '🌍 Сайт для России\n' +
+    'https://green-man.ru in\n' +
+    '⸻\n\n' +
+    '⏳ Отвечаем в порядке очереди. В будние дни с 9-17часов\n\n' +
+    '➡️Запросов на консультацию много, поэтому, чтобы вас обслужили быстрее — заполните анкету максимально полно и понятно.\n\n' +
+    'В освободившееся окно мы свяжемся с вами, подберём индивидуальный курс и отправим посылку 🌿';
 const ORDER_DRAFT_AI_FALLBACK_PROMPT = `
 GPT принимает одно сообщение = один заказ и возвращает строго один JSON-объект.
 Верни только JSON:
@@ -73,8 +111,6 @@ const extractSystemPromptFromIdeaFile = (source) => {
 const ideaForAiSource = loadIdeaForAiFile();
 const ORDER_DRAFT_AI_SYSTEM_PROMPT =
     extractSystemPromptFromIdeaFile(ideaForAiSource) || ORDER_DRAFT_AI_FALLBACK_PROMPT;
-const ORDER_DRAFT_AI_API_KEY =
-    String(process.env.OPENROUTER_API_KEY || '').trim();
 
 const safeStringify = (value) => {
     const seen = new WeakSet();
@@ -1453,6 +1489,64 @@ const parseIncomingAdminExpenseCommand = (text) => {
     };
 };
 
+const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
+    const webhookType = String(content?.typeWebhook || '').trim();
+    if (webhookType !== 'incomingMessageReceived') {
+        return;
+    }
+
+    const senderChatId = String(content?.senderData?.chatId || '').trim();
+    if (!senderChatId.endsWith('@c.us')) {
+        return;
+    }
+
+    const customerPhone = normalizePhoneNumber(senderChatId);
+    if (!customerPhone) {
+        return;
+    }
+
+    const adminProfile = await getAdminByPhone(customerPhone);
+    if (adminProfile) {
+        return;
+    }
+
+    const now = new Date();
+    let shouldSendGreeting = false;
+
+    const user = await User.findOne({
+        where: { phoneNumber: customerPhone }
+    });
+
+    if (!user) {
+        await User.create({
+            phoneNumber: customerPhone,
+            lastIncomingMessageAt: now
+        });
+        shouldSendGreeting = true;
+    } else {
+        const lastIncomingAt = user.lastIncomingMessageAt ? new Date(user.lastIncomingMessageAt) : null;
+        shouldSendGreeting =
+            !lastIncomingAt || now.getTime() - lastIncomingAt.getTime() > INCOMING_MESSAGE_GREET_INTERVAL_MS;
+
+        await user.update({
+            lastIncomingMessageAt: now
+        });
+    }
+
+    if (!shouldSendGreeting) {
+        return;
+    }
+
+    try {
+        await sendMessageByChatId(senderChatId, INCOMING_MESSAGE_GREETING);
+        console.log(
+            `[WhatsApp webhook] Greeting sent to ${senderChatId} (phone=${customerPhone}, firstOrIdleOver36h=true).`
+        );
+    } catch (error) {
+        console.error('[WhatsApp webhook] Failed to send greeting message:', error.response?.data || error.message);
+    }
+};
+
 const processIncomingAdminExpenseWebhook = async (content) => {
     if (String(content.typeWebhook || '').trim() !== 'incomingMessageReceived') {
         return;
@@ -1774,6 +1868,7 @@ router.post('/', async (req, res) => {
     }));
 
     try {
+        await trackIncomingMessageAndSendGreetingIfNeeded(content);
         await processIncomingAdminExpenseWebhook(content);
         await processIncomingPdfProofWebhook(content);
         await processIncomingMessageWebhook(content);
