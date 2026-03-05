@@ -833,7 +833,7 @@ const parseOrderDraftMessage = (text) => {
         return null;
     }
 
-    const firstLineNormalized = normalizeAlias(lines[0]).replace(/:$/, '');
+    const firstLineNormalized = normalizeAlias(lines[0]).replace(/\s*[:：]\s*$/, '');
     if (firstLineNormalized !== 'ваш заказ') {
         console.log(
             `[WhatsApp webhook][OrderDraft] Skip: first line is not "Ваш заказ" (got "${lines[0]}")`
