@@ -5,6 +5,7 @@ import {
     Card,
     CardContent,
     Chip,
+    LinearProgress,
     Paper,
     Stack,
     Table,
@@ -32,6 +33,8 @@ import {
     sectionSx,
     sectionTitleRowSx,
     summaryGridSx,
+    insightGridSx,
+    insightCardSx,
     tableSx,
     tableWrapSx
 } from './accountingUi';
@@ -82,6 +85,16 @@ const AccountingFullAccessPage = () => {
     }
 
     const byAccount = Array.isArray(summary.accountFinancials?.byAccount) ? summary.accountFinancials.byAccount : [];
+    const totalIncome = Number(summary.accountFinancials?.totalIncome || 0);
+    const totalExpenses = Number(summary.accountFinancials?.totalExpenses || 0);
+    const totalCurrent = Number(summary.accountFinancials?.totalCurrent || 0);
+    const expenseLoad = totalIncome > 0 ? Math.min(100, Math.max(0, (totalExpenses / totalIncome) * 100)) : 0;
+    const topAccount = byAccount.reduce((acc, item) => {
+        if (!acc || Number(item.current || 0) > Number(acc.current || 0)) {
+            return item;
+        }
+        return acc;
+    }, null);
 
     return (
         <Stack spacing={2.25} sx={pageStackSx}>
@@ -111,7 +124,7 @@ const AccountingFullAccessPage = () => {
             <Box sx={summaryGridSx}>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Общий доход
                             </Typography>
@@ -119,12 +132,13 @@ const AccountingFullAccessPage = () => {
                                 <PaidOutlinedIcon fontSize="small" color="success" />
                                 <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalIncome || 0)}</Typography>
                             </Stack>
+                            <Chip size="small" color="success" variant="outlined" label={`${byAccount.length} счетов в отчете`} sx={{ alignSelf: 'flex-start' }} />
                         </Stack>
                     </CardContent>
                 </Card>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Общий расход
                             </Typography>
@@ -132,12 +146,13 @@ const AccountingFullAccessPage = () => {
                                 <TrendingDownOutlinedIcon fontSize="small" color="warning" />
                                 <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalExpenses || 0)}</Typography>
                             </Stack>
+                            <Chip size="small" color="warning" variant="outlined" label={`Нагрузка ${Math.round(expenseLoad)}%`} sx={{ alignSelf: 'flex-start' }} />
                         </Stack>
                     </CardContent>
                 </Card>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Сейчас на счетах
                             </Typography>
@@ -145,7 +160,50 @@ const AccountingFullAccessPage = () => {
                                 <AccountBalanceWalletOutlinedIcon fontSize="small" color="primary" />
                                 <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalCurrent || 0)}</Typography>
                             </Stack>
+                            <Chip
+                                size="small"
+                                color={totalCurrent >= 0 ? 'success' : 'error'}
+                                variant="outlined"
+                                label={totalCurrent >= 0 ? 'Позитивный баланс' : 'Отрицательный баланс'}
+                                sx={{ alignSelf: 'flex-start' }}
+                            />
                         </Stack>
+                    </CardContent>
+                </Card>
+            </Box>
+
+            <Box sx={insightGridSx}>
+                <Card sx={insightCardSx}>
+                    <CardContent sx={{ p: '0 !important' }}>
+                        <Typography variant="subtitle2">Расходная нагрузка</Typography>
+                        <Typography variant="h6" sx={{ mt: 0.35 }}>
+                            {Math.round(expenseLoad)}%
+                        </Typography>
+                        <LinearProgress
+                            variant="determinate"
+                            value={expenseLoad}
+                            sx={{
+                                mt: 1.2,
+                                height: 9,
+                                borderRadius: 999,
+                                bgcolor: 'rgba(16,40,29,0.08)',
+                                '& .MuiLinearProgress-bar': {
+                                    borderRadius: 999,
+                                    background: 'linear-gradient(90deg, #f3a145, #de6e2a)'
+                                }
+                            }}
+                        />
+                    </CardContent>
+                </Card>
+                <Card sx={insightCardSx}>
+                    <CardContent sx={{ p: '0 !important' }}>
+                        <Typography variant="subtitle2">Лидер по остатку</Typography>
+                        <Typography variant="h6" sx={{ mt: 0.35 }}>
+                            {topAccount?.accountName || 'Нет данных'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6 }}>
+                            {topAccount ? formatMoney(topAccount.current) : 'Данные отсутствуют за период'}
+                        </Typography>
                     </CardContent>
                 </Card>
             </Box>

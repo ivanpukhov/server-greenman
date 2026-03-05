@@ -5,6 +5,7 @@ import {
     Card,
     CardContent,
     Chip,
+    LinearProgress,
     Paper,
     Stack,
     Table,
@@ -34,6 +35,8 @@ import {
     sectionSx,
     sectionTitleRowSx,
     summaryGridSx,
+    insightGridSx,
+    insightCardSx,
     tableSx,
     tableWrapSx
 } from './accountingUi';
@@ -154,6 +157,11 @@ const AccountingPage = () => {
         () => (Array.isArray(summary.accountFinancials?.byAccount) ? summary.accountFinancials.byAccount : []),
         [summary.accountFinancials]
     );
+    const income = Number(summary.ordersTotal || 0);
+    const expensesTotal = Number(summary.expensesTotal || 0);
+    const balance = Number(summary.balance || 0);
+    const expenseShare = income > 0 ? Math.min(100, Math.max(0, (expensesTotal / income) * 100)) : 0;
+    const marginPercent = income > 0 ? Math.round((balance / income) * 100) : 0;
     const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
     const hasHiddenOrders = orders.length > 5;
 
@@ -196,7 +204,7 @@ const AccountingPage = () => {
             <Box sx={summaryGridSx}>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Приход
                             </Typography>
@@ -204,12 +212,13 @@ const AccountingPage = () => {
                                 <PaidOutlinedIcon fontSize="small" color="success" />
                                 <Typography variant="h5">{formatMoney(summary.ordersTotal)}</Typography>
                             </Stack>
+                            <Chip size="small" color="success" variant="outlined" label={`${summary.ordersCount || 0} оплаченных`} sx={{ alignSelf: 'flex-start' }} />
                         </Stack>
                     </CardContent>
                 </Card>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Расход
                             </Typography>
@@ -217,12 +226,13 @@ const AccountingPage = () => {
                                 <TrendingDownOutlinedIcon fontSize="small" color="warning" />
                                 <Typography variant="h5">{formatMoney(summary.expensesTotal)}</Typography>
                             </Stack>
+                            <Chip size="small" color="warning" variant="outlined" label={`${summary.expensesCount || 0} расходов`} sx={{ alignSelf: 'flex-start' }} />
                         </Stack>
                     </CardContent>
                 </Card>
                 <Card sx={metricCardSx}>
                     <CardContent>
-                        <Stack spacing={0.6}>
+                        <Stack spacing={0.85}>
                             <Typography variant="body2" color="text.secondary">
                                 Остаток
                             </Typography>
@@ -230,7 +240,50 @@ const AccountingPage = () => {
                                 <AccountBalanceWalletOutlinedIcon fontSize="small" color="primary" />
                                 <Typography variant="h5">{formatMoney(summary.balance)}</Typography>
                             </Stack>
+                            <Chip
+                                size="small"
+                                color={marginPercent >= 0 ? 'success' : 'error'}
+                                variant="outlined"
+                                label={`Маржа ${marginPercent}%`}
+                                sx={{ alignSelf: 'flex-start' }}
+                            />
                         </Stack>
+                    </CardContent>
+                </Card>
+            </Box>
+
+            <Box sx={insightGridSx}>
+                <Card sx={insightCardSx}>
+                    <CardContent sx={{ p: '0 !important' }}>
+                        <Typography variant="subtitle2">Доля расходов от прихода</Typography>
+                        <Typography variant="h6" sx={{ mt: 0.35 }}>
+                            {Math.round(expenseShare)}%
+                        </Typography>
+                        <LinearProgress
+                            variant="determinate"
+                            value={expenseShare}
+                            sx={{
+                                mt: 1.2,
+                                height: 9,
+                                borderRadius: 999,
+                                bgcolor: 'rgba(16,40,29,0.08)',
+                                '& .MuiLinearProgress-bar': {
+                                    borderRadius: 999,
+                                    background: 'linear-gradient(90deg, #f3a145, #de6e2a)'
+                                }
+                            }}
+                        />
+                    </CardContent>
+                </Card>
+                <Card sx={insightCardSx}>
+                    <CardContent sx={{ p: '0 !important' }}>
+                        <Typography variant="subtitle2">Финансовая подушка</Typography>
+                        <Typography variant="h6" sx={{ mt: 0.35 }}>
+                            {formatMoney(balance)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6 }}>
+                            {balance >= 0 ? 'Положительный остаток на периоде' : 'Нужна корректировка трат'}
+                        </Typography>
                     </CardContent>
                 </Card>
             </Box>
