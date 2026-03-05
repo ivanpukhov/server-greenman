@@ -4,6 +4,7 @@ import {
     Button,
     Card,
     CardContent,
+    Chip,
     Paper,
     Stack,
     Table,
@@ -14,27 +15,28 @@ import {
     Typography,
     useMediaQuery
 } from '@mui/material';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import TrendingDownOutlinedIcon from '@mui/icons-material/TrendingDownOutlined';
 import { useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
-
-const formatMoney = (value) =>
-    `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Number(value || 0))} ₸`;
-
-const formatDate = (value) => new Date(value).toLocaleString('ru-RU');
-
-const cardSx = {
-    border: '1px solid rgba(16,40,29,0.08)',
-    boxShadow: '0 12px 32px rgba(16,40,29,0.09)'
-};
-
-const periodOptions = [
-    { id: 'today', label: 'Сегодня' },
-    { id: 'yesterday', label: 'Вчера' },
-    { id: 'week', label: 'Неделя' },
-    { id: 'month', label: 'Месяц' },
-    { id: 'halfyear', label: 'Полгода' }
-];
+import {
+    emptyStateSx,
+    formatDate,
+    formatMoney,
+    heroSx,
+    metricCardSx,
+    mobileCardSx,
+    pageStackSx,
+    periodOptions,
+    sectionSx,
+    sectionTitleRowSx,
+    summaryGridSx,
+    tableSx,
+    tableWrapSx
+} from './accountingUi';
 
 const AccountingPage = () => {
     const notify = useNotify();
@@ -160,65 +162,90 @@ const AccountingPage = () => {
     }
 
     return (
-        <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 2.5,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'rgba(248,253,250,0.96)'
-                }}
-            >
-                <Typography variant="h5">Бухгалтерия</Typography>
-                <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap' }}>
-                    {periodOptions.map((option) => (
-                        <Button
-                            key={option.id}
-                            variant={period === option.id ? 'contained' : 'outlined'}
-                            onClick={() => setPeriod(option.id)}
-                        >
-                            {option.label}
-                        </Button>
-                    ))}
+        <Stack spacing={2.25} sx={pageStackSx}>
+            <Box sx={heroSx}>
+                <Stack spacing={1.6}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.2} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+                        <Box>
+                            <Typography variant="h5">Бухгалтерия</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                Контроль прихода, расходов и счетов по выбранному периоду
+                            </Typography>
+                        </Box>
+                        <Chip
+                            icon={<ReceiptLongOutlinedIcon fontSize="small" />}
+                            label={`${summary.ordersCount || 0} оплат`}
+                            sx={{ bgcolor: 'rgba(15, 120, 84, 0.12)', border: '1px solid rgba(16,40,29,0.15)' }}
+                        />
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                        {periodOptions.map((option) => (
+                            <Button
+                                key={option.id}
+                                variant={period === option.id ? 'contained' : 'outlined'}
+                                onClick={() => setPeriod(option.id)}
+                                sx={{ borderRadius: 999, px: 2.1, minWidth: 'auto' }}
+                            >
+                                {option.label}
+                            </Button>
+                        ))}
+                    </Stack>
                 </Stack>
             </Box>
 
-            <Card sx={cardSx}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1.4 }}>
-                        Приход / Расход денег
-                    </Typography>
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                        <Box sx={{ flex: 1 }}>
+            <Box sx={summaryGridSx}>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Приход
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.ordersTotal)}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <PaidOutlinedIcon fontSize="small" color="success" />
+                                <Typography variant="h5">{formatMoney(summary.ordersTotal)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Расход
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.expensesTotal)}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <TrendingDownOutlinedIcon fontSize="small" color="warning" />
+                                <Typography variant="h5">{formatMoney(summary.expensesTotal)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Остаток
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.balance)}</Typography>
-                        </Box>
-                    </Stack>
-                </CardContent>
-            </Card>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <AccountBalanceWalletOutlinedIcon fontSize="small" color="primary" />
+                                <Typography variant="h5">{formatMoney(summary.balance)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+            </Box>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    Распределение прихода по счетам
-                </Typography>
-                {isSmall ? (
+            <Paper sx={sectionSx}>
+                <Box sx={sectionTitleRowSx}>
+                    <Typography variant="h6">Распределение прихода по счетам</Typography>
+                    <Chip size="small" label={`${accountFinancialRows.length} счетов`} />
+                </Box>
+                {!accountFinancialRows.length ? (
+                    <Box sx={emptyStateSx}>Нет данных по счетам за выбранный период</Box>
+                ) : isSmall ? (
                     <Stack spacing={1.2}>
                         {accountFinancialRows.map((item) => (
-                            <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Card key={item.accountName} variant="outlined" sx={mobileCardSx}>
                                 <CardContent>
                                     <Typography variant="subtitle2">{item.accountName}</Typography>
                                     <Typography variant="body2">Пришло: {formatMoney(item.income)}</Typography>
@@ -231,11 +258,11 @@ const AccountingPage = () => {
                         ))}
                     </Stack>
                 ) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 740 }}>
+                    <Box sx={tableWrapSx}>
+                        <Table size="small" sx={tableSx}>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Счёт</TableCell>
+                                    <TableCell>Счет</TableCell>
                                     <TableCell align="right">Пришло</TableCell>
                                     <TableCell align="right">Потрачено</TableCell>
                                     <TableCell align="right">Сейчас</TableCell>
@@ -256,18 +283,23 @@ const AccountingPage = () => {
                 )}
             </Paper>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    Расходы
-                </Typography>
-                {isSmall ? (
+            <Paper sx={sectionSx}>
+                <Box sx={sectionTitleRowSx}>
+                    <Typography variant="h6">Расходы</Typography>
+                    <Chip size="small" label={`${summary.expensesCount || expenses.length || 0} записей`} />
+                </Box>
+                {!expenses.length ? (
+                    <Box sx={emptyStateSx}>За выбранный период расходов нет</Box>
+                ) : isSmall ? (
                     <Stack spacing={1.2}>
                         {expenses.map((expense) => (
-                            <Card key={expense.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Card key={expense.id} variant="outlined" sx={mobileCardSx}>
                                 <CardContent>
                                     <Typography variant="subtitle2">{expense.category}</Typography>
-                                    <Typography variant="body2" color="text.secondary">{formatDate(expense.spentAt)}</Typography>
-                                    <Typography variant="body2">Кто потратил: {expense.spentByName}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {formatDate(expense.spentAt)}
+                                    </Typography>
+                                    <Typography variant="body2">Кто потратил: {expense.spentByName || '-'}</Typography>
                                     <Typography variant="body2">Комментарий: {expense.description || '-'}</Typography>
                                     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
                                         <Typography variant="body1">{formatMoney(expense.amount)}</Typography>
@@ -285,8 +317,8 @@ const AccountingPage = () => {
                         ))}
                     </Stack>
                 ) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 860 }}>
+                    <Box sx={tableWrapSx}>
+                        <Table size="small" sx={{ ...tableSx, minWidth: 860 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell>Дата</TableCell>
@@ -301,8 +333,8 @@ const AccountingPage = () => {
                                 {expenses.map((expense) => (
                                     <TableRow key={expense.id}>
                                         <TableCell>{formatDate(expense.spentAt)}</TableCell>
-                                        <TableCell>{expense.spentByName}</TableCell>
-                                        <TableCell>{expense.category}</TableCell>
+                                        <TableCell>{expense.spentByName || '-'}</TableCell>
+                                        <TableCell>{expense.category || '-'}</TableCell>
                                         <TableCell>{expense.description || '-'}</TableCell>
                                         <TableCell align="right">{formatMoney(expense.amount)}</TableCell>
                                         <TableCell align="right">
@@ -323,29 +355,36 @@ const AccountingPage = () => {
                 )}
             </Paper>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    Оплаченные связи клиент-ссылка (учтены в приходе)
-                </Typography>
-                {isSmall ? (
+            <Paper sx={sectionSx}>
+                <Box sx={sectionTitleRowSx}>
+                    <Typography variant="h6">Оплаченные связи клиент-ссылка</Typography>
+                    <Chip size="small" label={`${orders.length} заказов`} />
+                </Box>
+                {!ordersToShow.length ? (
+                    <Box sx={emptyStateSx}>Оплаченные заказы за этот период не найдены</Box>
+                ) : isSmall ? (
                     <Stack spacing={1.2}>
                         {ordersToShow.map((order) => (
-                            <Card key={order.id} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Card key={order.id} variant="outlined" sx={mobileCardSx}>
                                 <CardContent>
-                                    <Typography variant="subtitle2">Связь/заказ #{order.id}</Typography>
-                                    <Typography variant="body2" color="text.secondary">{formatDate(order.createdAt)}</Typography>
-                                    <Typography variant="body2">Клиент: {order.customerName}</Typography>
-                                    <Typography variant="body2">Город: {order.city}</Typography>
-                                    <Typography variant="body2">Статус: {order.status}</Typography>
-                                    <Typography variant="body2">Счёт: {order.accountName || 'Без ссылки'}</Typography>
-                                    <Typography variant="body1" sx={{ mt: 0.5 }}>{formatMoney(order.totalPrice)}</Typography>
+                                    <Typography variant="subtitle2">Заказ #{order.id}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {formatDate(order.createdAt)}
+                                    </Typography>
+                                    <Typography variant="body2">Клиент: {order.customerName || '-'}</Typography>
+                                    <Typography variant="body2">Город: {order.city || '-'}</Typography>
+                                    <Typography variant="body2">Статус: {order.status || '-'}</Typography>
+                                    <Typography variant="body2">Счет: {order.accountName || 'Без ссылки'}</Typography>
+                                    <Typography variant="body1" sx={{ mt: 0.5 }}>
+                                        {formatMoney(order.totalPrice)}
+                                    </Typography>
                                 </CardContent>
                             </Card>
                         ))}
                     </Stack>
                 ) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 860 }}>
+                    <Box sx={tableWrapSx}>
+                        <Table size="small" sx={{ ...tableSx, minWidth: 860 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell>ID</TableCell>
@@ -353,7 +392,7 @@ const AccountingPage = () => {
                                     <TableCell>Клиент</TableCell>
                                     <TableCell>Город</TableCell>
                                     <TableCell>Статус</TableCell>
-                                    <TableCell>Счёт</TableCell>
+                                    <TableCell>Счет</TableCell>
                                     <TableCell align="right">Сумма</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -362,9 +401,9 @@ const AccountingPage = () => {
                                     <TableRow key={order.id}>
                                         <TableCell>{order.id}</TableCell>
                                         <TableCell>{formatDate(order.createdAt)}</TableCell>
-                                        <TableCell>{order.customerName}</TableCell>
-                                        <TableCell>{order.city}</TableCell>
-                                        <TableCell>{order.status}</TableCell>
+                                        <TableCell>{order.customerName || '-'}</TableCell>
+                                        <TableCell>{order.city || '-'}</TableCell>
+                                        <TableCell>{order.status || '-'}</TableCell>
                                         <TableCell>{order.accountName || 'Без ссылки'}</TableCell>
                                         <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
                                     </TableRow>
@@ -375,7 +414,7 @@ const AccountingPage = () => {
                 )}
                 {hasHiddenOrders ? (
                     <Box sx={{ mt: 1.6 }}>
-                        <Button variant="outlined" onClick={() => setShowAllOrders((prev) => !prev)}>
+                        <Button variant="outlined" onClick={() => setShowAllOrders((prev) => !prev)} sx={{ borderRadius: 999 }}>
                             {showAllOrders ? 'Скрыть лишние заказы' : 'Смотреть все заказы'}
                         </Button>
                     </Box>

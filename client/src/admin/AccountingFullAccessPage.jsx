@@ -4,6 +4,7 @@ import {
     Button,
     Card,
     CardContent,
+    Chip,
     Paper,
     Stack,
     Table,
@@ -14,20 +15,26 @@ import {
     Typography,
     useMediaQuery
 } from '@mui/material';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
+import TrendingDownOutlinedIcon from '@mui/icons-material/TrendingDownOutlined';
 import { useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
-
-const formatMoney = (value) =>
-    `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Number(value || 0))} ₸`;
-
-const periodOptions = [
-    { id: 'today', label: 'Сегодня' },
-    { id: 'yesterday', label: 'Вчера' },
-    { id: 'week', label: 'Неделя' },
-    { id: 'month', label: 'Месяц' },
-    { id: 'halfyear', label: 'Полгода' }
-];
+import {
+    emptyStateSx,
+    formatMoney,
+    heroSx,
+    metricCardSx,
+    mobileCardSx,
+    pageStackSx,
+    periodOptions,
+    sectionSx,
+    sectionTitleRowSx,
+    summaryGridSx,
+    tableSx,
+    tableWrapSx
+} from './accountingUi';
 
 const AccountingFullAccessPage = () => {
     const notify = useNotify();
@@ -77,62 +84,83 @@ const AccountingFullAccessPage = () => {
     const byAccount = Array.isArray(summary.accountFinancials?.byAccount) ? summary.accountFinancials.byAccount : [];
 
     return (
-        <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 2.5,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'rgba(248,253,250,0.96)'
-                }}
-            >
-                <Typography variant="h5">Полная сводка счетов</Typography>
-                <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap' }}>
-                    {periodOptions.map((option) => (
-                        <Button
-                            key={option.id}
-                            variant={period === option.id ? 'contained' : 'outlined'}
-                            onClick={() => setPeriod(option.id)}
-                        >
-                            {option.label}
-                        </Button>
-                    ))}
+        <Stack spacing={2.25} sx={pageStackSx}>
+            <Box sx={heroSx}>
+                <Stack spacing={1.6}>
+                    <Box>
+                        <Typography variant="h5">Полная сводка счетов</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            Просмотр финансов по всем счетам без ограничений
+                        </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                        {periodOptions.map((option) => (
+                            <Button
+                                key={option.id}
+                                variant={period === option.id ? 'contained' : 'outlined'}
+                                onClick={() => setPeriod(option.id)}
+                                sx={{ borderRadius: 999, px: 2.1, minWidth: 'auto' }}
+                            >
+                                {option.label}
+                            </Button>
+                        ))}
+                    </Stack>
                 </Stack>
             </Box>
 
-            <Card sx={{ border: '1px solid rgba(16,40,29,0.08)', boxShadow: '0 12px 32px rgba(16,40,29,0.09)' }}>
-                <CardContent>
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                        <Box sx={{ flex: 1 }}>
+            <Box sx={summaryGridSx}>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Общий доход
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalIncome || 0)}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <PaidOutlinedIcon fontSize="small" color="success" />
+                                <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalIncome || 0)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Общий расход
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalExpenses || 0)}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <TrendingDownOutlinedIcon fontSize="small" color="warning" />
+                                <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalExpenses || 0)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+                <Card sx={metricCardSx}>
+                    <CardContent>
+                        <Stack spacing={0.6}>
                             <Typography variant="body2" color="text.secondary">
                                 Сейчас на счетах
                             </Typography>
-                            <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalCurrent || 0)}</Typography>
-                        </Box>
-                    </Stack>
-                </CardContent>
-            </Card>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                                <AccountBalanceWalletOutlinedIcon fontSize="small" color="primary" />
+                                <Typography variant="h5">{formatMoney(summary.accountFinancials?.totalCurrent || 0)}</Typography>
+                            </Stack>
+                        </Stack>
+                    </CardContent>
+                </Card>
+            </Box>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                    По каждому счету
-                </Typography>
-                {isSmall ? (
+            <Paper sx={sectionSx}>
+                <Box sx={sectionTitleRowSx}>
+                    <Typography variant="h6">По каждому счету</Typography>
+                    <Chip size="small" label={`${byAccount.length} счетов`} />
+                </Box>
+                {!byAccount.length ? (
+                    <Box sx={emptyStateSx}>По выбранному периоду данные отсутствуют</Box>
+                ) : isSmall ? (
                     <Stack spacing={1.2}>
                         {byAccount.map((item) => (
-                            <Card key={item.accountName} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Card key={item.accountName} variant="outlined" sx={mobileCardSx}>
                                 <CardContent>
                                     <Typography variant="subtitle2">{item.accountName}</Typography>
                                     <Typography variant="body2">Пришло: {formatMoney(item.income)}</Typography>
@@ -145,11 +173,11 @@ const AccountingFullAccessPage = () => {
                         ))}
                     </Stack>
                 ) : (
-                    <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 720 }}>
+                    <Box sx={tableWrapSx}>
+                        <Table size="small" sx={tableSx}>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Счёт</TableCell>
+                                    <TableCell>Счет</TableCell>
                                     <TableCell align="right">Пришло</TableCell>
                                     <TableCell align="right">Потрачено</TableCell>
                                     <TableCell align="right">Сейчас</TableCell>
