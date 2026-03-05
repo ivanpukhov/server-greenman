@@ -1617,7 +1617,10 @@ const processIncomingMessageWebhook = async (content) => {
         return;
     }
 
-    const shouldParseOrderDraft = webhookType === 'incomingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const shouldParseOrderDraft =
+        webhookType === 'incomingMessageReceived' ||
+        webhookType === 'outgoingMessageReceived' ||
+        webhookType === 'outgoingAPIMessageReceived';
     const parsedOrderDraft = shouldParseOrderDraft ? parseOrderDraftMessage(textMessage) : null;
     if (parsedOrderDraft) {
         console.log(
