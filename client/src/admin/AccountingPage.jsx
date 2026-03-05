@@ -170,9 +170,6 @@ const AccountingPage = () => {
                 }}
             >
                 <Typography variant="h5">Бухгалтерия</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    В приходе учитываются все оплаченные связи клиент-ссылка (кроме счетов Иван и Даша).
-                </Typography>
                 <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap' }}>
                     {periodOptions.map((option) => (
                         <Button

@@ -86,10 +86,7 @@ const AccountingFullAccessPage = () => {
                     background: 'rgba(248,253,250,0.96)'
                 }}
             >
-                <Typography variant="h5">Полная сводка счетов (Иван)</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Включены все счета, включая Иван и Даша.
-                </Typography>
+                <Typography variant="h5">Полная сводка счетов</Typography>
                 <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap' }}>
                     {periodOptions.map((option) => (
                         <Button

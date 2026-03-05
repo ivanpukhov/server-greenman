@@ -476,6 +476,16 @@ const excludeOrdersByAccountingAccounts = (orders, context) => {
     });
 };
 
+const excludeExpensesByAccountingAccounts = (expenses) => {
+    return (Array.isArray(expenses) ? expenses : []).filter((expense) => {
+        const spentByName = String(expense?.spentByName || '').trim();
+        if (!spentByName) {
+            return true;
+        }
+        return !isExcludedAccountingAccountName(spentByName);
+    });
+};
+
 const buildAccountingAllocation = async (orders, currentAdminPhone, preloadedContext = null) => {
     const context = preloadedContext || (await buildAccountingContext());
     const { activeAdmins } = context;
@@ -551,6 +561,9 @@ const buildAccountFinancialSummary = async ({
     const accountRowsMap = new Map();
     const registerAccount = (rawAccountName) => {
         const normalizedName = String(rawAccountName || '').trim() || WITHOUT_LINK_ACCOUNT_NAME;
+        if (isExcludedAccountingAccountName(normalizedName)) {
+            return null;
+        }
         const accountName =
             !includeAllAccounts && hiddenAccountNames.has(normalizedName) ? WITHOUT_LINK_ACCOUNT_NAME : normalizedName;
 
@@ -571,6 +584,9 @@ const buildAccountFinancialSummary = async ({
         if (!adminName) {
             return;
         }
+        if (isExcludedAccountingAccountName(adminName)) {
+            return;
+        }
 
         if (!includeAllAccounts && visibleAccountNames.size && !visibleAccountNames.has(adminName)) {
             return;
@@ -583,14 +599,23 @@ const buildAccountFinancialSummary = async ({
     (Array.isArray(orders) ? orders : []).forEach((order) => {
         const accountName = resolveOrderAccountNameByContext(order, context);
         const target = registerAccount(accountName);
+        if (!target) {
+            return;
+        }
         target.income += safeAmount(order.totalPrice);
     });
 
     (Array.isArray(expenses) ? expenses : []).forEach((expense) => {
         const spentByName = String(expense?.spentByName || '').trim();
+        if (spentByName && isExcludedAccountingAccountName(spentByName)) {
+            return;
+        }
         const accountName =
             spentByName && (includeAllAccounts || !hiddenAccountNames.has(spentByName)) ? spentByName : WITHOUT_LINK_ACCOUNT_NAME;
         const target = registerAccount(accountName);
+        if (!target) {
+            return;
+        }
         target.expenses += safeAmount(expense.amount);
     });
 
@@ -1003,11 +1028,12 @@ const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAl
 
     const accountingContext = await buildAccountingContext();
     const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
-    const filteredPaidOrders = includeAllAccounts ? allPaidOrders : excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
+    const filteredPaidOrders = excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
+    const filteredExpenses = excludeExpensesByAccountingAccounts(expenses);
     const allocation = await buildAccountingAllocation(filteredPaidOrders, currentAdminPhone, accountingContext);
     const accountFinancials = await buildAccountFinancialSummary({
         orders: filteredPaidOrders,
-        expenses,
+        expenses: filteredExpenses,
         currentAdminPhone,
         preloadedContext: accountingContext,
         includeAllAccounts
@@ -1015,11 +1041,11 @@ const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAl
 
     return {
         ordersTotal: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0),
-        expensesTotal: expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
+        expensesTotal: filteredExpenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
         balance: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0) -
-            expenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
+            filteredExpenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
         ordersCount: filteredPaidOrders.length,
-        expensesCount: expenses.length,
+        expensesCount: filteredExpenses.length,
         allocations: allocation,
         accountFinancials
     };
@@ -1764,7 +1790,7 @@ ${productDetails}`;
             const accountingContext = await buildAccountingContext();
             const orderRows = orders.map((order) => order.toJSON());
             const mergedPaidRows = excludeOrdersByAccountingAccounts([...orderRows, ...virtualPaidOrders], accountingContext);
-            const expenseRows = expenses.map((expense) => expense.toJSON());
+            const expenseRows = excludeExpensesByAccountingAccounts(expenses.map((expense) => expense.toJSON()));
             const productNameById = new Map(products.map((item) => [item.id, item.name]));
             const { orderSeries, financeSeries } = buildDashboardSeries(mergedPaidRows, expenseRows, ranges);
 
