@@ -477,6 +477,12 @@ const excludeOrdersByAccountingAccounts = (orders, context) => {
     });
 };
 
+const excludeOrdersWithoutLinkAccount = (orders, context) => {
+    return (Array.isArray(orders) ? orders : []).filter(
+        (order) => resolveOrderAccountNameByContext(order, context) !== WITHOUT_LINK_ACCOUNT_NAME
+    );
+};
+
 const excludeExpensesByAccountingAccounts = (expenses) => {
     return (Array.isArray(expenses) ? expenses : []).filter((expense) => {
         const spentByName = String(expense?.spentByName || '').trim();
@@ -1030,10 +1036,11 @@ const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAl
     const accountingContext = await buildAccountingContext();
     const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
     const filteredPaidOrders = excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
+    const linkedPaidOrders = excludeOrdersWithoutLinkAccount(filteredPaidOrders, accountingContext);
     const filteredExpenses = excludeExpensesByAccountingAccounts(expenses);
-    const allocation = await buildAccountingAllocation(filteredPaidOrders, currentAdminPhone, accountingContext);
+    const allocation = await buildAccountingAllocation(linkedPaidOrders, currentAdminPhone, accountingContext);
     const accountFinancials = await buildAccountFinancialSummary({
-        orders: filteredPaidOrders,
+        orders: linkedPaidOrders,
         expenses: filteredExpenses,
         currentAdminPhone,
         preloadedContext: accountingContext,
@@ -1041,11 +1048,11 @@ const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAl
     });
 
     return {
-        ordersTotal: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0),
+        ordersTotal: linkedPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0),
         expensesTotal: filteredExpenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
-        balance: filteredPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0) -
+        balance: linkedPaidOrders.reduce((sum, order) => sum + safeAmount(order.totalPrice), 0) -
             filteredExpenses.reduce((sum, item) => sum + safeAmount(item.amount), 0),
-        ordersCount: filteredPaidOrders.length,
+        ordersCount: linkedPaidOrders.length,
         expensesCount: filteredExpenses.length,
         allocations: allocation,
         accountFinancials
@@ -1352,6 +1359,7 @@ const adminController = {
             const filter = parseJsonParam(req.query.filter, {});
             const paidOnly = filter.paidOnly === true || String(filter.paidOnly || '').toLowerCase() === 'true';
             const excludeIvanDasha = filter.excludeIvanDasha === true || String(filter.excludeIvanDasha || '').toLowerCase() === 'true';
+            const excludeWithoutLink = filter.excludeWithoutLink === true || String(filter.excludeWithoutLink || '').toLowerCase() === 'true';
             const periodRange = filter.period ? getOrderPeriodRange(filter.period) : null;
 
             const where = {};
@@ -1407,11 +1415,16 @@ const adminController = {
             });
             const enrichedPaidOrders = await Promise.all(paidOrders.map((order) => enrichOrderProducts(order)));
             const virtualPaidOrders = await getPaidConnectionsWithoutOrder(periodRange, filter.phoneNumber);
-            const accountingContext = excludeIvanDasha ? await buildAccountingContext() : null;
-            const filteredMergedRows =
+            const accountingContext = excludeIvanDasha || excludeWithoutLink ? await buildAccountingContext() : null;
+            let filteredMergedRows =
                 excludeIvanDasha && accountingContext
                     ? excludeOrdersByAccountingAccounts([...enrichedPaidOrders, ...virtualPaidOrders], accountingContext)
                     : [...enrichedPaidOrders, ...virtualPaidOrders];
+
+            if (excludeWithoutLink && accountingContext) {
+                filteredMergedRows = excludeOrdersWithoutLinkAccount(filteredMergedRows, accountingContext);
+            }
+
             const mergedRows = filteredMergedRows.sort((a, b) => {
                 const aValue = a[sortField];
                 const bValue = b[sortField];
@@ -1791,16 +1804,17 @@ ${productDetails}`;
             const accountingContext = await buildAccountingContext();
             const orderRows = orders.map((order) => order.toJSON());
             const mergedPaidRows = excludeOrdersByAccountingAccounts([...orderRows, ...virtualPaidOrders], accountingContext);
+            const linkedPaidRows = excludeOrdersWithoutLinkAccount(mergedPaidRows, accountingContext);
             const expenseRows = excludeExpensesByAccountingAccounts(expenses.map((expense) => expense.toJSON()));
             const productNameById = new Map(products.map((item) => [item.id, item.name]));
-            const { orderSeries, financeSeries } = buildDashboardSeries(mergedPaidRows, expenseRows, ranges);
+            const { orderSeries, financeSeries } = buildDashboardSeries(linkedPaidRows, expenseRows, ranges);
 
             const selectedFinance = financeSeries[ranges.selectedPeriod] || [];
             const selectedTurnover = selectedFinance.reduce((sum, point) => sum + safeAmount(point.turnover), 0);
             const selectedExpenses = selectedFinance.reduce((sum, point) => sum + safeAmount(point.expenses), 0);
             const selectedProfit = selectedTurnover - selectedExpenses;
             const selectedRange = ranges[ranges.selectedPeriod];
-            const selectedOrders = mergedPaidRows.filter((order) => {
+            const selectedOrders = linkedPaidRows.filter((order) => {
                 const createdAt = new Date(order.createdAt);
                 return !Number.isNaN(createdAt.getTime()) && withinRange(createdAt, selectedRange);
             });

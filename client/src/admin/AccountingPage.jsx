@@ -72,7 +72,7 @@ const AccountingPage = () => {
                     apiUrl(
                         `/admin/orders?sort=${encodeURIComponent(JSON.stringify(['createdAt', 'DESC']))}&range=${encodeURIComponent(
                             JSON.stringify([0, 99999])
-                        )}&filter=${encodeURIComponent(JSON.stringify({ period, paidOnly: true, excludeIvanDasha: true }))}`
+                        )}&filter=${encodeURIComponent(JSON.stringify({ period, paidOnly: true, excludeIvanDasha: true, excludeWithoutLink: true }))}`
                     ),
                     { headers }
                 ),
