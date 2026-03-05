@@ -160,8 +160,10 @@ const AccountingPage = () => {
     const income = Number(summary.ordersTotal || 0);
     const expensesTotal = Number(summary.expensesTotal || 0);
     const balance = Number(summary.balance || 0);
+    const paidOrdersCount = Number(summary.ordersCount || orders.length || 0);
     const expenseShare = income > 0 ? Math.min(100, Math.max(0, (expensesTotal / income) * 100)) : 0;
     const marginPercent = income > 0 ? Math.round((balance / income) * 100) : 0;
+    const averageOrderValue = paidOrdersCount > 0 ? income / paidOrdersCount : 0;
     const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
     const hasHiddenOrders = orders.length > 5;
 
@@ -277,12 +279,14 @@ const AccountingPage = () => {
                 </Card>
                 <Card sx={insightCardSx}>
                     <CardContent sx={{ p: '0 !important' }}>
-                        <Typography variant="subtitle2">Финансовая подушка</Typography>
+                        <Typography variant="subtitle2">Средний оплаченный заказ</Typography>
                         <Typography variant="h6" sx={{ mt: 0.35 }}>
-                            {formatMoney(balance)}
+                            {formatMoney(averageOrderValue)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6 }}>
-                            {balance >= 0 ? 'Положительный остаток на периоде' : 'Нужна корректировка трат'}
+                            {paidOrdersCount > 0
+                                ? `${paidOrdersCount} заказов за период`
+                                : 'Нет оплаченных заказов за выбранный период'}
                         </Typography>
                     </CardContent>
                 </Card>
