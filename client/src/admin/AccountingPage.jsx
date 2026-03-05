@@ -5,9 +5,6 @@ import {
     Card,
     CardContent,
     Chip,
-    Dialog,
-    DialogContent,
-    DialogTitle,
     LinearProgress,
     Paper,
     Stack,
@@ -44,12 +41,9 @@ import {
     tableWrapSx
 } from './accountingUi';
 
-const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
-
 const AccountingPage = () => {
     const notify = useNotify();
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('md'));
-    const isIvan = adminAuthStorage.isIvan();
     const [period, setPeriod] = useState('month');
     const [summary, setSummary] = useState({
         ordersTotal: 0,
@@ -63,7 +57,6 @@ const AccountingPage = () => {
     const [loading, setLoading] = useState(true);
     const [deletingExpenseId, setDeletingExpenseId] = useState(null);
     const [showAllOrders, setShowAllOrders] = useState(false);
-    const [withoutLinkDialogOpen, setWithoutLinkDialogOpen] = useState(false);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -160,10 +153,15 @@ const AccountingPage = () => {
         }
     };
 
-    const accountFinancialRows = useMemo(
-        () => (Array.isArray(summary.accountFinancials?.byAccount) ? summary.accountFinancials.byAccount : []),
-        [summary.accountFinancials]
-    );
+    const accountFinancialRows = useMemo(() => {
+        if (!Array.isArray(summary.accountFinancials?.byAccount)) {
+            return [];
+        }
+
+        return summary.accountFinancials.byAccount.filter(
+            (item) => String(item?.accountName || '').trim() !== 'Без ссылки'
+        );
+    }, [summary.accountFinancials]);
     const income = Number(summary.ordersTotal || 0);
     const expensesTotal = Number(summary.expensesTotal || 0);
     const balance = Number(summary.balance || 0);
@@ -173,30 +171,6 @@ const AccountingPage = () => {
     const averageOrderValue = paidOrdersCount > 0 ? income / paidOrdersCount : 0;
     const ordersToShow = showAllOrders ? orders : orders.slice(0, 5);
     const hasHiddenOrders = orders.length > 5;
-    const withoutLinkOrders = useMemo(
-        () =>
-            orders.filter((order) => {
-                const accountName = String(order?.accountName || '').trim() || WITHOUT_LINK_ACCOUNT_NAME;
-                return accountName === WITHOUT_LINK_ACCOUNT_NAME;
-            }),
-        [orders]
-    );
-
-    const onOpenWithoutLinkOrders = useCallback(() => {
-        if (!isIvan) {
-            return;
-        }
-        setWithoutLinkDialogOpen(true);
-    }, [isIvan]);
-
-    const onOpenOrderDetails = useCallback((orderId) => {
-        const numericId = Number(orderId);
-        if (!Number.isInteger(numericId) || numericId <= 0) {
-            return;
-        }
-        window.open(`#/orders/${numericId}/show`, '_blank', 'noopener,noreferrer');
-    }, []);
-
     if (loading) {
         return <Typography>Загрузка бухгалтерии...</Typography>;
     }
@@ -335,15 +309,7 @@ const AccountingPage = () => {
                             <Card
                                 key={item.accountName}
                                 variant="outlined"
-                                sx={{
-                                    ...mobileCardSx,
-                                    ...(isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME
-                                        ? { cursor: 'pointer', borderColor: 'rgba(16,40,29,0.3)' }
-                                        : {})
-                                }}
-                                onClick={
-                                    isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME ? onOpenWithoutLinkOrders : undefined
-                                }
+                                sx={mobileCardSx}
                             >
                                 <CardContent>
                                     <Typography variant="subtitle2">{item.accountName}</Typography>
@@ -369,29 +335,8 @@ const AccountingPage = () => {
                             </TableHead>
                             <TableBody>
                                 {accountFinancialRows.map((item) => (
-                                    <TableRow
-                                        key={item.accountName}
-                                        hover={isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME}
-                                        onClick={
-                                            isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME
-                                                ? onOpenWithoutLinkOrders
-                                                : undefined
-                                        }
-                                        sx={
-                                            isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME
-                                                ? { cursor: 'pointer' }
-                                                : undefined
-                                        }
-                                    >
-                                        <TableCell
-                                            sx={
-                                                isIvan && item.accountName === WITHOUT_LINK_ACCOUNT_NAME
-                                                    ? { textDecoration: 'underline' }
-                                                    : undefined
-                                            }
-                                        >
-                                            {item.accountName}
-                                        </TableCell>
+                                    <TableRow key={item.accountName}>
+                                        <TableCell>{item.accountName}</TableCell>
                                         <TableCell align="right">{formatMoney(item.income)}</TableCell>
                                         <TableCell align="right">{formatMoney(item.expenses)}</TableCell>
                                         <TableCell align="right">{formatMoney(item.current)}</TableCell>
@@ -402,60 +347,6 @@ const AccountingPage = () => {
                     </Box>
                 )}
             </Paper>
-
-            {isIvan ? (
-                <Dialog open={withoutLinkDialogOpen} onClose={() => setWithoutLinkDialogOpen(false)} maxWidth="lg" fullWidth>
-                    <DialogTitle>Заказы со счетом «Без ссылки»</DialogTitle>
-                    <DialogContent>
-                        {!withoutLinkOrders.length ? (
-                            <Box sx={emptyStateSx}>Заказы без ссылки за выбранный период не найдены</Box>
-                        ) : (
-                            <Box sx={tableWrapSx}>
-                                <Table size="small" sx={{ ...tableSx, minWidth: 980 }}>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>ID</TableCell>
-                                            <TableCell>Дата</TableCell>
-                                            <TableCell>Клиент</TableCell>
-                                            <TableCell>Телефон</TableCell>
-                                            <TableCell>Статус</TableCell>
-                                            <TableCell>ИИН продавца</TableCell>
-                                            <TableCell align="right">Сумма</TableCell>
-                                            <TableCell align="right">Детали</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {withoutLinkOrders.map((order) => {
-                                            const numericOrderId = Number(order.id);
-                                            const hasOrderCard = Number.isInteger(numericOrderId) && numericOrderId > 0;
-                                            return (
-                                                <TableRow key={order.id}>
-                                                    <TableCell>{order.id}</TableCell>
-                                                    <TableCell>{formatDate(order.createdAt)}</TableCell>
-                                                    <TableCell>{order.customerName || '-'}</TableCell>
-                                                    <TableCell>{order.phoneNumber ? `+7${order.phoneNumber}` : '-'}</TableCell>
-                                                    <TableCell>{order.status || '-'}</TableCell>
-                                                    <TableCell>{order.paymentSellerIin || '-'}</TableCell>
-                                                    <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
-                                                    <TableCell align="right">
-                                                        {hasOrderCard ? (
-                                                            <Button size="small" onClick={() => onOpenOrderDetails(order.id)}>
-                                                                Открыть заказ
-                                                            </Button>
-                                                        ) : (
-                                                            '—'
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </Box>
-                        )}
-                    </DialogContent>
-                </Dialog>
-            ) : null}
 
             <Paper sx={sectionSx}>
                 <Box sx={sectionTitleRowSx}>
@@ -548,7 +439,7 @@ const AccountingPage = () => {
                                     <Typography variant="body2">Клиент: {order.customerName || '-'}</Typography>
                                     <Typography variant="body2">Город: {order.city || '-'}</Typography>
                                     <Typography variant="body2">Статус: {order.status || '-'}</Typography>
-                                    <Typography variant="body2">Счет: {order.accountName || 'Без ссылки'}</Typography>
+                                    <Typography variant="body2">Счет: {String(order.accountName || '').trim() || '-'}</Typography>
                                     <Typography variant="body1" sx={{ mt: 0.5 }}>
                                         {formatMoney(order.totalPrice)}
                                     </Typography>
@@ -578,7 +469,7 @@ const AccountingPage = () => {
                                         <TableCell>{order.customerName || '-'}</TableCell>
                                         <TableCell>{order.city || '-'}</TableCell>
                                         <TableCell>{order.status || '-'}</TableCell>
-                                        <TableCell>{order.accountName || 'Без ссылки'}</TableCell>
+                                        <TableCell>{String(order.accountName || '').trim() || '-'}</TableCell>
                                         <TableCell align="right">{formatMoney(order.totalPrice)}</TableCell>
                                     </TableRow>
                                 ))}
