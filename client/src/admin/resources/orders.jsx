@@ -1456,6 +1456,7 @@ const OrderShowContent = () => {
     if (!record) {
         return null;
     }
+    const isIvan = adminAuthStorage.isIvan();
 
     const orderProducts = Array.isArray(record.products) ? record.products : [];
 
@@ -1521,6 +1522,9 @@ const OrderShowContent = () => {
                                 Оплата и логистика
                             </Typography>
                             <Typography variant="body2">Оплата: {record.paymentMethod || '—'}</Typography>
+                            {isIvan ? (
+                                <Typography variant="body2">ИИН продавца: {record.paymentSellerIin || '—'}</Typography>
+                            ) : null}
                             <Typography variant="body2" sx={{ mt: 1 }}>
                                 Штрихкод трек-номера
                             </Typography>

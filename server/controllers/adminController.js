@@ -384,6 +384,7 @@ const toVirtualPaidOrderFromConnection = (connection) => {
         createdAt: receivedAt,
         paymentMethod: 'link',
         paymentLink: connection.paymentLink || '',
+        paymentSellerIin: String(connection.sellerIin || '').trim() || null,
         paymentSellerName: String(connection.sellerAdminName || '').trim() || null
     };
 };
