@@ -255,6 +255,14 @@ const ensureAdminUsersSchema = async () => {
                 defaultValue: true
             });
         }
+
+        if (!tableDefinition.whatsappAgreeTemplateEnabled) {
+            await queryInterface.addColumn('admin_users', 'whatsappAgreeTemplateEnabled', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: true
+            });
+        }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы admin_users:', error);
     }
@@ -270,6 +278,9 @@ const ensureAdminUsersSchema = async () => {
                 }
                 if (typeof admin.siteOrdersToNataliaEnabled !== 'boolean') {
                     patch.siteOrdersToNataliaEnabled = true;
+                }
+                if (typeof admin.whatsappAgreeTemplateEnabled !== 'boolean') {
+                    patch.whatsappAgreeTemplateEnabled = true;
                 }
                 if (Object.keys(patch).length > 0) {
                     await admin.update(patch);

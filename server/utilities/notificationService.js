@@ -1,5 +1,6 @@
 const axios = require('axios');
 const User = require('../models/orders/User');
+const AdminUser = require('../models/orders/AdminUser');
 const { normalizePhoneNumber } = require('./paymentLinkUtils');
 const { logError } = require('./errorLogger');
 const { WHATSAPP_360DIALOG_API_URL, WHATSAPP_360DIALOG_API_KEY } = require('../config/whatsapp360dialog');
@@ -7,6 +8,12 @@ const { WHATSAPP_360DIALOG_API_URL, WHATSAPP_360DIALOG_API_KEY } = require('../c
 const CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const AGREE_TEMPLATE_NAME = 'agree';
 const AUTH_TEMPLATE_NAME = 'auth';
+const IVAN_ADMIN_PHONE = '7073670497';
+const AGREE_TOGGLE_CACHE_TTL_MS = 30 * 1000;
+let agreeTemplateEnabledCache = {
+    value: true,
+    expiresAt: 0
+};
 
 const maskApiKey = (value) => {
     const raw = String(value || '').trim();
@@ -76,6 +83,39 @@ const parsePendingMessages = (rawValue) => {
             .filter(Boolean);
     } catch (_error) {
         return [];
+    }
+};
+
+const getAgreeTemplateEnabled = async () => {
+    const now = Date.now();
+    if (agreeTemplateEnabledCache.expiresAt > now) {
+        return agreeTemplateEnabledCache.value;
+    }
+
+    try {
+        const ivanAdmin = await AdminUser.findOne({
+            where: {
+                phoneNumber: IVAN_ADMIN_PHONE,
+                isActive: true
+            },
+            attributes: ['whatsappAgreeTemplateEnabled']
+        });
+
+        const value = ivanAdmin && typeof ivanAdmin.whatsappAgreeTemplateEnabled === 'boolean'
+            ? Boolean(ivanAdmin.whatsappAgreeTemplateEnabled)
+            : true;
+
+        agreeTemplateEnabledCache = {
+            value,
+            expiresAt: now + AGREE_TOGGLE_CACHE_TTL_MS
+        };
+        return value;
+    } catch (_error) {
+        agreeTemplateEnabledCache = {
+            value: true,
+            expiresAt: now + 5000
+        };
+        return true;
     }
 };
 
@@ -233,6 +273,14 @@ const sendTextWithPolicy = async (toWabaPhone, tenDigitsPhone, messageText, opti
 
     const userRecord = await ensureUserByPhone(tenDigitsPhone);
     if (!userRecord) {
+        return sendTextDirect(toWabaPhone, text);
+    }
+
+    const isAgreeTemplateEnabled = await getAgreeTemplateEnabled();
+    if (!isAgreeTemplateEnabled) {
+        logOutgoing('agree_template_disabled_direct_send', {
+            to: toWabaPhone
+        });
         return sendTextDirect(toWabaPhone, text);
     }
 

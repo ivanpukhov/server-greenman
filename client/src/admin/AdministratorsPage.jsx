@@ -81,7 +81,8 @@ const AdministratorsPage = () => {
         fullName: '',
         phoneNumber: '',
         iin: '',
-        siteOrdersToNataliaEnabled: true
+        siteOrdersToNataliaEnabled: true,
+        whatsappAgreeTemplateEnabled: true
     });
     const [paymentLinkForm, setPaymentLinkForm] = useState({
         url: '',
@@ -393,7 +394,9 @@ const AdministratorsPage = () => {
             fullName: String(admin.fullName || ''),
             phoneNumber: String(admin.phoneNumber || ''),
             iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12),
-            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
+            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
+            whatsappAgreeTemplateEnabled:
+                admin.whatsappAgreeTemplateEnabled === undefined ? true : Boolean(admin.whatsappAgreeTemplateEnabled)
         });
     };
 
@@ -406,7 +409,8 @@ const AdministratorsPage = () => {
             fullName: '',
             phoneNumber: '',
             iin: '',
-            siteOrdersToNataliaEnabled: true
+            siteOrdersToNataliaEnabled: true,
+            whatsappAgreeTemplateEnabled: true
         });
     };
 
@@ -444,7 +448,10 @@ const AdministratorsPage = () => {
                     phoneNumber,
                     iin,
                     ...(canEditIvanSiteOrdersToggle(editingAdmin)
-                        ? { siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled) }
+                        ? {
+                            siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled),
+                            whatsappAgreeTemplateEnabled: Boolean(editAdminForm.whatsappAgreeTemplateEnabled)
+                        }
                         : {})
                 })
             });
@@ -647,20 +654,36 @@ const AdministratorsPage = () => {
                                                         }
                                                     />
                                                     {canEditIvanSiteOrdersToggle(admin) && (
-                                                        <FormControlLabel
-                                                            control={
-                                                                <Switch
-                                                                    checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
-                                                                    onChange={(event) =>
-                                                                        setEditAdminForm((prev) => ({
-                                                                            ...prev,
-                                                                            siteOrdersToNataliaEnabled: event.target.checked
-                                                                        }))
-                                                                    }
-                                                                />
-                                                            }
-                                                            label="Заказы с сайта учитывать в приход Наталье"
-                                                        />
+                                                        <>
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Switch
+                                                                        checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
+                                                                        onChange={(event) =>
+                                                                            setEditAdminForm((prev) => ({
+                                                                                ...prev,
+                                                                                siteOrdersToNataliaEnabled: event.target.checked
+                                                                            }))
+                                                                        }
+                                                                    />
+                                                                }
+                                                                label="Заказы с сайта учитывать в приход Наталье"
+                                                            />
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Switch
+                                                                        checked={Boolean(editAdminForm.whatsappAgreeTemplateEnabled)}
+                                                                        onChange={(event) =>
+                                                                            setEditAdminForm((prev) => ({
+                                                                                ...prev,
+                                                                                whatsappAgreeTemplateEnabled: event.target.checked
+                                                                            }))
+                                                                        }
+                                                                    />
+                                                                }
+                                                                label="Использовать шаблон agree (24 часа)"
+                                                            />
+                                                        </>
                                                     )}
                                                 </>
                                             ) : (
@@ -762,21 +785,38 @@ const AdministratorsPage = () => {
                                                             }
                                                         />
                                                         {canEditIvanSiteOrdersToggle(admin) && (
-                                                            <FormControlLabel
-                                                                sx={{ ml: 0 }}
-                                                                control={
-                                                                    <Switch
-                                                                        checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
-                                                                        onChange={(event) =>
-                                                                            setEditAdminForm((prev) => ({
-                                                                                ...prev,
-                                                                                siteOrdersToNataliaEnabled: event.target.checked
-                                                                            }))
-                                                                        }
-                                                                    />
-                                                                }
-                                                                label="Заказы с сайта учитывать в приход Наталье"
-                                                            />
+                                                            <>
+                                                                <FormControlLabel
+                                                                    sx={{ ml: 0 }}
+                                                                    control={
+                                                                        <Switch
+                                                                            checked={Boolean(editAdminForm.siteOrdersToNataliaEnabled)}
+                                                                            onChange={(event) =>
+                                                                                setEditAdminForm((prev) => ({
+                                                                                    ...prev,
+                                                                                    siteOrdersToNataliaEnabled: event.target.checked
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                    }
+                                                                    label="Заказы с сайта учитывать в приход Наталье"
+                                                                />
+                                                                <FormControlLabel
+                                                                    sx={{ ml: 0 }}
+                                                                    control={
+                                                                        <Switch
+                                                                            checked={Boolean(editAdminForm.whatsappAgreeTemplateEnabled)}
+                                                                            onChange={(event) =>
+                                                                                setEditAdminForm((prev) => ({
+                                                                                    ...prev,
+                                                                                    whatsappAgreeTemplateEnabled: event.target.checked
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                    }
+                                                                    label="Использовать шаблон agree (24 часа)"
+                                                                />
+                                                            </>
                                                         )}
                                                     </Stack>
                                                 ) : (

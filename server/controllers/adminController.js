@@ -48,14 +48,15 @@ const serializeAdminForResponse = (admin, currentAdminPhone) => {
     }
 
     const canSeeIvanToggle = canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(plainAdmin.phoneNumber);
-    const { siteOrdersToNataliaEnabled, ...rest } = plainAdmin;
+    const { siteOrdersToNataliaEnabled, whatsappAgreeTemplateEnabled, ...rest } = plainAdmin;
     if (!canSeeIvanToggle) {
         return rest;
     }
 
     return {
         ...rest,
-        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled)
+        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled),
+        whatsappAgreeTemplateEnabled: Boolean(whatsappAgreeTemplateEnabled)
     };
 };
 
@@ -1915,7 +1916,10 @@ ${productDetails}`;
                     fullName: admin.fullName,
                     iin: admin.iin,
                     ...(canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(admin.phoneNumber)
-                        ? { siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled) }
+                        ? {
+                            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
+                            whatsappAgreeTemplateEnabled: Boolean(admin.whatsappAgreeTemplateEnabled)
+                        }
                         : {})
                 }))
             });
@@ -2054,6 +2058,9 @@ ${productDetails}`;
             if (isIvanPhone(adminUser.phoneNumber) && canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone)) {
                 if (req.body.siteOrdersToNataliaEnabled !== undefined) {
                     payload.siteOrdersToNataliaEnabled = Boolean(req.body.siteOrdersToNataliaEnabled);
+                }
+                if (req.body.whatsappAgreeTemplateEnabled !== undefined) {
+                    payload.whatsappAgreeTemplateEnabled = Boolean(req.body.whatsappAgreeTemplateEnabled);
                 }
             }
 

@@ -32,6 +32,11 @@ const AdminUser = orderDB.define(
             type: Sequelize.BOOLEAN,
             allowNull: false,
             defaultValue: true
+        },
+        whatsappAgreeTemplateEnabled: {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
         }
     },
     {
