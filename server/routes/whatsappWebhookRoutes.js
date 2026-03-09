@@ -180,6 +180,12 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
             caption: String(fileName || 'Видео').trim()
         }
     };
+    console.log('[WhatsApp outgoing] video_request:', safeStringify({
+        to,
+        type: payload.type,
+        linkPreview: String(payload.video.link || '').slice(0, 160),
+        caption: payload.video.caption
+    }));
 
     try {
         const response = await axios.post(

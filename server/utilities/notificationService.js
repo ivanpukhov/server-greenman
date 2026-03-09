@@ -8,6 +8,21 @@ const CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const AGREE_TEMPLATE_NAME = 'agree';
 const AUTH_TEMPLATE_NAME = 'auth';
 
+const maskApiKey = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+        return 'missing';
+    }
+    if (raw.length <= 8) {
+        return `${raw.slice(0, 2)}***`;
+    }
+    return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
+};
+
+const logOutgoing = (event, details = {}) => {
+    console.log(`[WhatsApp outgoing] ${event}: ${JSON.stringify(details)}`);
+};
+
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const normalizeToTenDigits = (value) => {
@@ -62,6 +77,15 @@ const sendWabaPayload = async (payload) => {
     }
 
     const url = `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`;
+    logOutgoing('request', {
+        url,
+        apiKey: maskApiKey(WHATSAPP_360DIALOG_API_KEY),
+        type: payload?.type || null,
+        to: payload?.to || null,
+        templateName: payload?.template?.name || null,
+        textLength: payload?.text?.body ? String(payload.text.body).length : 0
+    });
+
     const response = await axios.post(url, payload, {
         headers: {
             'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
@@ -69,6 +93,14 @@ const sendWabaPayload = async (payload) => {
         },
         timeout: 30000
     });
+
+    logOutgoing('success', {
+        type: payload?.type || null,
+        to: payload?.to || null,
+        templateName: payload?.template?.name || null,
+        response: response.data || null
+    });
+
     return response.data;
 };
 
@@ -166,6 +198,12 @@ const queueMessageAndRequestConsent = async (userRecord, toWabaPhone, messageTex
         await sendTemplateDirect(toWabaPhone, AGREE_TEMPLATE_NAME);
     }
 
+    logOutgoing('queued_outside_24h', {
+        to: toWabaPhone,
+        pendingCount: pendingMessages.length,
+        agreeSent: shouldSendAgree
+    });
+
     return {
         queued: true,
         pendingCount: pendingMessages.length,
@@ -201,6 +239,11 @@ const sendNotification = async (phoneNumber, message, options = {}) => {
     const toWabaPhone = normalizeToWabaPhone(phoneNumber);
 
     if (!tenDigitsPhone || !toWabaPhone) {
+        logOutgoing('skip_invalid_phone', {
+            phoneNumber: String(phoneNumber || ''),
+            tenDigitsPhone,
+            toWabaPhone
+        });
         return null;
     }
 
@@ -218,6 +261,9 @@ const sendNotification = async (phoneNumber, message, options = {}) => {
 const sendToChatId = async (chatId, message, options = {}) => {
     const tenDigitsPhone = normalizeToTenDigits(chatId);
     if (!tenDigitsPhone) {
+        logOutgoing('skip_invalid_chat_id', {
+            chatId: String(chatId || '')
+        });
         return null;
     }
 
@@ -229,6 +275,10 @@ const sendAuthTemplate = async (phoneNumber, code) => {
     const safeCode = String(code || '').replace(/\D/g, '').slice(0, 6);
 
     if (!toWabaPhone || safeCode.length !== 6) {
+        logOutgoing('skip_invalid_auth_payload', {
+            phoneNumber: String(phoneNumber || ''),
+            codeLength: safeCode.length
+        });
         return null;
     }
 
@@ -247,6 +297,9 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
     const tenDigitsPhone = normalizeToTenDigits(phoneNumber);
     const toWabaPhone = normalizeToWabaPhone(phoneNumber);
     if (!tenDigitsPhone || !toWabaPhone) {
+        logOutgoing('flush_skip_invalid_phone', {
+            phoneNumber: String(phoneNumber || '')
+        });
         return {
             sentCount: 0,
             pendingCount: 0
@@ -255,6 +308,9 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
 
     const userRecord = await User.findOne({ where: { phoneNumber: tenDigitsPhone } });
     if (!userRecord) {
+        logOutgoing('flush_skip_no_user', {
+            phoneNumber: tenDigitsPhone
+        });
         return {
             sentCount: 0,
             pendingCount: 0
@@ -269,6 +325,9 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
             });
         }
 
+        logOutgoing('flush_no_pending', {
+            phoneNumber: tenDigitsPhone
+        });
         return {
             sentCount: 0,
             pendingCount: 0
@@ -289,6 +348,11 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
                 phoneNumber: tenDigitsPhone,
                 sentCount
             });
+            logOutgoing('flush_failed', {
+                phoneNumber: tenDigitsPhone,
+                sentCount,
+                pendingCount: pendingMessages.length - sentCount
+            });
             break;
         }
     }
@@ -296,6 +360,12 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
     await userRecord.update({
         pendingWhatsAppMessages: unsentMessages.length > 0 ? JSON.stringify(unsentMessages) : null,
         isWaitingForWhatsappWindowOpen: unsentMessages.length > 0
+    });
+
+    logOutgoing('flush_done', {
+        phoneNumber: tenDigitsPhone,
+        sentCount,
+        pendingCount: unsentMessages.length
     });
 
     return {
