@@ -292,7 +292,41 @@ const sendAuthTemplate = async (phoneNumber, code) => {
     }
 
     try {
-        return await sendTemplateDirect(toWabaPhone, AUTH_TEMPLATE_NAME, [safeCode]);
+        const payload = {
+            messaging_product: 'whatsapp',
+            to: toWabaPhone,
+            type: 'template',
+            template: {
+                name: AUTH_TEMPLATE_NAME,
+                language: {
+                    code: 'ru'
+                },
+                components: [
+                    {
+                        type: 'body',
+                        parameters: [
+                            {
+                                type: 'text',
+                                text: safeCode
+                            }
+                        ]
+                    },
+                    {
+                        type: 'button',
+                        sub_type: 'URL',
+                        index: '0',
+                        parameters: [
+                            {
+                                type: 'text',
+                                text: safeCode
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        return await sendWabaPayload(payload);
     } catch (error) {
         logError('notificationService.sendAuthTemplate', error, {
             phoneNumber: normalizeToTenDigits(phoneNumber),
