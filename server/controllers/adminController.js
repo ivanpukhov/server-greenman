@@ -1631,6 +1631,19 @@ const adminController = {
             } else {
                 paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderPayload, phoneNumber);
             }
+
+            const paymentLink = String(orderPayload.paymentLink || '').trim();
+            const paymentSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+            const paymentSellerName = String(orderPayload.paymentSellerName || '').trim();
+            if (!paymentLink || paymentSellerIin.length !== 12 || !paymentSellerName) {
+                return res.status(400).json({
+                    message: 'Заказ со способом оплаты "link" нельзя создать без ссылки и администратора'
+                });
+            }
+            orderPayload.paymentLink = paymentLink;
+            orderPayload.paymentSellerIin = paymentSellerIin;
+            orderPayload.paymentSellerName = paymentSellerName;
+
             if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
                 orderPayload.status = 'Оплачено';
             }

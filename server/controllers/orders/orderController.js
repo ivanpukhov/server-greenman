@@ -63,6 +63,20 @@ const orderController = {
             };
 
             const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderData, phoneNumber);
+            if (String(paymentMethod || '').trim().toLowerCase() === 'link') {
+                const paymentLink = String(orderData.paymentLink || '').trim();
+                const paymentSellerIin = String(orderData.paymentSellerIin || '').replace(/\D/g, '');
+                const paymentSellerName = String(orderData.paymentSellerName || '').trim();
+                if (!paymentLink || paymentSellerIin.length !== 12 || !paymentSellerName) {
+                    return res.status(400).json({
+                        error: 'Заказ со способом оплаты "link" нельзя создать без ссылки и администратора'
+                    });
+                }
+
+                orderData.paymentLink = paymentLink;
+                orderData.paymentSellerIin = paymentSellerIin;
+                orderData.paymentSellerName = paymentSellerName;
+            }
             if (canAutoMarkOrderAsPaidByConnection(paymentLinkConnection, totalPrice)) {
                 orderData.status = 'Оплачено';
             }

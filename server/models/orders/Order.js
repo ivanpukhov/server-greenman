@@ -81,7 +81,32 @@ const Order = orderDB.define('order', {
         type: Sequelize.STRING,
         allowNull: true
     }
+},
+{
+    validate: {
+        linkPaymentRequiresAdmin() {
+            const paymentMethod = String(this.paymentMethod || '').trim().toLowerCase();
+            if (paymentMethod !== 'link') {
+                return;
+            }
 
+            const paymentLink = String(this.paymentLink || '').trim();
+            const paymentSellerName = String(this.paymentSellerName || '').trim();
+            const paymentSellerIinDigits = String(this.paymentSellerIin || '').replace(/\D/g, '');
+
+            if (!paymentLink) {
+                throw new Error('Для заказа со способом оплаты "link" обязательна ссылка на оплату');
+            }
+
+            if (paymentSellerIinDigits.length !== 12) {
+                throw new Error('Для заказа со способом оплаты "link" обязателен корректный ИИН продавца');
+            }
+
+            if (!paymentSellerName) {
+                throw new Error('Для заказа со способом оплаты "link" обязательно имя администратора');
+            }
+        }
+    }
 });
 
 

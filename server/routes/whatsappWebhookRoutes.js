@@ -22,7 +22,7 @@ const {
     canAutoMarkOrderAsPaidByConnection
 } = require('../utilities/paymentLinkUtils');
 const { pickNextPaymentLinkByDispatchPlan } = require('../utilities/paymentLinkDispatchPlan');
-const { getActiveAdmins, getAdminByPhone, normalizeAdminIin } = require('../utilities/adminUsers');
+const { getActiveAdmins, getAdminByPhone, normalizeAdminIin, normalizeAdminIinStrict } = require('../utilities/adminUsers');
 
 const router = express.Router();
 const { Op } = Sequelize;
@@ -456,7 +456,8 @@ const createOrderFromOrderDraft = async ({
     resolvedItems,
     deliveryPrice,
     noteText,
-    chatId
+    chatId,
+    sellerAdmin
 }) => {
     const decreasedStocks = [];
 
@@ -546,6 +547,9 @@ const createOrderFromOrderDraft = async ({
             totalPrice
         }));
 
+        const sellerIinFromSeller = normalizeAdminIinStrict(sellerAdmin?.iin);
+        const sellerNameFromSeller = String(sellerAdmin?.fullName || '').trim();
+
         const orderPayload = {
             customerName: clientFields.customerName,
             addressIndex: clientFields.addressIndex,
@@ -561,11 +565,24 @@ const createOrderFromOrderDraft = async ({
                 typeId: item.typeId,
                 quantity: item.quantity
             })),
-            totalPrice
+            totalPrice,
+            paymentSellerIin: sellerIinFromSeller || null,
+            paymentSellerName: sellerNameFromSeller || null
         };
         console.log('[WhatsApp webhook][OrderDraft][Create] Initial order payload:\n' + safeStringify(orderPayload));
 
         const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
+        const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
+        const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+        const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+
+        if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
+            throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
+        }
+
+        orderPayload.paymentLink = orderPaymentLink;
+        orderPayload.paymentSellerIin = orderSellerIin;
+        orderPayload.paymentSellerName = orderSellerName;
         console.log('[WhatsApp webhook][OrderDraft][Create] Payment connection attached:\n' + safeStringify({
             paymentConnectionId: paymentLinkConnection?.id || null,
             paymentConnectionIsPaid: paymentLinkConnection?.isPaid || false,
@@ -1042,6 +1059,12 @@ const createOrderFromPaidBundle = async ({
         }
     }
 
+    const sellerIin = normalizeAdminIinStrict(sellerAdmin?.iin);
+    const sellerName = String(sellerAdmin?.fullName || '').trim();
+    if (!sellerIin || !sellerName) {
+        throw new Error('Некорректный ИИН продавца: заказ link не будет создан, OpenRouter пропущен');
+    }
+
     const bundleRow = await OrderBundle.findOne({
         where: {
             code: bundleCode
@@ -1071,14 +1094,15 @@ const createOrderFromPaidBundle = async ({
         resolvedItems,
         deliveryPrice: bundlePayload.deliveryPrice,
         noteText: bundlePayload.noteText,
-        chatId: senderChatId
+        chatId: senderChatId,
+        sellerAdmin
     });
     const createdOrder = createdOrderMeta.order;
 
     const paymentUpdate = {
         status: 'Оплачено',
-        paymentSellerIin: normalizeAdminIin(sellerAdmin?.iin),
-        paymentSellerName: String(sellerAdmin?.fullName || '').trim() || null
+        paymentSellerIin: sellerIin,
+        paymentSellerName: sellerName
     };
     await createdOrder.update(paymentUpdate);
 
