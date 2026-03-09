@@ -36,10 +36,7 @@ const adminAuthController = {
             user.confirmationCodeExpires = new Date(Date.now() + CODE_LIFETIME_MS);
             await user.save();
 
-            await sendNotification(
-                adminProfile.phoneNumber,
-                `Код входа в админ-панель Greenman: ${user.confirmationCode}`
-            );
+            await sendNotification.sendAuthTemplate(adminProfile.phoneNumber, user.confirmationCode);
 
             return res.status(200).json({
                 message: 'Код подтверждения отправлен',

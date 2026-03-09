@@ -293,6 +293,28 @@ const ensureUsersSchema = async () => {
                 allowNull: true
             });
         }
+
+        if (!tableDefinition.pendingWhatsAppMessages) {
+            await queryInterface.addColumn('users', 'pendingWhatsAppMessages', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.isWaitingForWhatsappWindowOpen) {
+            await queryInterface.addColumn('users', 'isWaitingForWhatsappWindowOpen', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: false
+            });
+        }
+
+        if (!tableDefinition.lastAgreeTemplateSentAt) {
+            await queryInterface.addColumn('users', 'lastAgreeTemplateSentAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы users:', error);
     }

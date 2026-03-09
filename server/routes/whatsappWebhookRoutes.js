@@ -13,7 +13,9 @@ const User = require('../models/orders/User');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
+const sendNotification = require('../utilities/notificationService');
 const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
+const { WHATSAPP_360DIALOG_API_URL, WHATSAPP_360DIALOG_API_KEY } = require('../config/whatsapp360dialog');
 const {
     findMatchedLinkInDescription,
     normalizePhoneNumber,
@@ -29,8 +31,6 @@ const { Op } = Sequelize;
 
 const GREEN_API_SEND_FILE_URL =
     'https://api.greenapi.com/waInstance1101834631/sendFileByUrl/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
-const GREEN_API_SEND_MESSAGE_URL =
-    'https://api.greenapi.com/waInstance1101834631/sendMessage/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
 const QR_MIRROR_CHAT_ID = '77775464450@c.us';
 
 const DEFAULT_CAPTION =
@@ -165,18 +165,37 @@ const findFirstValueByKey = (source, targetKey) => {
 const sendFileByUrl = async (url, phoneNumber, fileName) => {
     console.log(`Attempting to send file: URL - ${url}, Phone Number - ${phoneNumber}, File Name - ${fileName}`);
 
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const to = normalizedPhone ? `7${normalizedPhone}` : String(phoneNumber || '').replace(/\D/g, '');
+    if (!to) {
+        throw new Error('Invalid phone number for 360dialog video send');
+    }
+
     const payload = {
-        chatId: `${phoneNumber}@c.us`,
-        urlFile: url,
-        fileName,
-        caption: DEFAULT_CAPTION
+        messaging_product: 'whatsapp',
+        to,
+        type: 'video',
+        video: {
+            link: String(url || '').trim(),
+            caption: String(fileName || 'Видео').trim()
+        }
     };
 
     try {
-        const response = await axios.post(GREEN_API_SEND_FILE_URL, payload);
-        console.log('Response from Green API:', response.data);
+        const response = await axios.post(
+            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
+            payload,
+            {
+                headers: {
+                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+        console.log('Response from 360dialog (video):', response.data);
     } catch (error) {
-        console.error('[WhatsApp webhook] sendFileByUrl failed:', {
+        console.error('[WhatsApp webhook] sendFileByUrl (video via 360dialog) failed:', {
             status: error.response?.status || null,
             data: error.response?.data || null,
             message: error.message
@@ -190,10 +209,9 @@ const sendMessageByChatId = async (chatId, message) => {
         return null;
     }
 
-    const payload = { chatId, message };
-    const response = await axios.post(GREEN_API_SEND_MESSAGE_URL, payload);
-    console.log('Response from Green API (sendMessage):', response.data);
-    return response.data;
+    const response = await sendNotification.sendToChatId(chatId, message, { enforce24h: true });
+    console.log('Response from 360dialog (sendMessage):', response);
+    return response;
 };
 
 const sendFileByUrlToChatId = async (chatId, urlFile, fileName, caption = '') => {
@@ -1555,6 +1573,14 @@ const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
         await user.update({
             lastIncomingMessageAt: now
         });
+    }
+
+    const flushResult = await sendNotification.flushPendingMessagesByPhone(customerPhone);
+    if (flushResult.sentCount > 0) {
+        console.log(
+            `[WhatsApp webhook] Flushed pending messages for ${senderChatId}: sent=${flushResult.sentCount}, pending=${flushResult.pendingCount}.`
+        );
+        return;
     }
 
     if (!shouldSendGreeting) {

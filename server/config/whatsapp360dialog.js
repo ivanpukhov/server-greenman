@@ -1,0 +1,7 @@
+const WHATSAPP_360DIALOG_API_URL = 'https://waba-v2.360dialog.io';
+const WHATSAPP_360DIALOG_API_KEY = 'weTgKfwR9WPpl5x02cSUiyZSAK';
+
+module.exports = {
+    WHATSAPP_360DIALOG_API_URL: String(WHATSAPP_360DIALOG_API_URL || '').trim(),
+    WHATSAPP_360DIALOG_API_KEY: String(WHATSAPP_360DIALOG_API_KEY || '').trim()
+};

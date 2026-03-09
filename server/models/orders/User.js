@@ -41,6 +41,19 @@ const User = orderDB.define('user', {
     lastIncomingMessageAt: {
         type: Sequelize.DATE,
         allowNull: true
+    },
+    pendingWhatsAppMessages: {
+        type: Sequelize.TEXT,
+        allowNull: true
+    },
+    isWaitingForWhatsappWindowOpen: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
+    lastAgreeTemplateSentAt: {
+        type: Sequelize.DATE,
+        allowNull: true
     }
 });
 

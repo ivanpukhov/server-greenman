@@ -27,7 +27,7 @@ const AuthController = {
             await user.save();
             console.log(confirmationCode)
 
-            sendNotification(phoneNumber, `Ваш код подтверждения: ${confirmationCode}`);
+            await sendNotification.sendAuthTemplate(phoneNumber, confirmationCode);
 
             res.status(isNewUser ? 201 : 200).json({
                 message: isNewUser ? 'Пользователь создан, отправлен код подтверждения' : 'Отправлен код подтверждения'
@@ -79,7 +79,7 @@ const AuthController = {
             await user.save();
 
             // Отправка кода подтверждения
-            sendNotification(phoneNumber, `Ваш код подтверждения: ${user.confirmationCode}`);
+            await sendNotification.sendAuthTemplate(phoneNumber, user.confirmationCode);
             res.status(200).json({ message: 'Код подтверждения повторно отправлен' });
         } catch (error) {
             res.status(500).json({ message: 'Ошибка при отправке кода подтверждения', error });
