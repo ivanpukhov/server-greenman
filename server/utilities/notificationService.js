@@ -23,6 +23,14 @@ const logOutgoing = (event, details = {}) => {
     console.log(`[WhatsApp outgoing] ${event}: ${JSON.stringify(details)}`);
 };
 
+const safeClone = (value) => {
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (_error) {
+        return value;
+    }
+};
+
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const normalizeToTenDigits = (value) => {
@@ -83,7 +91,8 @@ const sendWabaPayload = async (payload) => {
         type: payload?.type || null,
         to: payload?.to || null,
         templateName: payload?.template?.name || null,
-        textLength: payload?.text?.body ? String(payload.text.body).length : 0
+        textLength: payload?.text?.body ? String(payload.text.body).length : 0,
+        payload: safeClone(payload)
     });
 
     const response = await axios.post(url, payload, {

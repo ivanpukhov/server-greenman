@@ -183,8 +183,7 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
     console.log('[WhatsApp outgoing] video_request:', safeStringify({
         to,
         type: payload.type,
-        linkPreview: String(payload.video.link || '').slice(0, 160),
-        caption: payload.video.caption
+        payload
     }));
 
     try {
