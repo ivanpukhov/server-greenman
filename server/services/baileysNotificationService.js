@@ -148,6 +148,11 @@ const resolvePnChatIdFromLid = async (chatId, context = {}) => {
     const storeCandidates = new Set();
     const messageNode = context?.messageNode || null;
     const msg = context?.msg || null;
+    const remoteJidAlt = toNormalizedJid(msg?.key?.remoteJidAlt);
+    if (remoteJidAlt && isPnChatId(remoteJidAlt)) {
+        cacheResolvedPair(normalized, remoteJidAlt);
+        return { jid: remoteJidAlt, source: 'participant' };
+    }
 
     const addCandidate = (value, targetSet = candidates) => {
         const normalizedValue = toNormalizedJid(value);
@@ -413,7 +418,9 @@ const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {
     const message = msg?.message || {};
     const text = extractMessageText(message);
     const fromMe = Boolean(msg?.key?.fromMe);
-    const remoteJidRaw = normalizeChatId(msg?.key?.remoteJid);
+    const remoteJidRaw =
+        normalizeChatId(msg?.key?.remoteJidAlt) ||
+        normalizeChatId(msg?.key?.remoteJid);
     const remoteJid = normalizeChatId(
         resolvedJids.remoteJid || (await resolvePnChatIdFromLidWithRetries(remoteJidRaw, { msg, messageNode: message })).jid
     );
@@ -573,7 +580,9 @@ const onConnectionUpdate = async (update) => {
 };
 
 const getDeferredMessageKey = (msg) => {
-    const remoteJid = normalizeChatId(msg?.key?.remoteJid);
+    const remoteJid =
+        normalizeChatId(msg?.key?.remoteJidAlt) ||
+        normalizeChatId(msg?.key?.remoteJid);
     const explicitId = String(msg?.key?.id || '').trim();
     if (explicitId) {
         return `${remoteJid}|${explicitId}`;
@@ -653,7 +662,9 @@ const processSingleUpsertMessage = async (msg, upsertType) => {
 
     console.log('[Baileys][notification][raw]\n' + JSON.stringify(cloneSafe(msg), null, 2));
 
-    const chatIdRaw = normalizeChatId(msg?.key?.remoteJid);
+    const chatIdRaw =
+        normalizeChatId(msg?.key?.remoteJidAlt) ||
+        normalizeChatId(msg?.key?.remoteJid);
     const resolvedRemote = await resolvePnChatIdFromLidWithRetries(chatIdRaw, { msg, messageNode });
     const resolvedOwn = await resolvePnChatIdFromLidWithRetries(normalizeChatId(socket?.user?.id), { msg, messageNode });
     const chatId = normalizeChatId(resolvedRemote.jid);
