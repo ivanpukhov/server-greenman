@@ -267,6 +267,11 @@ const WhatsAppConnectionPage = () => {
                                         </Typography>
                                     ) : null}
                                 </Stack>
+                                {(event.fromPhone || event.toPhone || event.fromChatId || event.toChatId) ? (
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.6, display: 'block' }}>
+                                        {`От: ${event.fromPhone || event.fromChatId || '—'} → Кому: ${event.toPhone || event.toChatId || '—'}`}
+                                    </Typography>
+                                ) : null}
                                 {event.text ? (
                                     <Typography variant="body2" sx={{ mt: 0.8, whiteSpace: 'pre-wrap' }}>
                                         {event.text}

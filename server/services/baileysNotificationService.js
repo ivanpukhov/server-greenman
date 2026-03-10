@@ -1,10 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
+const pino = require('pino');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 
@@ -54,11 +56,22 @@ const normalizeChatId = (jid) => {
         return '';
     }
 
-    if (raw.endsWith('@s.whatsapp.net')) {
-        return `${raw.slice(0, -'@s.whatsapp.net'.length)}@c.us`;
+    const sanitized = raw.replace(/:\d+(?=@)/, '');
+
+    if (sanitized.endsWith('@s.whatsapp.net')) {
+        return `${sanitized.slice(0, -'@s.whatsapp.net'.length)}@c.us`;
     }
 
-    return raw;
+    return sanitized;
+};
+
+const chatIdToPhone = (chatId) => {
+    const value = String(chatId || '').trim();
+    if (!value) {
+        return null;
+    }
+    const digits = value.replace(/\D/g, '');
+    return digits || null;
 };
 
 const addEvent = (event) => {
@@ -96,20 +109,93 @@ const extractMessageText = (messageNode = {}) => {
     return '';
 };
 
-const buildWebhookPayloadFromMessage = (msg) => {
+const truncateText = (value, max = 120) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!text) {
+        return '';
+    }
+    if (text.length <= max) {
+        return text;
+    }
+    return `${text.slice(0, max)}...`;
+};
+
+const getFileNameFromMessageNode = (messageNode = {}) => {
+    if (messageNode.documentMessage?.fileName) {
+        return String(messageNode.documentMessage.fileName);
+    }
+    if (messageNode.videoMessage) {
+        return `video-${Date.now()}.mp4`;
+    }
+    if (messageNode.imageMessage) {
+        return `image-${Date.now()}.jpg`;
+    }
+    return 'file';
+};
+
+const getMimeTypeFromMessageNode = (messageNode = {}) => {
+    if (messageNode.documentMessage?.mimetype) {
+        return String(messageNode.documentMessage.mimetype);
+    }
+    if (messageNode.videoMessage?.mimetype) {
+        return String(messageNode.videoMessage.mimetype);
+    }
+    if (messageNode.imageMessage?.mimetype) {
+        return String(messageNode.imageMessage.mimetype);
+    }
+    return null;
+};
+
+const extractMediaSummary = (messageNode = {}) => {
+    if (messageNode.documentMessage) return 'document';
+    if (messageNode.videoMessage) return 'video';
+    if (messageNode.imageMessage) return 'image';
+    if (messageNode.audioMessage) return 'audio';
+    return null;
+};
+
+const safeDownloadMediaBuffer = async (msg) => {
+    if (!socket) {
+        return null;
+    }
+
+    try {
+        const buffer = await downloadMediaMessage(
+            msg,
+            'buffer',
+            {},
+            {
+                logger: pino({ level: 'silent' }),
+                reuploadRequest: socket.updateMediaMessage
+            }
+        );
+        return Buffer.isBuffer(buffer) ? buffer : null;
+    } catch (_error) {
+        return null;
+    }
+};
+
+const buildWebhookPayloadFromMessage = async (msg) => {
     const message = msg?.message || {};
     const text = extractMessageText(message);
     const fromMe = Boolean(msg?.key?.fromMe);
     const remoteJid = normalizeChatId(msg?.key?.remoteJid);
+    const ownJid = normalizeChatId(socket?.user?.id);
+    const senderChatId = fromMe ? ownJid || remoteJid : remoteJid;
+    const recipientChatId = fromMe ? remoteJid : ownJid || remoteJid;
+    const senderPhone = chatIdToPhone(senderChatId);
+    const recipientPhone = chatIdToPhone(recipientChatId);
 
     const payload = {
         idMessage: String(msg?.key?.id || '').trim() || null,
         typeWebhook: fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived',
         senderData: {
-            chatId: remoteJid
+            chatId: senderChatId,
+            sender: senderPhone
         },
         recipientData: {
-            chatId: remoteJid
+            chatId: recipientChatId,
+            recipient: recipientPhone
         },
         messageData: {}
     };
@@ -123,14 +209,46 @@ const buildWebhookPayloadFromMessage = (msg) => {
         };
     }
 
+    const mediaType = extractMediaSummary(message);
     const documentMessage = message?.documentMessage;
-    if (documentMessage) {
-        payload.messageData.fileMessageData = {
-            fileName: String(documentMessage.fileName || '').trim() || 'file',
-            mimeType: String(documentMessage.mimetype || '').trim() || null,
-            caption: String(documentMessage.caption || '').trim() || null,
-            downloadUrl: String(documentMessage.url || '').trim() || null
+    const videoMessage = message?.videoMessage;
+    const imageMessage = message?.imageMessage;
+    if (documentMessage || videoMessage || imageMessage) {
+        const baseDownloadUrl = String(
+            documentMessage?.url ||
+            videoMessage?.url ||
+            imageMessage?.url ||
+            ''
+        ).trim() || null;
+        const fileName = getFileNameFromMessageNode(message);
+        const mimeType = getMimeTypeFromMessageNode(message);
+        const fileData = {
+            fileName,
+            mimeType,
+            caption: String(
+                documentMessage?.caption ||
+                videoMessage?.caption ||
+                imageMessage?.caption ||
+                ''
+            ).trim() || null,
+            downloadUrl: baseDownloadUrl
         };
+        const isPdf = String(fileData.mimeType || '').toLowerCase().includes('pdf') ||
+            String(fileData.fileName || '').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            const mediaBuffer = await safeDownloadMediaBuffer(msg);
+            if (mediaBuffer) {
+                fileData.fileBase64 = mediaBuffer.toString('base64');
+            }
+        }
+        payload.messageData.fileMessageData = {
+            ...fileData
+        };
+        if (mediaType === 'video') {
+            payload.messageData.videoMessage = {
+                ...fileData
+            };
+        }
     }
 
     return payload;
@@ -142,7 +260,7 @@ const processByWebhookBridge = async (msg) => {
     }
 
     try {
-        const payload = buildWebhookPayloadFromMessage(msg);
+        const payload = await buildWebhookPayloadFromMessage(msg);
         await webhookProcessor(payload, { source: 'baileys' });
     } catch (error) {
         addEvent({
@@ -167,11 +285,8 @@ const scheduleReconnect = () => {
     clearReconnectTimer();
     reconnectTimer = setTimeout(() => {
         startSession().catch((error) => {
-            addEvent({
-                type: 'connection.error',
-                level: 'error',
-                error: String(error?.message || error)
-            });
+            state.lastError = String(error?.message || error);
+            markUpdated();
         });
     }, 2500);
 };
@@ -192,10 +307,6 @@ const onConnectionUpdate = async (update) => {
         }
         markUpdated();
         emitter.emit('qr', state.qrImageDataUrl || qr);
-        addEvent({
-            type: 'connection.qr',
-            connection: state.connection
-        });
     }
 
     if (connection === 'open') {
@@ -205,10 +316,6 @@ const onConnectionUpdate = async (update) => {
         state.qr = null;
         state.qrImageDataUrl = null;
         markUpdated();
-        addEvent({
-            type: 'connection.open',
-            connection: state.connection
-        });
     }
 
     if (connection === 'close') {
@@ -216,11 +323,6 @@ const onConnectionUpdate = async (update) => {
         state.lastDisconnectReason = statusCode;
         state.lastError = statusCode ? `connection closed (${statusCode})` : 'connection closed';
         markUpdated();
-        addEvent({
-            type: 'connection.close',
-            connection: state.connection,
-            statusCode
-        });
 
         if (!isStopping) {
             scheduleReconnect();
@@ -237,15 +339,32 @@ const onMessagesUpsert = async (payload) => {
         }
 
         const chatId = normalizeChatId(msg?.key?.remoteJid);
+        const ownChatId = normalizeChatId(socket?.user?.id);
         const fromMe = Boolean(msg?.key?.fromMe);
         const text = extractMessageText(messageNode);
+        const mediaType = extractMediaSummary(messageNode);
+        const notificationType = fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived';
+        const fromChatId = fromMe ? ownChatId || chatId : chatId;
+        const toChatId = fromMe ? chatId : ownChatId || chatId;
+        const fromPhone = chatIdToPhone(fromChatId);
+        const toPhone = chatIdToPhone(toChatId);
+
+        console.log(
+            `[Baileys][message] type=${notificationType} from=${fromPhone || fromChatId} to=${toPhone || toChatId} id=${String(msg?.key?.id || '')} text="${truncateText(text)}"${mediaType ? ` media=${mediaType}` : ''}`
+        );
 
         addEvent({
-            type: 'message.upsert',
+            type: 'message.notification',
             direction: fromMe ? 'outgoing' : 'incoming',
+            webhookType: notificationType,
             chatId,
+            fromChatId,
+            toChatId,
+            fromPhone,
+            toPhone,
             messageId: String(msg?.key?.id || '').trim() || null,
             text: text || null,
+            mediaType,
             raw: cloneSafe({
                 upsertType: payload?.type || null,
                 key: msg?.key || null,
@@ -255,27 +374,6 @@ const onMessagesUpsert = async (payload) => {
 
         await processByWebhookBridge(msg);
     }
-};
-
-const onMessagesUpdate = (list) => {
-    addEvent({
-        type: 'messages.update',
-        raw: cloneSafe(list)
-    });
-};
-
-const onMessageReceiptUpdate = (list) => {
-    addEvent({
-        type: 'message-receipt.update',
-        raw: cloneSafe(list)
-    });
-};
-
-const onPresenceUpdate = (payload) => {
-    addEvent({
-        type: 'presence.update',
-        raw: cloneSafe(payload)
-    });
 };
 
 const startSession = async () => {
@@ -301,7 +399,8 @@ const startSession = async () => {
             auth: authState,
             version,
             printQRInTerminal: false,
-            browser: ['Greenman', 'Chrome', '1.0.0']
+            browser: ['Greenman', 'Chrome', '1.0.0'],
+            logger: pino({ level: 'silent' })
         });
 
         socket = sock;
@@ -322,14 +421,6 @@ const startSession = async () => {
                     error: String(error?.message || error)
                 });
             });
-        });
-        sock.ev.on('messages.update', onMessagesUpdate);
-        sock.ev.on('message-receipt.update', onMessageReceiptUpdate);
-        sock.ev.on('presence.update', onPresenceUpdate);
-
-        addEvent({
-            type: 'connection.start',
-            connection: state.connection
         });
     })();
 
@@ -360,10 +451,6 @@ const stopSession = async () => {
     state.qr = null;
     state.qrImageDataUrl = null;
     markUpdated();
-    addEvent({
-        type: 'connection.stop',
-        connection: state.connection
-    });
 };
 
 const waitForQr = async (timeoutMs = QR_WAIT_TIMEOUT_MS) => {

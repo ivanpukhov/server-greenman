@@ -1421,23 +1421,47 @@ const processIncomingPdfProofWebhook = async (content) => {
 
     const fileData = content?.messageData?.fileMessageData;
     const downloadUrl = String(fileData?.downloadUrl || '').trim();
+    const fileBase64 = String(fileData?.fileBase64 || '').trim();
+    const mimeType = String(fileData?.mimeType || '').trim().toLowerCase();
+    const fileName = String(fileData?.fileName || '').trim().toLowerCase();
     const senderChatId = String(content?.senderData?.chatId || '').trim();
 
-    if (!downloadUrl || !senderChatId || !isPdfUrl(downloadUrl)) {
+    const looksLikePdf =
+        isPdfUrl(downloadUrl) ||
+        mimeType.includes('pdf') ||
+        fileName.endsWith('.pdf');
+
+    if ((!downloadUrl && !fileBase64) || !senderChatId || !looksLikePdf) {
         return;
     }
 
-    let pdfResponse;
-    try {
-        pdfResponse = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
-    } catch (error) {
-        console.error('[WhatsApp webhook] Failed to download payment proof PDF:', error.response?.data || error.message);
+    let pdfBuffer = null;
+    if (fileBase64) {
+        try {
+            pdfBuffer = Buffer.from(fileBase64, 'base64');
+        } catch (_error) {
+            pdfBuffer = null;
+        }
+    }
+
+    if (!pdfBuffer && downloadUrl) {
+        let pdfResponse;
+        try {
+            pdfResponse = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
+            pdfBuffer = Buffer.from(pdfResponse.data);
+        } catch (error) {
+            console.error('[WhatsApp webhook] Failed to download payment proof PDF:', error.response?.data || error.message);
+            return;
+        }
+    }
+
+    if (!pdfBuffer) {
         return;
     }
 
     let pdfText = '';
     try {
-        pdfText = await extractTextFromPdfBuffer(pdfResponse.data);
+        pdfText = await extractTextFromPdfBuffer(pdfBuffer);
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to parse PDF text:', error.message);
         return;
@@ -1493,7 +1517,7 @@ const processIncomingPdfProofWebhook = async (content) => {
             isPaid: true,
             paidAt: new Date(),
             paidAmount,
-            paymentProofUrl: downloadUrl,
+            paymentProofUrl: downloadUrl || null,
             sellerIin: sellerIin,
             sellerAdminPhone: sellerAdmin.phoneNumber,
             sellerAdminName: sellerAdmin.fullName
@@ -1508,7 +1532,7 @@ const processIncomingPdfProofWebhook = async (content) => {
             isPaid: true,
             paidAt: new Date(),
             paidAmount,
-            paymentProofUrl: downloadUrl,
+            paymentProofUrl: downloadUrl || connection.paymentProofUrl || null,
             sellerIin: sellerIin,
             sellerAdminPhone: sellerAdmin.phoneNumber,
             sellerAdminName: sellerAdmin.fullName
@@ -1741,10 +1765,16 @@ const processIncomingMessageWebhook = async (content) => {
         return;
     }
 
+    const isOutgoingWebhook = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+
     const textMessage =
         content?.messageData?.extendedTextMessageData?.text ||
         content?.messageData?.textMessageData?.textMessage;
-    const recipientChatId = String(content?.senderData?.chatId || content?.recipientData?.chatId || '').trim();
+    const recipientChatId = String(
+        isOutgoingWebhook
+            ? (content?.recipientData?.chatId || content?.senderData?.chatId || '')
+            : (content?.senderData?.chatId || content?.recipientData?.chatId || '')
+    ).trim();
     const messageId = String(content?.idMessage || '').trim() || null;
 
     if (!textMessage || !recipientChatId) {
@@ -1935,6 +1965,27 @@ const processIncomingMessageWebhook = async (content) => {
     return saved;
 };
 
+const processIncomingVideoMessageWebhook = async (content) => {
+    const search = 'videoMessage';
+    if (!JSON.stringify(content).includes(search)) {
+        return;
+    }
+
+    const downloadUrl = findFirstValueByKey(content, 'downloadUrl');
+    const phoneNumber = findFirstValueByKey(content, 'caption');
+    const fileName = findFirstValueByKey(content, 'fileName');
+
+    if (downloadUrl && phoneNumber && fileName) {
+        try {
+            await sendFileByUrl(downloadUrl, phoneNumber, fileName);
+        } catch (error) {
+            console.error('Failed to send file by url:', error.response?.data || error.message);
+        }
+    } else {
+        console.log('Did not find all required fields.');
+    }
+};
+
 const processWebhookContent = async (content, meta = {}) => {
     if (meta?.logRequest) {
         console.log('[WhatsApp webhook] Incoming request:\n' + safeStringify({
@@ -1950,6 +2001,7 @@ const processWebhookContent = async (content, meta = {}) => {
         await processIncomingAdminExpenseWebhook(content);
         await processIncomingPdfProofWebhook(content);
         await processIncomingMessageWebhook(content);
+        await processIncomingVideoMessageWebhook(content);
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to process incoming message webhook:', error.response?.data || error.message);
     }
@@ -1965,38 +2017,6 @@ router.post('/', async (req, res) => {
         headers: req.headers,
         query: req.query
     });
-
-    const search = 'videoMessage';
-    if (!JSON.stringify(content).includes(search)) {
-        return res.status(200).send('OK');
-    }
-
-    console.log(`${search} found in content.`);
-
-    const downloadUrl = findFirstValueByKey(content, 'downloadUrl');
-    if (downloadUrl) {
-        console.log('Found download_url:', downloadUrl);
-    }
-
-    const phoneNumber = findFirstValueByKey(content, 'caption');
-    if (phoneNumber) {
-        console.log('Found phone_number:', phoneNumber);
-    }
-
-    const fileName = findFirstValueByKey(content, 'fileName');
-    if (fileName) {
-        console.log('Found file_name:', fileName);
-    }
-
-    if (downloadUrl && phoneNumber && fileName) {
-        try {
-            await sendFileByUrl(downloadUrl, phoneNumber, fileName);
-        } catch (error) {
-            console.error('Failed to send file by url:', error.response?.data || error.message);
-        }
-    } else {
-        console.log('Did not find all required fields.');
-    }
 
     return res.status(200).send('OK');
 });
