@@ -384,6 +384,110 @@ const sendAuthTemplate = async (phoneNumber, code) => {
     }
 };
 
+const sendTemplateByName = async (phoneNumber, templateName, options = {}) => {
+    const toWabaPhone = normalizeToWabaPhone(phoneNumber);
+    const safeTemplateName = String(templateName || '').trim();
+    const languageCode = String(options.languageCode || 'ru').trim() || 'ru';
+    const components = Array.isArray(options.components) ? options.components : [];
+
+    if (!toWabaPhone || !safeTemplateName) {
+        logOutgoing('skip_invalid_template_payload', {
+            phoneNumber: String(phoneNumber || ''),
+            templateName: safeTemplateName
+        });
+        return null;
+    }
+
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: toWabaPhone,
+        type: 'template',
+        template: {
+            name: safeTemplateName,
+            language: {
+                code: languageCode
+            },
+            components
+        }
+    };
+
+    try {
+        return await sendWabaPayload(payload);
+    } catch (error) {
+        logError('notificationService.sendTemplateByName', error, {
+            phoneNumber: normalizeToTenDigits(phoneNumber),
+            toWabaPhone,
+            templateName: safeTemplateName
+        });
+        if (options.raiseErrors) {
+            throw error;
+        }
+        return null;
+    }
+};
+
+const sendOrderTrackingTemplate = async (phoneNumber, trackingNumber) => {
+    const toWabaPhone = normalizeToWabaPhone(phoneNumber);
+    const safeTrackingNumber = String(trackingNumber || '').trim();
+    if (!toWabaPhone || !safeTrackingNumber) {
+        logOutgoing('skip_invalid_tracking_payload', {
+            phoneNumber: String(phoneNumber || ''),
+            trackingNumber: safeTrackingNumber
+        });
+        return null;
+    }
+
+    const trackingUrl = `https://track.greenman.kz/${safeTrackingNumber}`;
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: toWabaPhone,
+        type: 'template',
+        template: {
+            name: 'order_tracking',
+            language: {
+                code: 'ru'
+            },
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: safeTrackingNumber
+                        },
+                        {
+                            type: 'text',
+                            text: trackingUrl
+                        }
+                    ]
+                },
+                {
+                    type: 'button',
+                    sub_type: 'URL',
+                    index: '0',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: safeTrackingNumber
+                        }
+                    ]
+                }
+            ]
+        }
+    };
+
+    try {
+        return await sendWabaPayload(payload);
+    } catch (error) {
+        logError('notificationService.sendOrderTrackingTemplate', error, {
+            phoneNumber: normalizeToTenDigits(phoneNumber),
+            toWabaPhone,
+            trackingNumber: safeTrackingNumber
+        });
+        return null;
+    }
+};
+
 const flushPendingMessagesByPhone = async (phoneNumber) => {
     const tenDigitsPhone = normalizeToTenDigits(phoneNumber);
     const toWabaPhone = normalizeToWabaPhone(phoneNumber);
@@ -470,5 +574,7 @@ const flushPendingMessagesByChatId = async (chatId) => flushPendingMessagesByPho
 module.exports = sendNotification;
 module.exports.sendToChatId = sendToChatId;
 module.exports.sendAuthTemplate = sendAuthTemplate;
+module.exports.sendTemplateByName = sendTemplateByName;
+module.exports.sendOrderTrackingTemplate = sendOrderTrackingTemplate;
 module.exports.flushPendingMessagesByPhone = flushPendingMessagesByPhone;
 module.exports.flushPendingMessagesByChatId = flushPendingMessagesByChatId;

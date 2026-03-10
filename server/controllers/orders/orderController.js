@@ -1,5 +1,6 @@
 const Order = require('../../models/orders/Order');
 const sendNotification = require('../../utilities/notificationService');
+const { sendOrderTrackingTemplate } = sendNotification;
 const OrderProfile = require("../../models/orders/OrderProfile");
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendMessageToChannel = require('../../utilities/sendMessageToChannel');
@@ -370,7 +371,7 @@ res.status(err.statusCode || 500).json({error: err.message});
             console.log(number)
             // Отправка уведомления о трек-номере
 
-            await sendNotification(number, `Трек-номер вашего заказа: ${trackingNumber}. Отследить посылку можете по ссылке: https://track.greenman.kz/${trackingNumber}`);
+            await sendOrderTrackingTemplate(number, trackingNumber);
 
             if (updated[0] > 0) {
 

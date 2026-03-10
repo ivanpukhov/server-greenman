@@ -11,6 +11,7 @@ const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
+const { sendTemplateByName } = sendNotification;
 const { logError } = require('../utilities/errorLogger');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone, normalizeAdminIin } = require('../utilities/adminUsers');
 const {
@@ -1350,6 +1351,56 @@ const adminController = {
                 providerResponseBody: error?.responseBody || null
             });
             return res.status(500).json({ message: 'Не удалось отправить файл клиенту', error: error.message });
+        }
+    },
+
+    async testWhatsAppTemplate(req, res) {
+        try {
+            const phoneNumber = String(req.body?.phoneNumber || '').trim();
+            const templateName = String(req.body?.templateName || '').trim();
+            const languageCode = String(req.body?.languageCode || 'ru').trim() || 'ru';
+            const rawComponents = req.body?.components;
+
+            if (!phoneNumber) {
+                return res.status(400).json({ message: 'Укажите номер телефона получателя' });
+            }
+
+            if (!templateName) {
+                return res.status(400).json({ message: 'Укажите имя шаблона' });
+            }
+
+            let components = [];
+            if (rawComponents !== undefined && rawComponents !== null && rawComponents !== '') {
+                if (!Array.isArray(rawComponents)) {
+                    return res.status(400).json({ message: 'Поле components должно быть массивом JSON' });
+                }
+                components = rawComponents;
+            }
+
+            const providerResponse = await sendTemplateByName(phoneNumber, templateName, {
+                languageCode,
+                components,
+                raiseErrors: true
+            });
+
+            return res.json({
+                data: {
+                    phoneNumber,
+                    templateName,
+                    languageCode,
+                    components,
+                    providerResponse
+                }
+            });
+        } catch (error) {
+            logError('adminController.testWhatsAppTemplate', error, {
+                phoneNumber: req.body?.phoneNumber || null,
+                templateName: req.body?.templateName || null
+            });
+            return res.status(500).json({
+                message: 'Не удалось отправить шаблон WhatsApp',
+                error: error.message
+            });
         }
     },
 

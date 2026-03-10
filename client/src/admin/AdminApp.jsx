@@ -8,6 +8,7 @@ import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
+import SmsOutlinedIcon from '@mui/icons-material/SmsOutlined';
 import { Box, Button, Typography } from '@mui/material';
 import { Admin, AppBar, Layout, Menu, Resource, useLogout } from 'react-admin';
 import authProvider from './authProvider';
@@ -23,6 +24,7 @@ import QrCodesPage from './QrCodesPage';
 import PaymentLinkConnectionsPage from './PaymentLinkConnectionsPage';
 import AddExpensePage from './AddExpensePage';
 import AliasesPage from './AliasesPage';
+import WhatsAppTemplateTestPage from './WhatsAppTemplateTestPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import { adminAuthStorage } from './authProvider';
@@ -142,6 +144,12 @@ const AdminApp = () => {
             options={{ label: 'Администраторы' }}
             list={AdministratorsPage}
             icon={ManageAccountsOutlinedIcon}
+        />
+        <Resource
+            name="whatsapp-templates"
+            options={{ label: 'WhatsApp шаблоны' }}
+            list={WhatsAppTemplateTestPage}
+            icon={SmsOutlinedIcon}
         />
         <Resource
             name="payment-link-connections"
