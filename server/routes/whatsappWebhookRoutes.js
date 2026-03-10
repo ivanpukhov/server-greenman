@@ -824,6 +824,85 @@ const findRecentUnpaidPaymentConnection = async ({
     return null;
 };
 
+const sendPlannedPaymentLinkAndTrack = async ({
+    recipientChatId,
+    expectedAmount,
+    sourceDescription,
+    messageId
+}) => {
+    const plannedLink = await pickNextPaymentLinkByDispatchPlan();
+    if (!plannedLink) {
+        console.log('[WhatsApp webhook] Payment request detected, but there are no links from dispatch plan.');
+        return null;
+    }
+
+    const customerPhone = normalizePhoneNumber(recipientChatId);
+    if (!customerPhone) {
+        return null;
+    }
+
+    const duplicateRecentConnection = await findRecentUnpaidPaymentConnection({
+        customerChatId: recipientChatId,
+        paymentLink: plannedLink.url,
+        expectedAmount
+    });
+    if (duplicateRecentConnection) {
+        const duplicateJson = duplicateRecentConnection.toJSON();
+        const hasBundleMeta = Boolean(parseOrderDraftSourceMeta(duplicateJson.sourceDescription)?.bundleCode);
+        const hasIncomingBundleMeta = Boolean(parseOrderDraftSourceMeta(sourceDescription)?.bundleCode);
+        if (hasIncomingBundleMeta && !hasBundleMeta) {
+            await duplicateRecentConnection.update({ sourceDescription });
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Reused recent connection #${duplicateJson.id} and attached deferred bundle metadata.`
+            );
+        } else {
+            console.log(
+                `[WhatsApp webhook] Duplicate payment connection prevented: reused #${duplicateJson.id} for ${customerPhone}.`
+            );
+        }
+        return duplicateRecentConnection;
+    }
+
+    console.log(`[WhatsApp webhook] Sending planned payment link to ${recipientChatId}: ${plannedLink.url}`);
+    await sendMessageByChatId(recipientChatId, `${plannedLink.url}\n${PAYMENT_LINK_FOOTER}`);
+
+    if (messageId) {
+        const [savedLink, created] = await SentPaymentLink.findOrCreate({
+            where: { messageId },
+            defaults: {
+                messageId,
+                customerPhone,
+                customerChatId: recipientChatId,
+                paymentLink: plannedLink.url,
+                sourceDescription,
+                expectedAmount
+            }
+        });
+
+        if (created) {
+            console.log(`[WhatsApp webhook] Planned payment link sent and saved by messageId ${messageId}: ${customerPhone} = ${plannedLink.url}`);
+        } else {
+            console.log(`[WhatsApp webhook] Duplicate messageId ${messageId}, planned payment link was already processed.`);
+            if (parseOrderDraftSourceMeta(sourceDescription)?.bundleCode && !parseOrderDraftSourceMeta(savedLink.sourceDescription)?.bundleCode) {
+                await savedLink.update({ sourceDescription });
+                console.log(`[WhatsApp webhook][OrderDraft] Added deferred bundle metadata to existing messageId ${messageId}.`);
+            }
+        }
+
+        return savedLink;
+    }
+
+    const saved = await SentPaymentLink.create({
+        customerPhone,
+        customerChatId: recipientChatId,
+        paymentLink: plannedLink.url,
+        sourceDescription,
+        expectedAmount
+    });
+    console.log(`[WhatsApp webhook] Planned payment link sent and saved: ${customerPhone} = ${saved.paymentLink}`);
+    return saved;
+};
+
 const parseAliasLineWithQuantity = (line) => {
     const cleanedLine = String(line || '')
         .replace(/^[\s\-•*]+/, '')
@@ -1738,6 +1817,21 @@ const processIncomingMessageWebhook = async (content) => {
         console.log('[WhatsApp webhook][OrderDraft] Sending total-to-pay message...');
         await sendMessageByChatId(recipientChatId, `К оплате ${totalToPay}`);
         console.log('[WhatsApp webhook][OrderDraft] Total-to-pay message sent');
+        const orderDraftPaymentSource = buildOrderDraftSourceDescription({
+            sourceText: `К оплате ${totalToPay}`,
+            bundleCode,
+            totalToPay
+        });
+        const sentPaymentConnection = await sendPlannedPaymentLinkAndTrack({
+            recipientChatId,
+            expectedAmount: totalToPay,
+            sourceDescription: orderDraftPaymentSource,
+            messageId: null
+        });
+        if (sentPaymentConnection) {
+            pendingOrderDraftByChatId.delete(recipientChatId);
+            console.log('[WhatsApp webhook][OrderDraft] Planned payment link sent immediately after total-to-pay message');
+        }
 
         console.log(
             `[WhatsApp webhook] Order draft accepted. QR deferred until payment. chatId=${recipientChatId}, items=${resolved.items.length}, total=${totalToPay}`
@@ -1760,20 +1854,6 @@ const processIncomingMessageWebhook = async (content) => {
             return;
         }
 
-        const plannedLink = await pickNextPaymentLinkByDispatchPlan();
-        if (!plannedLink) {
-            console.log('[WhatsApp webhook] Payment request detected, but there are no links from dispatch plan.');
-            return;
-        }
-
-        console.log(`[WhatsApp webhook] Sending planned payment link to ${recipientChatId}: ${plannedLink.url}`);
-        await sendMessageByChatId(recipientChatId, `${plannedLink.url}\n${PAYMENT_LINK_FOOTER}`);
-
-        const customerPhone = normalizePhoneNumber(recipientChatId);
-        if (!customerPhone) {
-            return null;
-        }
-
         const pendingDraft = expectedAmount === null ? null : getPendingOrderDraftIfMatches(recipientChatId, expectedAmount);
         const sourceDescription = pendingDraft
             ? buildOrderDraftSourceDescription({
@@ -1786,75 +1866,15 @@ const processIncomingMessageWebhook = async (content) => {
             console.log('[WhatsApp webhook][OrderDraft] Pending bundle linked to payment connection');
         }
 
-        const duplicateRecentConnection = await findRecentUnpaidPaymentConnection({
-            customerChatId: recipientChatId,
-            paymentLink: plannedLink.url,
-            expectedAmount
-        });
-        if (duplicateRecentConnection) {
-            const duplicateJson = duplicateRecentConnection.toJSON();
-            const hasBundleMeta = Boolean(parseOrderDraftSourceMeta(duplicateJson.sourceDescription)?.bundleCode);
-            if (pendingDraft && !hasBundleMeta) {
-                await duplicateRecentConnection.update({ sourceDescription });
-                console.log(
-                    `[WhatsApp webhook][OrderDraft] Reused recent connection #${duplicateJson.id} and attached deferred bundle metadata.`
-                );
-            } else {
-                console.log(
-                    `[WhatsApp webhook] Duplicate payment connection prevented: reused #${duplicateJson.id} for ${customerPhone}.`
-                );
-            }
-
-            if (pendingDraft) {
-                pendingOrderDraftByChatId.delete(recipientChatId);
-            }
-            return duplicateRecentConnection;
-        }
-
-        if (messageId) {
-            const [savedLink, created] = await SentPaymentLink.findOrCreate({
-                where: { messageId },
-                defaults: {
-                    messageId,
-                    customerPhone,
-                    customerChatId: recipientChatId,
-                    paymentLink: plannedLink.url,
-                    sourceDescription,
-                    expectedAmount
-                }
-            });
-
-            if (created) {
-                console.log(`[WhatsApp webhook] Planned payment link sent and saved by messageId ${messageId}: ${customerPhone} = ${plannedLink.url}`);
-                if (pendingDraft) {
-                    pendingOrderDraftByChatId.delete(recipientChatId);
-                }
-            } else {
-                console.log(`[WhatsApp webhook] Duplicate messageId ${messageId}, planned payment link was already processed.`);
-                if (pendingDraft && !parseOrderDraftSourceMeta(savedLink.sourceDescription)?.bundleCode) {
-                    await savedLink.update({ sourceDescription });
-                    console.log(`[WhatsApp webhook][OrderDraft] Added deferred bundle metadata to existing messageId ${messageId}.`);
-                }
-                if (pendingDraft) {
-                    pendingOrderDraftByChatId.delete(recipientChatId);
-                }
-            }
-
-            return savedLink;
-        }
-
-        const saved = await SentPaymentLink.create({
-            customerPhone,
-            customerChatId: recipientChatId,
-            paymentLink: plannedLink.url,
+        const saved = await sendPlannedPaymentLinkAndTrack({
+            recipientChatId,
+            expectedAmount,
             sourceDescription,
-            expectedAmount
+            messageId
         });
         if (pendingDraft) {
             pendingOrderDraftByChatId.delete(recipientChatId);
         }
-
-        console.log(`[WhatsApp webhook] Planned payment link sent and saved: ${customerPhone} = ${saved.paymentLink}`);
         return saved;
     }
 
