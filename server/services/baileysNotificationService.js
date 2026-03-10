@@ -651,6 +651,8 @@ const processSingleUpsertMessage = async (msg, upsertType) => {
         return;
     }
 
+    console.log('[Baileys][notification][raw]\n' + JSON.stringify(cloneSafe(msg), null, 2));
+
     const chatIdRaw = normalizeChatId(msg?.key?.remoteJid);
     const resolvedRemote = await resolvePnChatIdFromLidWithRetries(chatIdRaw, { msg, messageNode });
     const resolvedOwn = await resolvePnChatIdFromLidWithRetries(normalizeChatId(socket?.user?.id), { msg, messageNode });
