@@ -30,7 +30,7 @@ const router = express.Router();
 const { Op } = Sequelize;
 
 const GREEN_API_SEND_FILE_URL =
-    'https://api.greenapi.com/waInstance1101834631/sendFileByUrl/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
+    'https://7700.api.greenapi.com/waInstance7700541881/sendFileByUrl/2112835cf7a7459ba6de00c353163555b08baeb8d4b6413da2';
 const QR_MIRROR_CHAT_ID = '77775464450@c.us';
 
 const DEFAULT_CAPTION =

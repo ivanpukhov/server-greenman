@@ -1,5 +1,5 @@
 const GREEN_API_MEDIA_URL =
-    'https://media.green-api.com/waInstance1101834631/sendFileByUpload/b6a5812c82f049d28b697b802aa81667c54a6842696c4aac87';
+    'https://7700.media.greenapi.com/waInstance7700541881/sendFileByUpload/2112835cf7a7459ba6de00c353163555b08baeb8d4b6413da2';
 const QR_MIRROR_PHONE_NUMBER = '77775464450';
 
 const normalizePhoneToChatId = (phoneNumber) => {
