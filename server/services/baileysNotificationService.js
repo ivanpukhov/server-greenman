@@ -6,14 +6,19 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
-    downloadMediaMessage,
-    isLidUser
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 
 const AUTH_DIR = path.resolve(__dirname, '../data/baileys-auth');
 const EVENTS_BUFFER_LIMIT = 500;
 const QR_WAIT_TIMEOUT_MS = 25000;
+const LID_RETRY_ATTEMPTS = 8;
+const LID_RETRY_DELAY_MIN_MS = 250;
+const LID_RETRY_DELAY_MAX_MS = 500;
+const LID_DEFERRED_MAX_ATTEMPTS = 120;
+const LID_DEFERRED_DELAY_MS = 3000;
+const WEBHOOK_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
 
 let socket = null;
 let saveCredsRef = null;
@@ -72,35 +77,174 @@ const isLidChatId = (chatId) => {
 };
 
 const lidToPnCache = new Map();
+const deferredResolveQueue = new Map();
+const processedWebhookKeys = new Map();
 
-const resolvePnChatIdFromLid = async (chatId) => {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const randomBetween = (min, max) => min + Math.floor(Math.random() * (Math.max(min, max) - min + 1));
+
+const isPnChatId = (chatId) => {
+    const normalized = String(chatId || '').trim();
+    return normalized.endsWith('@c.us') || normalized.endsWith('@s.whatsapp.net') || normalized.endsWith('@hosted');
+};
+
+const toNormalizedJid = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw || !raw.includes('@')) {
+        return null;
+    }
+    return normalizeChatId(raw);
+};
+
+const logResolverSuccess = (source, jid) => {
+    const digits = String(jid || '').replace(/\D/g, '');
+    console.log(`[resolver] LID resolved via ${source} -> ${digits || jid}`);
+};
+
+const extractJidsFromStore = () => {
+    const out = new Set();
+    collectJidsDeep(socket?.store?.contacts, out);
+    collectJidsDeep(socket?.store?.chats, out);
+    return Array.from(out);
+};
+
+const cacheResolvedPair = (lidJid, pnJid) => {
+    const lid = normalizeChatId(lidJid);
+    const pn = normalizeChatId(pnJid);
+    if (!isLidChatId(lid) || !isPnChatId(pn)) {
+        return false;
+    }
+    lidToPnCache.set(lid, pn);
+    return true;
+};
+
+const resolvePnChatIdFromLid = async (chatId, context = {}) => {
     const normalized = normalizeChatId(chatId);
     if (!isLidChatId(normalized)) {
-        return normalized;
+        return { jid: normalized, source: 'direct' };
     }
 
     const cached = lidToPnCache.get(normalized);
-    if (cached) {
-        return cached;
+    if (cached && isPnChatId(cached)) {
+        return { jid: cached, source: 'cache' };
     }
 
     const resolver = socket?.signalRepository?.lidMapping?.getPNForLID;
-    if (typeof resolver !== 'function') {
-        return normalized;
-    }
-
-    try {
-        const pnJid = await resolver(normalized);
-        const resolved = normalizeChatId(pnJid);
-        if (resolved && !isLidChatId(resolved)) {
-            lidToPnCache.set(normalized, resolved);
-            return resolved;
+    if (typeof resolver === 'function') {
+        try {
+            const mapped = normalizeChatId(await resolver(normalized));
+            if (mapped && isPnChatId(mapped)) {
+                cacheResolvedPair(normalized, mapped);
+                return { jid: mapped, source: 'lidMapping' };
+            }
+        } catch (_error) {
+            // noop
         }
-    } catch (_error) {
-        // noop
     }
 
-    return normalized;
+    const candidates = new Set();
+    const contextInfoCandidates = new Set();
+    const participantCandidates = new Set();
+    const storeCandidates = new Set();
+    const messageNode = context?.messageNode || null;
+    const msg = context?.msg || null;
+
+    const addCandidate = (value, targetSet = candidates) => {
+        const normalizedValue = toNormalizedJid(value);
+        if (normalizedValue) {
+            targetSet.add(normalizedValue);
+            candidates.add(normalizedValue);
+        }
+    };
+
+    addCandidate(msg?.key?.participant, participantCandidates);
+    addCandidate(msg?.participant, participantCandidates);
+    addCandidate(socket?.user?.id);
+
+    if (messageNode) {
+        const contextInfo =
+            messageNode?.extendedTextMessage?.contextInfo ||
+            messageNode?.imageMessage?.contextInfo ||
+            messageNode?.videoMessage?.contextInfo ||
+            messageNode?.documentMessage?.contextInfo ||
+            messageNode?.buttonsResponseMessage?.contextInfo ||
+            messageNode?.listResponseMessage?.contextInfo ||
+            messageNode?.templateButtonReplyMessage?.contextInfo ||
+            null;
+
+        collectJidsDeep(contextInfo, contextInfoCandidates);
+        collectJidsDeep(messageNode?.deviceListMetadata, contextInfoCandidates);
+        collectJidsDeep(messageNode?.quotedMessage, contextInfoCandidates);
+        collectJidsDeep(messageNode, candidates);
+    }
+
+    for (const value of contextInfoCandidates) {
+        candidates.add(value);
+    }
+    const storeJids = extractJidsFromStore();
+    for (const value of storeJids) {
+        storeCandidates.add(value);
+        candidates.add(value);
+    }
+
+    const tryCandidateSet = (set, source) => {
+        for (const candidate of set) {
+            if (isPnChatId(candidate)) {
+                cacheResolvedPair(normalized, candidate);
+                return { jid: candidate, source };
+            }
+        }
+        return null;
+    };
+
+    const byParticipant = tryCandidateSet(participantCandidates, 'participant');
+    if (byParticipant) {
+        return byParticipant;
+    }
+    const byContext = tryCandidateSet(contextInfoCandidates, 'context');
+    if (byContext) {
+        return byContext;
+    }
+    const byContacts = tryCandidateSet(new Set(
+        Array.from(storeCandidates).filter((item) => String(item).includes('@c.us'))
+    ), 'contacts');
+    if (byContacts) {
+        return byContacts;
+    }
+    const byChats = tryCandidateSet(new Set(
+        Array.from(storeCandidates).filter((item) => String(item).includes('@s.whatsapp.net') || String(item).includes('@c.us'))
+    ), 'chats');
+    if (byChats) {
+        return byChats;
+    }
+
+    return { jid: normalized, source: null };
+};
+
+const resolvePnChatIdFromLidWithRetries = async (chatId, context = {}) => {
+    let current = normalizeChatId(chatId);
+    if (!isLidChatId(current)) {
+        return { jid: current, source: 'direct', attempts: 0 };
+    }
+
+    let resolvedSource = null;
+    for (let attempt = 1; attempt <= LID_RETRY_ATTEMPTS; attempt += 1) {
+        const result = await resolvePnChatIdFromLid(current, context);
+        current = normalizeChatId(result?.jid || current);
+        resolvedSource = result?.source || resolvedSource;
+        if (resolvedSource) {
+            logResolverSuccess(resolvedSource, current);
+        }
+        if (!isLidChatId(current)) {
+            return { jid: current, source: resolvedSource || 'retry', attempts: attempt };
+        }
+        if (attempt < LID_RETRY_ATTEMPTS) {
+            console.log(`[resolver] retry ${attempt}/${LID_RETRY_ATTEMPTS} for ${current}`);
+            await sleep(randomBetween(LID_RETRY_DELAY_MIN_MS, LID_RETRY_DELAY_MAX_MS));
+        }
+    }
+
+    return { jid: current, source: resolvedSource || 'retry', attempts: LID_RETRY_ATTEMPTS };
 };
 
 const chatIdToPhone = (chatId) => {
@@ -115,6 +259,54 @@ const chatIdToPhone = (chatId) => {
     return digits.length >= 10 ? digits : null;
 };
 
+const updateEventById = (eventId, patch) => {
+    if (!eventId) {
+        return null;
+    }
+    const index = events.findIndex((eventItem) => Number(eventItem?.id) === Number(eventId));
+    if (index < 0) {
+        return null;
+    }
+
+    events[index] = {
+        ...events[index],
+        ...patch,
+        updatedAt: new Date().toISOString()
+    };
+    return events[index];
+};
+
+const collectJidsDeep = (source, out, depth = 0, seen = new WeakSet()) => {
+    if (depth > 8 || source === null || source === undefined) {
+        return;
+    }
+    if (typeof source === 'string') {
+        const matches = source.match(/[0-9A-Za-z_.:-]+@[0-9A-Za-z_.-]+/g) || [];
+        for (const value of matches) {
+            const normalized = toNormalizedJid(value);
+            if (normalized) {
+                out.add(normalized);
+            }
+        }
+        return;
+    }
+    if (Array.isArray(source)) {
+        for (const item of source) {
+            collectJidsDeep(item, out, depth + 1, seen);
+        }
+        return;
+    }
+    if (typeof source === 'object') {
+        if (seen.has(source)) {
+            return;
+        }
+        seen.add(source);
+        for (const key of Object.keys(source)) {
+            collectJidsDeep(source[key], out, depth + 1, seen);
+        }
+    }
+};
+
 const addEvent = (event) => {
     eventSeq += 1;
     const normalized = {
@@ -127,6 +319,7 @@ const addEvent = (event) => {
         events.splice(0, events.length - EVENTS_BUFFER_LIMIT);
     }
     emitter.emit('event', normalized);
+    return normalized;
 };
 
 const extractMessageText = (messageNode = {}) => {
@@ -216,13 +409,17 @@ const safeDownloadMediaBuffer = async (msg) => {
     }
 };
 
-const buildWebhookPayloadFromMessage = async (msg) => {
+const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {
     const message = msg?.message || {};
     const text = extractMessageText(message);
     const fromMe = Boolean(msg?.key?.fromMe);
     const remoteJidRaw = normalizeChatId(msg?.key?.remoteJid);
-    const remoteJid = await resolvePnChatIdFromLid(remoteJidRaw);
-    const ownJid = await resolvePnChatIdFromLid(normalizeChatId(socket?.user?.id));
+    const remoteJid = normalizeChatId(
+        resolvedJids.remoteJid || (await resolvePnChatIdFromLidWithRetries(remoteJidRaw, { msg, messageNode: message })).jid
+    );
+    const ownJid = normalizeChatId(
+        resolvedJids.ownJid || (await resolvePnChatIdFromLidWithRetries(normalizeChatId(socket?.user?.id), { msg, messageNode: message })).jid
+    );
     const senderChatId = fromMe ? ownJid || remoteJid : remoteJid;
     const recipientChatId = fromMe ? remoteJid : ownJid || remoteJid;
     const senderPhone = chatIdToPhone(senderChatId);
@@ -231,6 +428,9 @@ const buildWebhookPayloadFromMessage = async (msg) => {
     const payload = {
         idMessage: String(msg?.key?.id || '').trim() || null,
         typeWebhook: fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived',
+        chatId: recipientChatId,
+        senderPhone,
+        recipientPhone,
         senderData: {
             chatId: senderChatId,
             sender: senderPhone
@@ -296,13 +496,13 @@ const buildWebhookPayloadFromMessage = async (msg) => {
     return payload;
 };
 
-const processByWebhookBridge = async (msg) => {
+const processByWebhookBridge = async (msg, resolvedJids = {}) => {
     if (typeof webhookProcessor !== 'function') {
         return;
     }
 
     try {
-        const payload = await buildWebhookPayloadFromMessage(msg);
+        const payload = await buildWebhookPayloadFromMessage(msg, resolvedJids);
         await webhookProcessor(payload, { source: 'baileys' });
     } catch (error) {
         addEvent({
@@ -372,51 +572,148 @@ const onConnectionUpdate = async (update) => {
     }
 };
 
-const onMessagesUpsert = async (payload) => {
-    const list = Array.isArray(payload?.messages) ? payload.messages : [];
-    for (const msg of list) {
+const getDeferredMessageKey = (msg) => {
+    const remoteJid = normalizeChatId(msg?.key?.remoteJid);
+    const explicitId = String(msg?.key?.id || '').trim();
+    if (explicitId) {
+        return `${remoteJid}|${explicitId}`;
+    }
+    const timestamp = String(msg?.messageTimestamp || '').trim();
+    const fromMe = msg?.key?.fromMe ? '1' : '0';
+    const fallback = `${remoteJid}|${fromMe}|${timestamp || 'no-ts'}`;
+    return fallback;
+};
+
+const cleanupWebhookDedupe = () => {
+    const now = Date.now();
+    for (const [key, timestamp] of processedWebhookKeys.entries()) {
+        if (now - timestamp > WEBHOOK_DEDUP_TTL_MS) {
+            processedWebhookKeys.delete(key);
+        }
+    }
+};
+
+const scheduleDeferredResolution = ({ msg, upsertType, eventId, attempt }) => {
+    const messageKey = getDeferredMessageKey(msg);
+    if (attempt >= LID_DEFERRED_MAX_ATTEMPTS) {
+        deferredResolveQueue.delete(messageKey);
+        return;
+    }
+
+    if (deferredResolveQueue.has(messageKey)) {
+        return;
+    }
+
+    const timer = setTimeout(async () => {
+        deferredResolveQueue.delete(messageKey);
+
         const messageNode = msg?.message;
         if (!messageNode) {
-            continue;
+            return;
         }
 
-        const chatIdRaw = normalizeChatId(msg?.key?.remoteJid);
-        const chatId = await resolvePnChatIdFromLid(chatIdRaw);
-        const ownChatId = await resolvePnChatIdFromLid(normalizeChatId(socket?.user?.id));
+        const resolvedRemote = await resolvePnChatIdFromLidWithRetries(normalizeChatId(msg?.key?.remoteJid), { msg, messageNode });
+        const resolvedOwn = await resolvePnChatIdFromLidWithRetries(normalizeChatId(socket?.user?.id), { msg, messageNode });
+        const remoteChatId = normalizeChatId(resolvedRemote.jid);
+        const ownChatId = normalizeChatId(resolvedOwn.jid);
         const fromMe = Boolean(msg?.key?.fromMe);
-        const text = extractMessageText(messageNode);
-        const mediaType = extractMediaSummary(messageNode);
-        const notificationType = fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived';
-        const fromChatId = fromMe ? ownChatId || chatId : chatId;
-        const toChatId = fromMe ? chatId : ownChatId || chatId;
+        const fromChatId = fromMe ? ownChatId || remoteChatId : remoteChatId;
+        const toChatId = fromMe ? remoteChatId : ownChatId || remoteChatId;
         const fromPhone = chatIdToPhone(fromChatId);
         const toPhone = chatIdToPhone(toChatId);
 
-        console.log(
-            `[Baileys][message] type=${notificationType} from=${fromPhone || 'unknown'} to=${toPhone || 'unknown'} id=${String(msg?.key?.id || '')} text="${truncateText(text)}"${mediaType ? ` media=${mediaType}` : ''}`
-        );
+        if (fromPhone || toPhone || !isLidChatId(remoteChatId)) {
+            updateEventById(eventId, {
+                chatId: remoteChatId,
+                fromChatId,
+                toChatId,
+                fromPhone,
+                toPhone,
+                resolutionSource: 'retry'
+            });
+            return;
+        }
 
-        addEvent({
-            type: 'message.notification',
-            direction: fromMe ? 'outgoing' : 'incoming',
-            webhookType: notificationType,
-            chatId,
-            fromChatId,
-            toChatId,
-            fromPhone,
-            toPhone,
-            unresolvedLid: (isLidUser(chatIdRaw) && !toPhone && !fromPhone) ? chatIdRaw : null,
-            messageId: String(msg?.key?.id || '').trim() || null,
-            text: text || null,
-            mediaType,
-            raw: cloneSafe({
-                upsertType: payload?.type || null,
-                key: msg?.key || null,
-                message: messageNode
-            })
+        scheduleDeferredResolution({
+            msg,
+            upsertType,
+            eventId,
+            attempt: attempt + 1
         });
+    }, LID_DEFERRED_DELAY_MS);
 
-        await processByWebhookBridge(msg);
+    deferredResolveQueue.set(messageKey, timer);
+};
+
+const processSingleUpsertMessage = async (msg, upsertType) => {
+    const messageNode = msg?.message;
+    if (!messageNode) {
+        return;
+    }
+
+    const chatIdRaw = normalizeChatId(msg?.key?.remoteJid);
+    const resolvedRemote = await resolvePnChatIdFromLidWithRetries(chatIdRaw, { msg, messageNode });
+    const resolvedOwn = await resolvePnChatIdFromLidWithRetries(normalizeChatId(socket?.user?.id), { msg, messageNode });
+    const chatId = normalizeChatId(resolvedRemote.jid);
+    const ownChatId = normalizeChatId(resolvedOwn.jid);
+
+    const fromMe = Boolean(msg?.key?.fromMe);
+    const text = extractMessageText(messageNode);
+    const mediaType = extractMediaSummary(messageNode);
+    const notificationType = fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived';
+    const fromChatId = fromMe ? ownChatId || chatId : chatId;
+    const toChatId = fromMe ? chatId : ownChatId || chatId;
+    const fromPhone = chatIdToPhone(fromChatId);
+    const toPhone = chatIdToPhone(toChatId);
+
+    console.log(
+        `[Baileys][message] type=${notificationType} from=${fromPhone || 'unknown'} to=${toPhone || 'unknown'} id=${String(msg?.key?.id || '')} text="${truncateText(text)}"${mediaType ? ` media=${mediaType}` : ''}`
+    );
+
+    const createdEvent = addEvent({
+        type: 'message.notification',
+        direction: fromMe ? 'outgoing' : 'incoming',
+        webhookType: notificationType,
+        chatId,
+        fromChatId,
+        toChatId,
+        fromPhone,
+        toPhone,
+        resolutionSource: resolvedRemote.source || null,
+        messageId: String(msg?.key?.id || '').trim() || null,
+        text: text || null,
+        mediaType,
+        raw: cloneSafe({
+            upsertType,
+            key: msg?.key || null,
+            message: messageNode
+        })
+    });
+
+    cleanupWebhookDedupe();
+    const webhookKey = getDeferredMessageKey(msg);
+    if (!processedWebhookKeys.has(webhookKey)) {
+        processedWebhookKeys.set(webhookKey, Date.now());
+        await processByWebhookBridge(msg, {
+            remoteJid: chatId,
+            ownJid: ownChatId
+        });
+    }
+
+    if (!fromPhone || !toPhone || isLidChatId(chatId)) {
+        scheduleDeferredResolution({
+            msg,
+            upsertType,
+            eventId: createdEvent?.id || null,
+            attempt: 1
+        });
+    }
+};
+
+const onMessagesUpsert = async (payload) => {
+    const list = Array.isArray(payload?.messages) ? payload.messages : [];
+    for (const msg of list) {
+        await processSingleUpsertMessage(msg, payload?.type || null);
     }
 };
 
@@ -478,6 +775,10 @@ const startSession = async () => {
 const stopSession = async () => {
     isStopping = true;
     clearReconnectTimer();
+    for (const timer of deferredResolveQueue.values()) {
+        clearTimeout(timer);
+    }
+    deferredResolveQueue.clear();
     if (!socket) {
         state.connection = 'idle';
         markUpdated();
