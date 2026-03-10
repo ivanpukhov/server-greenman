@@ -25,6 +25,7 @@ import PaymentLinkConnectionsPage from './PaymentLinkConnectionsPage';
 import AddExpensePage from './AddExpensePage';
 import AliasesPage from './AliasesPage';
 import WhatsAppTemplateTestPage from './WhatsAppTemplateTestPage';
+import WhatsAppConnectionPage from './WhatsAppConnectionPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import { adminAuthStorage } from './authProvider';
@@ -144,6 +145,12 @@ const AdminApp = () => {
             options={{ label: 'Администраторы' }}
             list={AdministratorsPage}
             icon={ManageAccountsOutlinedIcon}
+        />
+        <Resource
+            name="whatsapp-connection"
+            options={{ label: 'WhatsApp подключение' }}
+            list={WhatsAppConnectionPage}
+            icon={SmsOutlinedIcon}
         />
         <Resource
             name="whatsapp-templates"

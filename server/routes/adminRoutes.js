@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const adminController = require('../controllers/adminController');
+const adminWhatsAppController = require('../controllers/adminWhatsAppController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 
 const router = express.Router();
@@ -27,6 +28,10 @@ router.delete('/orders/:id', adminController.deleteOrder);
 router.post('/orders/:id/send-photo', orderPhotoUpload.single('file'), adminController.sendOrderPhoto);
 router.post('/whatsapp/test-template', adminController.testWhatsAppTemplate);
 router.post('/whatsapp/test-message', adminController.testWhatsAppTemplate);
+router.get('/whatsapp/baileys/status', adminWhatsAppController.getBaileysStatus);
+router.post('/whatsapp/baileys/qr', adminWhatsAppController.requestBaileysQr);
+router.post('/whatsapp/baileys/restart', adminWhatsAppController.restartBaileysSession);
+router.get('/whatsapp/baileys/events', adminWhatsAppController.getBaileysEvents);
 
 router.get('/analytics/dashboard', adminController.getDashboardAnalytics);
 router.get('/admins', adminController.getAdmins);

@@ -6,6 +6,7 @@
     "start": "nodemon app.js"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "add": "^2.0.6",
     "axios": "^1.6.2",
     "bcrypt": "^5.1.1",
@@ -25,6 +26,7 @@
     "openai": "^4.20.1",
     "pdf-parse": "1.1.1",
     "pug": "2.0.0-beta11",
+    "qrcode": "^1.5.4",
     "react-loader-spinner": "^6.1.6",
     "sequelize": "^6.35.1",
     "sqlite3": "^5.1.6",

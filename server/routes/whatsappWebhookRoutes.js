@@ -1935,16 +1935,16 @@ const processIncomingMessageWebhook = async (content) => {
     return saved;
 };
 
-router.post('/', async (req, res) => {
-    const content = req.body || {};
-    console.log('[WhatsApp webhook] Incoming request:\n' + safeStringify({
-        method: req.method,
-        url: req.originalUrl,
-        headers: req.headers,
-        query: req.query,
-        body: content
-    }));
-
+const processWebhookContent = async (content, meta = {}) => {
+    if (meta?.logRequest) {
+        console.log('[WhatsApp webhook] Incoming request:\n' + safeStringify({
+            method: meta.method || null,
+            url: meta.url || null,
+            headers: meta.headers || null,
+            query: meta.query || null,
+            body: content
+        }));
+    }
     try {
         await trackIncomingMessageAndSendGreetingIfNeeded(content);
         await processIncomingAdminExpenseWebhook(content);
@@ -1953,6 +1953,18 @@ router.post('/', async (req, res) => {
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to process incoming message webhook:', error.response?.data || error.message);
     }
+
+};
+
+router.post('/', async (req, res) => {
+    const content = req.body || {};
+    await processWebhookContent(content, {
+        logRequest: true,
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query
+    });
 
     const search = 'videoMessage';
     if (!JSON.stringify(content).includes(search)) {
@@ -1990,3 +2002,4 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.processWebhookContent = processWebhookContent;
