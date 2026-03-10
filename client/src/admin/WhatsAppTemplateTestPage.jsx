@@ -1,39 +1,15 @@
 import { useState } from 'react';
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
-const DEFAULT_COMPONENTS = JSON.stringify(
-    [
-        {
-            type: 'body',
-            parameters: [
-                {
-                    type: 'text',
-                    text: 'AP238974283KZ'
-                },
-                {
-                    type: 'text',
-                    text: 'https://track.greenman.kz/AP238974283KZ'
-                }
-            ]
-        },
-        {
-            type: 'button',
-            sub_type: 'URL',
-            index: '0',
-            parameters: [
-                {
-                    type: 'text',
-                    text: 'AP238974283KZ'
-                }
-            ]
-        }
-    ],
-    null,
-    2
-);
+const MESSAGE_TYPE_OPTIONS = [
+    { value: 'text', label: 'Текстовое сообщение' },
+    { value: 'agree_template', label: 'Шаблон agree' },
+    { value: 'auth_template', label: 'Шаблон auth' },
+    { value: 'order_tracking_template', label: 'Шаблон order_tracking' }
+];
 
 const WhatsAppTemplateTestPage = () => {
     const notify = useNotify();
@@ -41,9 +17,7 @@ const WhatsAppTemplateTestPage = () => {
     const [result, setResult] = useState(null);
     const [form, setForm] = useState({
         phoneNumber: '',
-        templateName: 'order_tracking',
-        languageCode: 'ru',
-        componentsText: DEFAULT_COMPONENTS
+        messageType: MESSAGE_TYPE_OPTIONS[0].value
     });
 
     const submit = async (event) => {
@@ -53,33 +27,16 @@ const WhatsAppTemplateTestPage = () => {
         }
 
         const phoneNumber = String(form.phoneNumber || '').trim();
-        const templateName = String(form.templateName || '').trim();
-        const languageCode = String(form.languageCode || 'ru').trim() || 'ru';
+        const messageType = String(form.messageType || '').trim();
 
         if (!phoneNumber) {
             notify('Укажите номер телефона', { type: 'warning' });
             return;
         }
 
-        if (!templateName) {
-            notify('Укажите имя шаблона', { type: 'warning' });
+        if (!messageType) {
+            notify('Выберите тип сообщения', { type: 'warning' });
             return;
-        }
-
-        let components = [];
-        const componentsText = String(form.componentsText || '').trim();
-        if (componentsText) {
-            try {
-                const parsed = JSON.parse(componentsText);
-                if (!Array.isArray(parsed)) {
-                    notify('Components должен быть JSON-массивом', { type: 'warning' });
-                    return;
-                }
-                components = parsed;
-            } catch (_error) {
-                notify('Components содержит невалидный JSON', { type: 'warning' });
-                return;
-            }
         }
 
         setSending(true);
@@ -94,9 +51,7 @@ const WhatsAppTemplateTestPage = () => {
                 },
                 body: JSON.stringify({
                     phoneNumber,
-                    templateName,
-                    languageCode,
-                    components
+                    messageType
                 })
             });
 
@@ -106,7 +61,7 @@ const WhatsAppTemplateTestPage = () => {
             }
 
             setResult(body.data || null);
-            notify('Шаблон отправлен', { type: 'success' });
+            notify('Сообщение отправлено', { type: 'success' });
         } catch (error) {
             notify(error.message, { type: 'error' });
         } finally {
@@ -124,9 +79,9 @@ const WhatsAppTemplateTestPage = () => {
                     background: 'linear-gradient(135deg, rgba(19,111,99,0.16) 0%, rgba(31,154,96,0.12) 100%)'
                 }}
             >
-                <Typography variant="h5">Тест шаблонов WhatsApp</Typography>
+                <Typography variant="h5">Тест сообщений WhatsApp</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Отправка любого template-сообщения через 360dialog на любой номер.
+                    Выберите тип из доступных в системе, укажите номер и отправьте тест.
                 </Typography>
             </Box>
 
@@ -143,32 +98,23 @@ const WhatsAppTemplateTestPage = () => {
                                 required
                             />
                             <TextField
-                                label="Имя шаблона"
-                                value={form.templateName}
-                                onChange={(event) => setForm((prev) => ({ ...prev, templateName: event.target.value }))}
-                                sx={{ minWidth: 240 }}
+                                label="Тип сообщения"
+                                value={form.messageType}
+                                onChange={(event) => setForm((prev) => ({ ...prev, messageType: event.target.value }))}
+                                select
+                                sx={{ minWidth: 280 }}
                                 required
-                            />
-                            <TextField
-                                label="Язык"
-                                value={form.languageCode}
-                                onChange={(event) => setForm((prev) => ({ ...prev, languageCode: event.target.value }))}
-                                sx={{ minWidth: 140 }}
-                                required
-                            />
+                            >
+                                {MESSAGE_TYPE_OPTIONS.map((option) => (
+                                    <MenuItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
                         </Stack>
 
-                        <TextField
-                            label="Components (JSON array)"
-                            value={form.componentsText}
-                            onChange={(event) => setForm((prev) => ({ ...prev, componentsText: event.target.value }))}
-                            fullWidth
-                            multiline
-                            minRows={12}
-                        />
-
                         <Button type="submit" variant="contained" disabled={sending} sx={{ alignSelf: 'flex-start' }}>
-                            Отправить тестовый шаблон
+                            Отправить
                         </Button>
                     </Stack>
                 </Box>
@@ -176,7 +122,7 @@ const WhatsAppTemplateTestPage = () => {
 
             {result ? (
                 <Alert severity="success" sx={{ borderRadius: 2 }}>
-                    Отправлено на {result.phoneNumber} шаблоном <strong>{result.templateName}</strong>
+                    Отправлено на {result.phoneNumber}. Тип: <strong>{result.messageType}</strong>
                     <Box component="pre" sx={{ mt: 1, mb: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>
                         {JSON.stringify(result.providerResponse || {}, null, 2)}
                     </Box>

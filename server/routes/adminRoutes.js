@@ -26,6 +26,7 @@ router.put('/orders/:id', adminController.updateOrder);
 router.delete('/orders/:id', adminController.deleteOrder);
 router.post('/orders/:id/send-photo', orderPhotoUpload.single('file'), adminController.sendOrderPhoto);
 router.post('/whatsapp/test-template', adminController.testWhatsAppTemplate);
+router.post('/whatsapp/test-message', adminController.testWhatsAppTemplate);
 
 router.get('/analytics/dashboard', adminController.getDashboardAnalytics);
 router.get('/admins', adminController.getAdmins);

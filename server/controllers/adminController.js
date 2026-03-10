@@ -1357,45 +1357,104 @@ const adminController = {
     async testWhatsAppTemplate(req, res) {
         try {
             const phoneNumber = String(req.body?.phoneNumber || '').trim();
-            const templateName = String(req.body?.templateName || '').trim();
-            const languageCode = String(req.body?.languageCode || 'ru').trim() || 'ru';
-            const rawComponents = req.body?.components;
+            const messageType = String(req.body?.messageType || '').trim();
+            const defaultTrackingNumber = 'AP238974283KZ';
+            const defaultAuthCode = '123456';
 
             if (!phoneNumber) {
                 return res.status(400).json({ message: 'Укажите номер телефона получателя' });
             }
 
-            if (!templateName) {
-                return res.status(400).json({ message: 'Укажите имя шаблона' });
+            if (!messageType) {
+                return res.status(400).json({ message: 'Выберите тип сообщения' });
             }
 
-            let components = [];
-            if (rawComponents !== undefined && rawComponents !== null && rawComponents !== '') {
-                if (!Array.isArray(rawComponents)) {
-                    return res.status(400).json({ message: 'Поле components должно быть массивом JSON' });
-                }
-                components = rawComponents;
+            let providerResponse = null;
+            if (messageType === 'text') {
+                providerResponse = await sendNotification(phoneNumber, 'Тестовое сообщение Greenman', { enforce24h: false });
+            } else if (messageType === 'agree_template') {
+                providerResponse = await sendTemplateByName(phoneNumber, 'agree', {
+                    languageCode: 'ru',
+                    components: [],
+                    raiseErrors: true
+                });
+            } else if (messageType === 'auth_template') {
+                providerResponse = await sendTemplateByName(phoneNumber, 'auth', {
+                    languageCode: 'ru',
+                    components: [
+                        {
+                            type: 'body',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: defaultAuthCode
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            sub_type: 'URL',
+                            index: '0',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: defaultAuthCode
+                                }
+                            ]
+                        }
+                    ],
+                    raiseErrors: true
+                });
+            } else if (messageType === 'order_tracking_template') {
+                providerResponse = await sendTemplateByName(phoneNumber, 'order_tracking', {
+                    languageCode: 'ru',
+                    components: [
+                        {
+                            type: 'body',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: defaultTrackingNumber
+                                },
+                                {
+                                    type: 'text',
+                                    text: `https://track.greenman.kz/${defaultTrackingNumber}`
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            sub_type: 'URL',
+                            index: '0',
+                            parameters: [
+                                {
+                                    type: 'text',
+                                    text: defaultTrackingNumber
+                                }
+                            ]
+                        }
+                    ],
+                    raiseErrors: true
+                });
+            } else {
+                return res.status(400).json({ message: 'Неизвестный тип сообщения' });
             }
 
-            const providerResponse = await sendTemplateByName(phoneNumber, templateName, {
-                languageCode,
-                components,
-                raiseErrors: true
-            });
+            if (!providerResponse) {
+                return res.status(502).json({ message: 'Провайдер не вернул успешный ответ' });
+            }
 
             return res.json({
                 data: {
                     phoneNumber,
-                    templateName,
-                    languageCode,
-                    components,
+                    messageType,
                     providerResponse
                 }
             });
         } catch (error) {
             logError('adminController.testWhatsAppTemplate', error, {
                 phoneNumber: req.body?.phoneNumber || null,
-                templateName: req.body?.templateName || null
+                messageType: req.body?.messageType || null
             });
             return res.status(500).json({
                 message: 'Не удалось отправить шаблон WhatsApp',
