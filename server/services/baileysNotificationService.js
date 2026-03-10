@@ -6,7 +6,8 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
-    downloadMediaMessage
+    downloadMediaMessage,
+    isLidUser
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 
@@ -65,13 +66,53 @@ const normalizeChatId = (jid) => {
     return sanitized;
 };
 
+const isLidChatId = (chatId) => {
+    const normalized = String(chatId || '').trim();
+    return normalized.endsWith('@lid') || normalized.endsWith('@hosted.lid');
+};
+
+const lidToPnCache = new Map();
+
+const resolvePnChatIdFromLid = async (chatId) => {
+    const normalized = normalizeChatId(chatId);
+    if (!isLidChatId(normalized)) {
+        return normalized;
+    }
+
+    const cached = lidToPnCache.get(normalized);
+    if (cached) {
+        return cached;
+    }
+
+    const resolver = socket?.signalRepository?.lidMapping?.getPNForLID;
+    if (typeof resolver !== 'function') {
+        return normalized;
+    }
+
+    try {
+        const pnJid = await resolver(normalized);
+        const resolved = normalizeChatId(pnJid);
+        if (resolved && !isLidChatId(resolved)) {
+            lidToPnCache.set(normalized, resolved);
+            return resolved;
+        }
+    } catch (_error) {
+        // noop
+    }
+
+    return normalized;
+};
+
 const chatIdToPhone = (chatId) => {
     const value = String(chatId || '').trim();
     if (!value) {
         return null;
     }
+    if (isLidChatId(value)) {
+        return null;
+    }
     const digits = value.replace(/\D/g, '');
-    return digits || null;
+    return digits.length >= 10 ? digits : null;
 };
 
 const addEvent = (event) => {
@@ -179,8 +220,9 @@ const buildWebhookPayloadFromMessage = async (msg) => {
     const message = msg?.message || {};
     const text = extractMessageText(message);
     const fromMe = Boolean(msg?.key?.fromMe);
-    const remoteJid = normalizeChatId(msg?.key?.remoteJid);
-    const ownJid = normalizeChatId(socket?.user?.id);
+    const remoteJidRaw = normalizeChatId(msg?.key?.remoteJid);
+    const remoteJid = await resolvePnChatIdFromLid(remoteJidRaw);
+    const ownJid = await resolvePnChatIdFromLid(normalizeChatId(socket?.user?.id));
     const senderChatId = fromMe ? ownJid || remoteJid : remoteJid;
     const recipientChatId = fromMe ? remoteJid : ownJid || remoteJid;
     const senderPhone = chatIdToPhone(senderChatId);
@@ -338,8 +380,9 @@ const onMessagesUpsert = async (payload) => {
             continue;
         }
 
-        const chatId = normalizeChatId(msg?.key?.remoteJid);
-        const ownChatId = normalizeChatId(socket?.user?.id);
+        const chatIdRaw = normalizeChatId(msg?.key?.remoteJid);
+        const chatId = await resolvePnChatIdFromLid(chatIdRaw);
+        const ownChatId = await resolvePnChatIdFromLid(normalizeChatId(socket?.user?.id));
         const fromMe = Boolean(msg?.key?.fromMe);
         const text = extractMessageText(messageNode);
         const mediaType = extractMediaSummary(messageNode);
@@ -350,7 +393,7 @@ const onMessagesUpsert = async (payload) => {
         const toPhone = chatIdToPhone(toChatId);
 
         console.log(
-            `[Baileys][message] type=${notificationType} from=${fromPhone || fromChatId} to=${toPhone || toChatId} id=${String(msg?.key?.id || '')} text="${truncateText(text)}"${mediaType ? ` media=${mediaType}` : ''}`
+            `[Baileys][message] type=${notificationType} from=${fromPhone || 'unknown'} to=${toPhone || 'unknown'} id=${String(msg?.key?.id || '')} text="${truncateText(text)}"${mediaType ? ` media=${mediaType}` : ''}`
         );
 
         addEvent({
@@ -362,6 +405,7 @@ const onMessagesUpsert = async (payload) => {
             toChatId,
             fromPhone,
             toPhone,
+            unresolvedLid: (isLidUser(chatIdRaw) && !toPhone && !fromPhone) ? chatIdRaw : null,
             messageId: String(msg?.key?.id || '').trim() || null,
             text: text || null,
             mediaType,

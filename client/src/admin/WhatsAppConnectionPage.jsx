@@ -269,7 +269,12 @@ const WhatsAppConnectionPage = () => {
                                 </Stack>
                                 {(event.fromPhone || event.toPhone || event.fromChatId || event.toChatId) ? (
                                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.6, display: 'block' }}>
-                                        {`От: ${event.fromPhone || event.fromChatId || '—'} → Кому: ${event.toPhone || event.toChatId || '—'}`}
+                                        {`От: ${event.fromPhone || 'не определен'} → Кому: ${event.toPhone || 'не определен'}`}
+                                    </Typography>
+                                ) : null}
+                                {event.unresolvedLid ? (
+                                    <Typography variant="caption" color="warning.main" sx={{ mt: 0.3, display: 'block' }}>
+                                        {`LID без PN-маппинга: ${event.unresolvedLid}`}
                                     </Typography>
                                 ) : null}
                                 {event.text ? (
