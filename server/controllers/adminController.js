@@ -11,7 +11,7 @@ const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
-const { sendTemplateByName } = sendNotification;
+const { sendTemplateByName, sendOrderTrackingTemplate, sendAuthTemplate } = sendNotification;
 const { logError } = require('../utilities/errorLogger');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone, normalizeAdminIin } = require('../utilities/adminUsers');
 const {
@@ -33,6 +33,43 @@ const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Дос
 const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
 const EXCLUDED_ACCOUNT_NAME_TOKENS = new Set(['иван', 'даша']);
 const ORDER_BUNDLE_CODE_REGEX = /^ob_[A-Za-z0-9]{6,24}$/;
+const PAYMENT_LINK_FOOTER =
+    'После оплаты скиньте пожалуйста чек\n‼️Без чека отправки не будет';
+const INCOMING_MESSAGE_GREETING =
+    'Вас приветствует команда травника Greenman 🌿\n\n' +
+    '‼️Чтобы получить качественную консультацию и быстро оформить заказ,          внимательно заполните анкету.\n\n' +
+    '📋 Для консультации по подбору трав укажите:\n\n' +
+    '1️⃣ Возраст\n' +
+    '2️⃣ Вес\n' +
+    '3️⃣ Хронические заболевания\n' +
+    '4️⃣ Что вас беспокоит\n' +
+    '5️⃣ Поставленный диагноз\n' +
+    '6️⃣ Результаты обследований (УЗИ, анализы и др.)\n\n' +
+    '📎 Если есть обследования — прикрепляйте сразу.\n' +
+    '❗️Особенно важно чётко указать диагноз.\n\n' +
+    '⸻\n\n' +
+    '📦 Для отправки заказа по почте сразу оставьте:\n\n' +
+    '• Фамилия, имя, отчество\n' +
+    '• Город\n' +
+    '• Полный адрес\n' +
+    '• Индекс почтового отделения\n' +
+    '• Номер телефона\n\n' +
+    '⸻\n\n' +
+    '🛒 Если консультация не нужна и вы уже определились:\n\n' +
+    'Обязательно укажите:\n\n' +
+    '• Название продукции\n' +
+    '• Форму — на мёду / на водно-спиртовой основе / в пакетиках для заваривания\n' +
+    '• Количество\n' +
+    '• Данные для отправки\n\n' +
+    'Также вы можете оформить заказ напрямую на сайте:\n' +
+    '🌍 Сайт для Казахстана\n' +
+    'https://greenman.kz\n\n' +
+    '🌍 Сайт для России\n' +
+    'https://green-man.ru \n\n' +
+    '⸻\n\n' +
+    '⏳ Отвечаем в порядке очереди. В будние дни с 9-17часов\n\n' +
+    '➡️Запросов на консультацию много, поэтому, чтобы вас обслужили быстрее — заполните анкету максимально полно и понятно.\n\n' +
+    'В освободившееся окно мы свяжемся с вами, подберём индивидуальный курс и отправим посылку 🌿';
 
 const filterRestrictedAdmins = (items, currentAdminPhone, getItemPhone) => {
     return items.filter((item) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, getItemPhone(item)));
@@ -1360,6 +1397,44 @@ const adminController = {
             const messageType = String(req.body?.messageType || '').trim();
             const defaultTrackingNumber = 'AP238974283KZ';
             const defaultAuthCode = '123456';
+            const sampleTotalPrice = 15900;
+            const sampleStatus = 'Отправлено';
+            const samplePaymentLink = 'https://pay.example.com/test';
+
+            const siteOrderDetailsMessage = `
+Имя и Фамилия: *Тест Клиент*
+Номер телефона: *77073670497*
+Номер телефона Kaspi: *77073670497*
+Город: *Алматы*
+Адрес: *Абая, 10*
+Почтовый индекс: *050000*
+Метод доставки: *Казпочта*
+Метод оплаты: *Kaspi*
+Итоговая сумма: *${sampleTotalPrice}* тенге
+
+*Товары*:
+
+Название: Тестовый товар
+Тип: Настойка
+Количество: 1
+`;
+            const adminOrderDetailsMessage = `
+Имя и Фамилия: *Тест Клиент*
+Номер телефона: *77073670497*
+Номер телефона Kaspi: *77073670497*
+Город: *Алматы*
+Адрес: *Абая, 10*
+Почтовый индекс: *050000*
+Метод доставки: *Казпочта*
+Метод оплаты: *link*
+Итоговая сумма: *${sampleTotalPrice}* тенге
+
+*Товары*:
+
+Название: Тестовый товар
+Тип: Настойка
+Количество: 1
+`;
 
             if (!phoneNumber) {
                 return res.status(400).json({ message: 'Укажите номер телефона получателя' });
@@ -1370,8 +1445,46 @@ const adminController = {
             }
 
             let providerResponse = null;
-            if (messageType === 'text') {
-                providerResponse = await sendNotification(phoneNumber, 'Тестовое сообщение Greenman', { enforce24h: false });
+            if (messageType === 'order_created_details_site_text') {
+                providerResponse = await sendNotification(phoneNumber, siteOrderDetailsMessage, { enforce24h: false });
+            } else if (messageType === 'order_created_details_admin_text') {
+                providerResponse = await sendNotification(phoneNumber, adminOrderDetailsMessage, { enforce24h: false });
+            } else if (messageType === 'order_created_payment_instruction_text') {
+                providerResponse = await sendNotification(
+                    phoneNumber,
+                    `Ваш заказ создан. Оплатите счет на сумму *${sampleTotalPrice}* тенге в приложении Каспи.`,
+                    { enforce24h: false }
+                );
+            } else if (messageType === 'order_status_changed_text') {
+                providerResponse = await sendNotification(
+                    phoneNumber,
+                    `Статус вашего заказа изменен на: ${sampleStatus}`,
+                    { enforce24h: false }
+                );
+            } else if (messageType === 'incoming_greeting_text') {
+                providerResponse = await sendNotification(phoneNumber, INCOMING_MESSAGE_GREETING, { enforce24h: false });
+            } else if (messageType === 'admin_expense_added_text') {
+                providerResponse = await sendNotification(phoneNumber, 'Расход добавлен: 5000 ₸\nНа что: Тестовая категория', {
+                    enforce24h: false
+                });
+            } else if (messageType === 'order_draft_unknown_aliases_text') {
+                providerResponse = await sendNotification(phoneNumber, 'Не найдены псевдонимы: тест1, тест2', { enforce24h: false });
+            } else if (messageType === 'order_draft_empty_items_text') {
+                providerResponse = await sendNotification(phoneNumber, 'Не удалось собрать заказ: список товаров пуст.', {
+                    enforce24h: false
+                });
+            } else if (messageType === 'order_draft_total_to_pay_text') {
+                providerResponse = await sendNotification(phoneNumber, `К оплате ${sampleTotalPrice}`, { enforce24h: false });
+            } else if (messageType === 'payment_link_with_footer_text') {
+                providerResponse = await sendNotification(phoneNumber, `${samplePaymentLink}\n${PAYMENT_LINK_FOOTER}`, {
+                    enforce24h: false
+                });
+            } else if (messageType === 'order_draft_auto_create_failed_text') {
+                providerResponse = await sendNotification(
+                    phoneNumber,
+                    'Не удалось автоматически создать заказ после оплаты: test error',
+                    { enforce24h: false }
+                );
             } else if (messageType === 'agree_template') {
                 providerResponse = await sendTemplateByName(phoneNumber, 'agree', {
                     languageCode: 'ru',
@@ -1379,63 +1492,9 @@ const adminController = {
                     raiseErrors: true
                 });
             } else if (messageType === 'auth_template') {
-                providerResponse = await sendTemplateByName(phoneNumber, 'auth', {
-                    languageCode: 'ru',
-                    components: [
-                        {
-                            type: 'body',
-                            parameters: [
-                                {
-                                    type: 'text',
-                                    text: defaultAuthCode
-                                }
-                            ]
-                        },
-                        {
-                            type: 'button',
-                            sub_type: 'URL',
-                            index: '0',
-                            parameters: [
-                                {
-                                    type: 'text',
-                                    text: defaultAuthCode
-                                }
-                            ]
-                        }
-                    ],
-                    raiseErrors: true
-                });
+                providerResponse = await sendAuthTemplate(phoneNumber, defaultAuthCode);
             } else if (messageType === 'order_tracking_template') {
-                providerResponse = await sendTemplateByName(phoneNumber, 'order_tracking', {
-                    languageCode: 'ru',
-                    components: [
-                        {
-                            type: 'body',
-                            parameters: [
-                                {
-                                    type: 'text',
-                                    text: defaultTrackingNumber
-                                },
-                                {
-                                    type: 'text',
-                                    text: `https://track.greenman.kz/${defaultTrackingNumber}`
-                                }
-                            ]
-                        },
-                        {
-                            type: 'button',
-                            sub_type: 'URL',
-                            index: '0',
-                            parameters: [
-                                {
-                                    type: 'text',
-                                    text: defaultTrackingNumber
-                                }
-                            ]
-                        }
-                    ],
-                    raiseErrors: true
-                });
+                providerResponse = await sendOrderTrackingTemplate(phoneNumber, defaultTrackingNumber);
             } else {
                 return res.status(400).json({ message: 'Неизвестный тип сообщения' });
             }

@@ -5,7 +5,17 @@ import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
 const MESSAGE_TYPE_OPTIONS = [
-    { value: 'text', label: 'Текстовое сообщение' },
+    { value: 'order_created_details_site_text', label: 'Заказ создан (детали, сайт)' },
+    { value: 'order_created_details_admin_text', label: 'Заказ создан (детали, админка)' },
+    { value: 'order_created_payment_instruction_text', label: 'Заказ создан (инструкция оплаты)' },
+    { value: 'order_status_changed_text', label: 'Изменение статуса заказа' },
+    { value: 'incoming_greeting_text', label: 'Приветственное сообщение (webhook)' },
+    { value: 'admin_expense_added_text', label: 'Расход добавлен (webhook)' },
+    { value: 'order_draft_unknown_aliases_text', label: 'Не найдены псевдонимы (webhook)' },
+    { value: 'order_draft_empty_items_text', label: 'Пустой список товаров (webhook)' },
+    { value: 'order_draft_total_to_pay_text', label: 'К оплате (webhook)' },
+    { value: 'payment_link_with_footer_text', label: 'Ссылка на оплату + футер (webhook)' },
+    { value: 'order_draft_auto_create_failed_text', label: 'Ошибка автосоздания заказа (webhook)' },
     { value: 'agree_template', label: 'Шаблон agree' },
     { value: 'auth_template', label: 'Шаблон auth' },
     { value: 'order_tracking_template', label: 'Шаблон order_tracking' }
