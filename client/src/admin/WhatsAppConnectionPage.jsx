@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
 import AutorenewOutlinedIcon from '@mui/icons-material/AutorenewOutlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import { useNotify } from 'react-admin';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
@@ -33,6 +34,7 @@ const WhatsAppConnectionPage = () => {
     const [status, setStatus] = useState(null);
     const [loadingQr, setLoadingQr] = useState(false);
     const [restarting, setRestarting] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
     const [events, setEvents] = useState([]);
     const [errorText, setErrorText] = useState('');
     const maxEventIdRef = useRef(0);
@@ -118,6 +120,24 @@ const WhatsAppConnectionPage = () => {
         }
     };
 
+    const handleLogout = async () => {
+        if (loggingOut) return;
+        setLoggingOut(true);
+        setErrorText('');
+        try {
+            const body = await authorizedFetch(apiUrl('/admin/whatsapp/baileys/logout'), {
+                method: 'POST'
+            });
+            setStatus(body.data || null);
+            notify('WhatsApp разлогинен', { type: 'success' });
+        } catch (error) {
+            setErrorText(error.message);
+            notify(error.message, { type: 'error' });
+        } finally {
+            setLoggingOut(false);
+        }
+    };
+
     useEffect(() => {
         let cancelled = false;
 
@@ -200,6 +220,15 @@ const WhatsAppConnectionPage = () => {
                             startIcon={<AutorenewOutlinedIcon />}
                         >
                             Перезапустить
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={handleLogout}
+                            disabled={loggingOut}
+                            startIcon={<LogoutOutlinedIcon />}
+                        >
+                            Разлогинить
                         </Button>
                     </Stack>
 

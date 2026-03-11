@@ -195,6 +195,7 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
 
 const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
     const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
+    const captionText = String(fileName || 'Видео').trim() || 'Видео';
     const form = new FormData();
     form.append('file', mediaBuffer, {
         filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
@@ -236,7 +237,7 @@ const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl =
         type: 'video',
         video: {
             id: mediaId,
-            caption: safeFileName
+            caption: captionText
         }
     };
 
@@ -2056,6 +2057,7 @@ const processIncomingVideoMessageWebhook = async (content) => {
             if (!mediaBuffer || mediaBuffer.length === 0) {
                 throw new Error('Video base64 buffer is empty');
             }
+            console.log('[WhatsApp webhook][video] forward source=baileys-buffer');
             await sendVideoBufferTo360Dialog(mediaBuffer, to, fileName, downloadUrl);
             return;
         } catch (error) {
@@ -2065,6 +2067,7 @@ const processIncomingVideoMessageWebhook = async (content) => {
 
     if (downloadUrl) {
         try {
+            console.log('[WhatsApp webhook][video] forward source=url-fallback');
             await sendFileByUrl(downloadUrl, to, fileName);
         } catch (error) {
             console.error('Failed to send file by url:', error.response?.data || error.message);

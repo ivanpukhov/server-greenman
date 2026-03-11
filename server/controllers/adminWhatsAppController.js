@@ -38,6 +38,20 @@ module.exports = {
         }
     },
 
+    async logoutBaileysSession(_req, res) {
+        try {
+            await baileysService.logoutSession();
+            return res.json({
+                data: baileysService.getStatus()
+            });
+        } catch (error) {
+            return res.status(500).json({
+                message: 'Не удалось разлогинить WhatsApp Baileys',
+                error: error.message
+            });
+        }
+    },
+
     async getBaileysEvents(req, res) {
         const sinceId = Number(req.query?.sinceId || 0);
         const limit = Number(req.query?.limit || 100);

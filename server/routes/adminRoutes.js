@@ -31,6 +31,7 @@ router.post('/whatsapp/test-message', adminController.testWhatsAppTemplate);
 router.get('/whatsapp/baileys/status', adminWhatsAppController.getBaileysStatus);
 router.post('/whatsapp/baileys/qr', adminWhatsAppController.requestBaileysQr);
 router.post('/whatsapp/baileys/restart', adminWhatsAppController.restartBaileysSession);
+router.post('/whatsapp/baileys/logout', adminWhatsAppController.logoutBaileysSession);
 router.get('/whatsapp/baileys/events', adminWhatsAppController.getBaileysEvents);
 
 router.get('/analytics/dashboard', adminController.getDashboardAnalytics);

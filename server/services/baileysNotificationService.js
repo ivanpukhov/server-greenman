@@ -898,6 +898,47 @@ const stopSession = async () => {
     markUpdated();
 };
 
+const clearAuthState = () => {
+    try {
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    } catch (_error) {
+        // noop
+    }
+};
+
+const logoutSession = async () => {
+    isStopping = true;
+    clearReconnectTimer();
+    for (const timer of deferredResolveQueue.values()) {
+        clearTimeout(timer);
+    }
+    deferredResolveQueue.clear();
+
+    if (socket) {
+        try {
+            if (typeof socket.logout === 'function') {
+                await socket.logout();
+            } else {
+                socket.end(new Error('manual-logout'));
+            }
+        } catch (_error) {
+            // noop
+        }
+    }
+
+    socket = null;
+    saveCredsRef = null;
+    clearAuthState();
+
+    state.connection = 'idle';
+    state.qr = null;
+    state.qrImageDataUrl = null;
+    state.lastError = null;
+    state.lastDisconnectReason = null;
+    state.startedAt = null;
+    markUpdated();
+};
+
 const waitForQr = async (timeoutMs = QR_WAIT_TIMEOUT_MS) => {
     if (state.qrImageDataUrl || state.qr) {
         return state.qrImageDataUrl || state.qr;
@@ -970,6 +1011,7 @@ const setWebhookProcessor = (processor) => {
 module.exports = {
     startSession,
     stopSession,
+    logoutSession,
     waitForQr,
     getStatus,
     getEvents,
