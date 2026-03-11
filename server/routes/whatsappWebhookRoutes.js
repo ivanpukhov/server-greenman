@@ -190,17 +190,16 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
             contentType: 'video/mp4'
         });
         form.append('messaging_product', 'whatsapp');
-        form.append('to', to);
 
-        console.log('[WhatsApp outgoing] video_upload_request:', safeStringify({
+        console.log('[WhatsApp outgoing] video_media_upload_request:', safeStringify({
             to,
             fileName: safeFileName,
             sourceUrlPreview: sourceUrl.slice(0, 120),
             size: mediaBuffer.length
         }));
 
-        const response = await axios.post(
-            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
+        const uploadResponse = await axios.post(
+            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
             form,
             {
                 headers: {
@@ -211,7 +210,37 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
                 timeout: 60000
             }
         );
-        console.log('Response from 360dialog (video upload):', response.data);
+        const mediaId = String(uploadResponse?.data?.id || '').trim();
+        if (!mediaId) {
+            throw new Error('360dialog media upload did not return media id');
+        }
+        console.log('[WhatsApp outgoing] video_media_upload_success:', safeStringify({
+            to,
+            mediaId
+        }));
+
+        const payload = {
+            messaging_product: 'whatsapp',
+            to,
+            type: 'video',
+            video: {
+                id: mediaId,
+                caption: safeFileName
+            }
+        };
+
+        const response = await axios.post(
+            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
+            payload,
+            {
+                headers: {
+                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+        console.log('Response from 360dialog (video by media id):', response.data);
     } catch (error) {
         console.error('[WhatsApp webhook] sendFileByUrl (video upload via 360dialog) failed:', {
             status: error.response?.status || null,
