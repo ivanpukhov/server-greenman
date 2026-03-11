@@ -452,6 +452,10 @@ const safeDownloadMediaBuffer = async (msg) => {
         return null;
     }
 
+    const hasDocumentWithCaption = Boolean(
+        msg?.message?.documentWithCaptionMessage?.message?.documentMessage
+    );
+
     try {
         const buffer = await downloadMediaMessage(
             msg,
@@ -463,8 +467,36 @@ const safeDownloadMediaBuffer = async (msg) => {
             }
         );
         return Buffer.isBuffer(buffer) ? buffer : null;
-    } catch (_error) {
-        return null;
+    } catch (firstError) {
+        // Fallback for wrapped media nodes (documentWithCaptionMessage / viewOnce / ephemeral)
+        try {
+            const unwrapped = unwrapMessageNode(msg?.message || {});
+            const fallbackMsg = {
+                ...msg,
+                message: unwrapped
+            };
+            const buffer = await downloadMediaMessage(
+                fallbackMsg,
+                'buffer',
+                {},
+                {
+                    logger: pino({ level: 'silent' }),
+                    reuploadRequest: socket.updateMediaMessage
+                }
+            );
+            if (hasDocumentWithCaption) {
+                const fileName =
+                    msg?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName ||
+                    'file.pdf';
+                console.log(`[Baileys][pdf] extracted from documentWithCaptionMessage: ${fileName}`);
+            }
+            return Buffer.isBuffer(buffer) ? buffer : null;
+        } catch (_secondError) {
+            console.log(
+                `[Baileys][pdf] download failed: ${String(firstError?.message || firstError)}`
+            );
+            return null;
+        }
     }
 };
 
