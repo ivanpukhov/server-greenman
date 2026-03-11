@@ -827,16 +827,13 @@ const createOrderFromKazpostOutgoingCommand = async ({
 
         await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
         let orderPaymentLink = String(orderPayload.paymentLink || '').trim();
-        let orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
-        let orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+        let orderSellerIin = '';
+        let orderSellerName = '';
 
-        if (orderPaymentLink && (orderSellerIin.length !== 12 || !orderSellerName)) {
-            const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
-            if (ivanAdmin) {
-                orderSellerIin = String(normalizeAdminIin(ivanAdmin.iin) || '').replace(/\D/g, '');
-                orderSellerName = String(ivanAdmin.fullName || 'Иван').trim();
-                console.log('[WhatsApp webhook][Kazpost] Seller fallback applied: Иван');
-            }
+        const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
+        if (ivanAdmin) {
+            orderSellerIin = String(normalizeAdminIin(ivanAdmin.iin) || '').replace(/\D/g, '');
+            orderSellerName = String(ivanAdmin.fullName || 'Иван').trim();
         }
 
         if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
