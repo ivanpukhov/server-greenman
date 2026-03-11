@@ -332,6 +332,12 @@ const startsWithKazpostCommand = (text) => {
     return normalized.startsWith('казпочта');
 };
 
+const stripKazpostCommandPrefix = (text) => {
+    return String(text || '')
+        .replace(/^\s*казпочта[\s:,-]*/i, '')
+        .trim();
+};
+
 const normalizeAlias = (value) =>
     String(value || '')
         .replace(/\u00A0/g, ' ')
@@ -771,7 +777,8 @@ const createOrderFromKazpostOutgoingCommand = async ({
         return null;
     }
 
-    const aiInput = `${String(textMessage || '').trim()}\nТелефон получателя: ${recipientPhone}`;
+    const commandBody = stripKazpostCommandPrefix(textMessage);
+    const aiInput = `${commandBody}\nТелефон получателя: ${recipientPhone}`.trim();
     const typeRow = await ProductType.findByPk(KAZPOST_COMMAND_TYPE_ID);
     if (!typeRow) {
         throw new Error(`Тип товара с ID ${KAZPOST_COMMAND_TYPE_ID} не найден`);
@@ -797,7 +804,7 @@ const createOrderFromKazpostOutgoingCommand = async ({
         }
 
         const unitPrice = Math.max(0, Number(typeRow.price) || 0);
-        const createdOrder = await Order.create({
+        const orderPayload = {
             customerName: clientFields.customerName,
             addressIndex: clientFields.addressIndex,
             city: clientFields.city,
@@ -806,7 +813,7 @@ const createOrderFromKazpostOutgoingCommand = async ({
             phoneNumber: clientFields.phoneNumber,
             kaspiNumber: clientFields.phoneNumber,
             deliveryMethod: 'kazpost',
-            paymentMethod: 'kaspi',
+            paymentMethod: 'link',
             products: [
                 {
                     productId: KAZPOST_COMMAND_PRODUCT_ID,
@@ -815,7 +822,22 @@ const createOrderFromKazpostOutgoingCommand = async ({
                 }
             ],
             totalPrice: unitPrice
-        });
+        };
+
+        await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
+        const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
+        const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+        const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+
+        if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
+            throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
+        }
+
+        orderPayload.paymentLink = orderPaymentLink;
+        orderPayload.paymentSellerIin = orderSellerIin;
+        orderPayload.paymentSellerName = orderSellerName;
+
+        const createdOrder = await Order.create(orderPayload);
 
         if (messageId) {
             processedKazpostCommandByMessageId.set(messageId, Date.now());
