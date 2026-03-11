@@ -182,65 +182,7 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
         if (!mediaBuffer || mediaBuffer.length === 0) {
             throw new Error('Downloaded media buffer is empty');
         }
-
-        const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
-        const form = new FormData();
-        form.append('file', mediaBuffer, {
-            filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
-            contentType: 'video/mp4'
-        });
-        form.append('messaging_product', 'whatsapp');
-
-        console.log('[WhatsApp outgoing] video_media_upload_request:', safeStringify({
-            to,
-            fileName: safeFileName,
-            sourceUrlPreview: sourceUrl.slice(0, 120),
-            size: mediaBuffer.length
-        }));
-
-        const uploadResponse = await axios.post(
-            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
-            form,
-            {
-                headers: {
-                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                    ...form.getHeaders()
-                },
-                maxBodyLength: Infinity,
-                timeout: 60000
-            }
-        );
-        const mediaId = String(uploadResponse?.data?.id || '').trim();
-        if (!mediaId) {
-            throw new Error('360dialog media upload did not return media id');
-        }
-        console.log('[WhatsApp outgoing] video_media_upload_success:', safeStringify({
-            to,
-            mediaId
-        }));
-
-        const payload = {
-            messaging_product: 'whatsapp',
-            to,
-            type: 'video',
-            video: {
-                id: mediaId,
-                caption: safeFileName
-            }
-        };
-
-        const response = await axios.post(
-            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
-            payload,
-            {
-                headers: {
-                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 30000
-            }
-        );
-        console.log('Response from 360dialog (video by media id):', response.data);
+        await sendVideoBufferTo360Dialog(mediaBuffer, to, fileName, sourceUrl);
     } catch (error) {
         console.error('[WhatsApp webhook] sendFileByUrl (video upload via 360dialog) failed:', {
             status: error.response?.status || null,
@@ -249,6 +191,67 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
         });
         throw error;
     }
+};
+
+const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
+    const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
+    const form = new FormData();
+    form.append('file', mediaBuffer, {
+        filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
+        contentType: 'video/mp4'
+    });
+    form.append('messaging_product', 'whatsapp');
+
+    console.log('[WhatsApp outgoing] video_media_upload_request:', safeStringify({
+        to,
+        fileName: safeFileName,
+        sourceUrlPreview: String(sourceUrl || '').slice(0, 120),
+        size: mediaBuffer.length
+    }));
+
+    const uploadResponse = await axios.post(
+        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
+        form,
+        {
+            headers: {
+                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                ...form.getHeaders()
+            },
+            maxBodyLength: Infinity,
+            timeout: 60000
+        }
+    );
+    const mediaId = String(uploadResponse?.data?.id || '').trim();
+    if (!mediaId) {
+        throw new Error('360dialog media upload did not return media id');
+    }
+    console.log('[WhatsApp outgoing] video_media_upload_success:', safeStringify({
+        to,
+        mediaId
+    }));
+
+    const payload = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'video',
+        video: {
+            id: mediaId,
+            caption: safeFileName
+        }
+    };
+
+    const response = await axios.post(
+        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
+        payload,
+        {
+            headers: {
+                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        }
+    );
+    console.log('Response from 360dialog (video by media id):', response.data);
 };
 
 const sendMessageByChatId = async (chatId, message) => {
@@ -2025,23 +2028,47 @@ const processIncomingMessageWebhook = async (content) => {
 };
 
 const processIncomingVideoMessageWebhook = async (content) => {
-    const search = 'videoMessage';
-    if (!JSON.stringify(content).includes(search)) {
+    const videoData = content?.messageData?.videoMessage || null;
+    const fileData = content?.messageData?.fileMessageData || null;
+    const downloadUrl = String(videoData?.downloadUrl || fileData?.downloadUrl || '').trim();
+    const fileBase64 = String(videoData?.fileBase64 || fileData?.fileBase64 || '').trim();
+    const fileName = String(videoData?.fileName || fileData?.fileName || '').trim() || `video-${Date.now()}.mp4`;
+    const rawPhoneNumber =
+        String(videoData?.caption || '').trim() ||
+        String(fileData?.caption || '').trim() ||
+        String(content?.recipientPhone || '').trim() ||
+        String(content?.senderPhone || '').trim();
+
+    if (!downloadUrl && !fileBase64) {
         return;
     }
 
-    const downloadUrl = findFirstValueByKey(content, 'downloadUrl');
-    const phoneNumber = findFirstValueByKey(content, 'caption');
-    const fileName = findFirstValueByKey(content, 'fileName');
+    const normalizedPhone = normalizePhoneNumber(rawPhoneNumber);
+    const to = normalizedPhone ? `7${normalizedPhone}` : String(rawPhoneNumber || '').replace(/\D/g, '');
+    if (!to) {
+        console.log('Did not find valid phone number for video forwarding.');
+        return;
+    }
 
-    if (downloadUrl && phoneNumber && fileName) {
+    if (fileBase64) {
         try {
-            await sendFileByUrl(downloadUrl, phoneNumber, fileName);
+            const mediaBuffer = Buffer.from(fileBase64, 'base64');
+            if (!mediaBuffer || mediaBuffer.length === 0) {
+                throw new Error('Video base64 buffer is empty');
+            }
+            await sendVideoBufferTo360Dialog(mediaBuffer, to, fileName, downloadUrl);
+            return;
+        } catch (error) {
+            console.error('Failed to send file by base64 buffer:', error.response?.data || error.message);
+        }
+    }
+
+    if (downloadUrl) {
+        try {
+            await sendFileByUrl(downloadUrl, to, fileName);
         } catch (error) {
             console.error('Failed to send file by url:', error.response?.data || error.message);
         }
-    } else {
-        console.log('Did not find all required fields.');
     }
 };
 

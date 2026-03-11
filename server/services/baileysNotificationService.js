@@ -574,7 +574,8 @@ const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {
         };
         const isPdf = String(fileData.mimeType || '').toLowerCase().includes('pdf') ||
             String(fileData.fileName || '').toLowerCase().endsWith('.pdf');
-        if (isPdf) {
+        const shouldAttachBinary = isPdf || mediaType === 'video';
+        if (shouldAttachBinary) {
             const mediaBuffer = await safeDownloadMediaBuffer(msg);
             if (mediaBuffer) {
                 fileData.fileBase64 = mediaBuffer.toString('base64');
