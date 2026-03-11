@@ -97,21 +97,22 @@ const toNormalizedJid = (value) => {
 };
 
 const pickBestRemoteJidFromKey = (key = {}) => {
-    const candidates = [
-        toNormalizedJid(key?.remoteJid),
-        toNormalizedJid(key?.remoteJidAlt)
-    ].filter(Boolean);
+    const remoteRaw = String(key?.remoteJid || '').trim();
+    const remoteAltRaw = String(key?.remoteJidAlt || '').trim();
 
-    const ownJid = toNormalizedJid(socket?.user?.id);
-    const nonOwnCandidates = ownJid ? candidates.filter((jid) => jid !== ownJid) : candidates;
-    const lookupPool = nonOwnCandidates.length > 0 ? nonOwnCandidates : candidates;
-
-    const pnCandidate = lookupPool.find((jid) => isPnChatId(jid));
-    if (pnCandidate) {
-        return pnCandidate;
+    // Rule: client phone is whichever field contains @s.whatsapp.net
+    if (remoteRaw.includes('@s.whatsapp.net')) {
+        return normalizeChatId(remoteRaw);
+    }
+    if (remoteAltRaw.includes('@s.whatsapp.net')) {
+        return normalizeChatId(remoteAltRaw);
     }
 
-    return lookupPool[0] || candidates[0] || '';
+    const remote = toNormalizedJid(remoteRaw);
+    const remoteAlt = toNormalizedJid(remoteAltRaw);
+    if (remote && isPnChatId(remote)) return remote;
+    if (remoteAlt && isPnChatId(remoteAlt)) return remoteAlt;
+    return remote || remoteAlt || '';
 };
 
 const logResolverSuccess = (source, jid) => {

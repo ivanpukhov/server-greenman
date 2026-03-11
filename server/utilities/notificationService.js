@@ -64,8 +64,20 @@ const safeClone = (value) => {
 };
 
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
+const toText = (value) => String(value || '').trim();
+const isPhoneLikeWaJid = (value) => {
+    const raw = toText(value).toLowerCase();
+    if (!raw.includes('@')) {
+        return true;
+    }
+    return raw.endsWith('@c.us') || raw.endsWith('@s.whatsapp.net') || raw.endsWith('@hosted');
+};
 
 const normalizeToTenDigits = (value) => {
+    if (!isPhoneLikeWaJid(value)) {
+        return null;
+    }
+
     const normalized = normalizePhoneNumber(value);
     if (normalized) {
         return normalized;
@@ -79,6 +91,10 @@ const normalizeToTenDigits = (value) => {
 };
 
 const normalizeToWabaPhone = (value) => {
+    if (!isPhoneLikeWaJid(value)) {
+        return null;
+    }
+
     const digits = toDigits(value);
     if (digits.length === 10) {
         return `7${digits}`;

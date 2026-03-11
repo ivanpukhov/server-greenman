@@ -1500,7 +1500,16 @@ const processIncomingPdfProofWebhook = async (content) => {
         return;
     }
 
-    const customerPhone = normalizePhoneNumber(senderChatId);
+    let customerPhone = normalizePhoneNumber(senderChatId);
+    if (!customerPhone) {
+        const lastByChat = await SentPaymentLink.findOne({
+            where: {
+                customerChatId: senderChatId
+            },
+            order: [['receivedAt', 'DESC']]
+        });
+        customerPhone = String(lastByChat?.customerPhone || '').replace(/\D/g, '').slice(-10) || null;
+    }
     if (!customerPhone) {
         console.log('[WhatsApp webhook] PDF ignored: could not normalize customer phone from chat id.');
         return;
