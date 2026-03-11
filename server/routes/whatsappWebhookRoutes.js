@@ -825,16 +825,62 @@ const createOrderFromKazpostOutgoingCommand = async ({
             totalPrice: unitPrice
         };
 
-        await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
-        let orderPaymentLink = String(orderPayload.paymentLink || '').trim();
-        let orderSellerIin = '';
-        let orderSellerName = '';
+        let paymentLinkConnection = await SentPaymentLink.findOne({
+            where: {
+                customerPhone: recipientPhone,
+                linkedOrderId: null
+            },
+            order: [['receivedAt', 'DESC']]
+        });
+
+        if (paymentLinkConnection) {
+            orderPayload.paymentLink = String(paymentLinkConnection.paymentLink || '').trim() || null;
+            if (paymentLinkConnection.sellerIin) {
+                orderPayload.paymentSellerIin = String(paymentLinkConnection.sellerIin);
+            }
+            if (paymentLinkConnection.sellerAdminName) {
+                orderPayload.paymentSellerName = String(paymentLinkConnection.sellerAdminName);
+            }
+        }
 
         const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
-        if (ivanAdmin) {
-            orderSellerIin = String(normalizeAdminIin(ivanAdmin.iin) || '').replace(/\D/g, '');
-            orderSellerName = String(ivanAdmin.fullName || 'Иван').trim();
+        const ivanSellerIin = String(normalizeAdminIin(ivanAdmin?.iin) || '').replace(/\D/g, '');
+        const ivanSellerName = String(ivanAdmin?.fullName || 'Иван').trim();
+
+        if (!paymentLinkConnection) {
+            const ivanPaymentLink = await PaymentLink.findOne({
+                where: {
+                    adminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
+                    isActive: true
+                },
+                order: [['id', 'DESC']]
+            });
+
+            if (ivanPaymentLink) {
+                orderPayload.paymentLink = String(ivanPaymentLink.url || '').trim() || null;
+                paymentLinkConnection = await SentPaymentLink.create({
+                    customerPhone: recipientPhone,
+                    customerChatId: String(recipientChatId || '').trim() || `${recipientPhone}@c.us`,
+                    paymentLink: orderPayload.paymentLink,
+                    sourceDescription: '[Kazpost fallback] Auto-attached Ivan payment link',
+                    expectedAmount: Math.round(unitPrice),
+                    sellerIin: ivanSellerIin || null,
+                    sellerAdminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
+                    sellerAdminName: ivanSellerName || null
+                });
+            }
         }
+
+        if (!orderPayload.paymentSellerIin && ivanSellerIin) {
+            orderPayload.paymentSellerIin = ivanSellerIin;
+        }
+        if (!orderPayload.paymentSellerName && ivanSellerName) {
+            orderPayload.paymentSellerName = ivanSellerName;
+        }
+
+        const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
+        const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+        const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
 
         if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
             throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
@@ -845,6 +891,13 @@ const createOrderFromKazpostOutgoingCommand = async ({
         orderPayload.paymentSellerName = orderSellerName;
 
         const createdOrder = await Order.create(orderPayload);
+        if (paymentLinkConnection?.id) {
+            const isLinked = await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, createdOrder.id);
+            if (!isLinked) {
+                await createdOrder.destroy();
+                throw new Error('Эта связь оплаты уже привязана к другому заказу');
+            }
+        }
 
         if (messageId) {
             processedKazpostCommandByMessageId.set(messageId, Date.now());
