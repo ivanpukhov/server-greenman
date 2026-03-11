@@ -1415,7 +1415,11 @@ const assignOrderToSellerFromPdf = async (connection, paidAmount, sellerAdmin) =
 };
 
 const processIncomingPdfProofWebhook = async (content) => {
-    if (String(content.typeWebhook || '') !== 'incomingMessageReceived') {
+    const webhookType = String(content.typeWebhook || '').trim();
+    const isIncoming = webhookType === 'incomingMessageReceived';
+    const isOutgoing = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+
+    if (!isIncoming && !isOutgoing) {
         return;
     }
 
@@ -1424,7 +1428,11 @@ const processIncomingPdfProofWebhook = async (content) => {
     const fileBase64 = String(fileData?.fileBase64 || '').trim();
     const mimeType = String(fileData?.mimeType || '').trim().toLowerCase();
     const fileName = String(fileData?.fileName || '').trim().toLowerCase();
-    const senderChatId = String(content?.senderData?.chatId || '').trim();
+    const senderChatId = String(
+        isOutgoing
+            ? (content?.recipientData?.chatId || content?.senderData?.chatId || '')
+            : (content?.senderData?.chatId || content?.recipientData?.chatId || '')
+    ).trim();
 
     const looksLikePdf =
         isPdfUrl(downloadUrl) ||

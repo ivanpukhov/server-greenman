@@ -102,12 +102,16 @@ const pickBestRemoteJidFromKey = (key = {}) => {
         toNormalizedJid(key?.remoteJidAlt)
     ].filter(Boolean);
 
-    const pnCandidate = candidates.find((jid) => isPnChatId(jid));
+    const ownJid = toNormalizedJid(socket?.user?.id);
+    const nonOwnCandidates = ownJid ? candidates.filter((jid) => jid !== ownJid) : candidates;
+    const lookupPool = nonOwnCandidates.length > 0 ? nonOwnCandidates : candidates;
+
+    const pnCandidate = lookupPool.find((jid) => isPnChatId(jid));
     if (pnCandidate) {
         return pnCandidate;
     }
 
-    return candidates[0] || '';
+    return lookupPool[0] || candidates[0] || '';
 };
 
 const logResolverSuccess = (source, jid) => {
