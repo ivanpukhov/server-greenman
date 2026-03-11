@@ -1938,7 +1938,9 @@ const processIncomingMessageWebhook = async (content) => {
     });
     console.log(`[WhatsApp webhook] Active payment links: ${activeLinks.length}`);
 
-    if (startsWithPaymentRequest(textMessage)) {
+    const isIncomingWebhook = webhookType === 'incomingMessageReceived';
+
+    if (isIncomingWebhook && startsWithPaymentRequest(textMessage)) {
         console.log(`[WhatsApp webhook] Payment command detected. chatId=${recipientChatId}, text="${textMessage}"`);
         const expectedAmount = extractExpectedAmount(textMessage);
         console.log(`[WhatsApp webhook] Expected amount parsed: ${expectedAmount === null ? 'none' : expectedAmount}`);
