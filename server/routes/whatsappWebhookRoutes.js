@@ -49,6 +49,7 @@ const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
 const KAZPOST_COMMAND_PRODUCT_ID = 61;
 const KAZPOST_COMMAND_TYPE_ID = 137;
 const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
+const KAZPOST_FALLBACK_ADMIN_PHONE = '7073670497';
 const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 36;
 const INCOMING_MESSAGE_GREETING =
     'Вас приветствует команда травника Greenman 🌿\n\n' +
@@ -825,9 +826,18 @@ const createOrderFromKazpostOutgoingCommand = async ({
         };
 
         await attachRecentPaymentLinkToOrder(orderPayload, clientFields.phoneNumber);
-        const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
-        const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
-        const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+        let orderPaymentLink = String(orderPayload.paymentLink || '').trim();
+        let orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+        let orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+
+        if (orderPaymentLink && (orderSellerIin.length !== 12 || !orderSellerName)) {
+            const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
+            if (ivanAdmin) {
+                orderSellerIin = String(normalizeAdminIin(ivanAdmin.iin) || '').replace(/\D/g, '');
+                orderSellerName = String(ivanAdmin.fullName || 'Иван').trim();
+                console.log('[WhatsApp webhook][Kazpost] Seller fallback applied: Иван');
+            }
+        }
 
         if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
             throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
