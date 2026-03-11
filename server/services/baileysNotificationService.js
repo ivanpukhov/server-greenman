@@ -342,24 +342,61 @@ const addEvent = (event) => {
 };
 
 const extractMessageText = (messageNode = {}) => {
-    if (!messageNode || typeof messageNode !== 'object') {
+    const node = unwrapMessageNode(messageNode);
+    if (!node || typeof node !== 'object') {
         return '';
     }
 
-    if (messageNode.conversation) return String(messageNode.conversation);
-    if (messageNode.extendedTextMessage?.text) return String(messageNode.extendedTextMessage.text);
-    if (messageNode.imageMessage?.caption) return String(messageNode.imageMessage.caption);
-    if (messageNode.videoMessage?.caption) return String(messageNode.videoMessage.caption);
-    if (messageNode.documentMessage?.caption) return String(messageNode.documentMessage.caption);
-    if (messageNode.buttonsResponseMessage?.selectedDisplayText) {
-        return String(messageNode.buttonsResponseMessage.selectedDisplayText);
+    if (node.conversation) return String(node.conversation);
+    if (node.extendedTextMessage?.text) return String(node.extendedTextMessage.text);
+    if (node.imageMessage?.caption) return String(node.imageMessage.caption);
+    if (node.videoMessage?.caption) return String(node.videoMessage.caption);
+    if (node.documentMessage?.caption) return String(node.documentMessage.caption);
+    if (node.buttonsResponseMessage?.selectedDisplayText) {
+        return String(node.buttonsResponseMessage.selectedDisplayText);
     }
-    if (messageNode.listResponseMessage?.title) return String(messageNode.listResponseMessage.title);
-    if (messageNode.templateButtonReplyMessage?.selectedDisplayText) {
-        return String(messageNode.templateButtonReplyMessage.selectedDisplayText);
+    if (node.listResponseMessage?.title) return String(node.listResponseMessage.title);
+    if (node.templateButtonReplyMessage?.selectedDisplayText) {
+        return String(node.templateButtonReplyMessage.selectedDisplayText);
     }
 
     return '';
+};
+
+const unwrapMessageNode = (messageNode = {}) => {
+    let current = messageNode;
+    let guard = 0;
+
+    while (current && typeof current === 'object' && guard < 10) {
+        guard += 1;
+        if (current.documentWithCaptionMessage?.message) {
+            current = current.documentWithCaptionMessage.message;
+            continue;
+        }
+        if (current.ephemeralMessage?.message) {
+            current = current.ephemeralMessage.message;
+            continue;
+        }
+        if (current.viewOnceMessage?.message) {
+            current = current.viewOnceMessage.message;
+            continue;
+        }
+        if (current.viewOnceMessageV2?.message) {
+            current = current.viewOnceMessageV2.message;
+            continue;
+        }
+        if (current.viewOnceMessageV2Extension?.message) {
+            current = current.viewOnceMessageV2Extension.message;
+            continue;
+        }
+        if (current.editedMessage?.message) {
+            current = current.editedMessage.message;
+            continue;
+        }
+        break;
+    }
+
+    return current || messageNode;
 };
 
 const truncateText = (value, max = 120) => {
@@ -374,36 +411,39 @@ const truncateText = (value, max = 120) => {
 };
 
 const getFileNameFromMessageNode = (messageNode = {}) => {
-    if (messageNode.documentMessage?.fileName) {
-        return String(messageNode.documentMessage.fileName);
+    const node = unwrapMessageNode(messageNode);
+    if (node.documentMessage?.fileName) {
+        return String(node.documentMessage.fileName);
     }
-    if (messageNode.videoMessage) {
+    if (node.videoMessage) {
         return `video-${Date.now()}.mp4`;
     }
-    if (messageNode.imageMessage) {
+    if (node.imageMessage) {
         return `image-${Date.now()}.jpg`;
     }
     return 'file';
 };
 
 const getMimeTypeFromMessageNode = (messageNode = {}) => {
-    if (messageNode.documentMessage?.mimetype) {
-        return String(messageNode.documentMessage.mimetype);
+    const node = unwrapMessageNode(messageNode);
+    if (node.documentMessage?.mimetype) {
+        return String(node.documentMessage.mimetype);
     }
-    if (messageNode.videoMessage?.mimetype) {
-        return String(messageNode.videoMessage.mimetype);
+    if (node.videoMessage?.mimetype) {
+        return String(node.videoMessage.mimetype);
     }
-    if (messageNode.imageMessage?.mimetype) {
-        return String(messageNode.imageMessage.mimetype);
+    if (node.imageMessage?.mimetype) {
+        return String(node.imageMessage.mimetype);
     }
     return null;
 };
 
 const extractMediaSummary = (messageNode = {}) => {
-    if (messageNode.documentMessage) return 'document';
-    if (messageNode.videoMessage) return 'video';
-    if (messageNode.imageMessage) return 'image';
-    if (messageNode.audioMessage) return 'audio';
+    const node = unwrapMessageNode(messageNode);
+    if (node.documentMessage) return 'document';
+    if (node.videoMessage) return 'video';
+    if (node.imageMessage) return 'image';
+    if (node.audioMessage) return 'audio';
     return null;
 };
 
@@ -429,7 +469,8 @@ const safeDownloadMediaBuffer = async (msg) => {
 };
 
 const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {
-    const message = msg?.message || {};
+    const rawMessage = msg?.message || {};
+    const message = unwrapMessageNode(rawMessage);
     const text = extractMessageText(message);
     const fromMe = Boolean(msg?.key?.fromMe);
     const remoteJidRaw = pickBestRemoteJidFromKey(msg?.key || {});
