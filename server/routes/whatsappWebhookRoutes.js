@@ -40,11 +40,15 @@ const ORDER_DRAFT_SOURCE_PREFIX = '__ORDER_DRAFT__';
 const ORDER_DRAFT_TTL_MS = 1000 * 60 * 60 * 6;
 const PAYMENT_LINK_DUPLICATE_WINDOW_MS = 1000 * 60 * 3;
 const pendingOrderDraftByChatId = new Map();
+const processedKazpostCommandByMessageId = new Map();
 const PAYMENT_LINK_FOOTER =
     'После оплаты скиньте пожалуйста чек\n‼️Без чека отправки не будет';
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
+const KAZPOST_COMMAND_PRODUCT_ID = 61;
+const KAZPOST_COMMAND_TYPE_ID = 137;
+const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
 const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 36;
 const INCOMING_MESSAGE_GREETING =
     'Вас приветствует команда травника Greenman 🌿\n\n' +
@@ -195,7 +199,7 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
 
 const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
     const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
-    const captionText = String(fileName || 'Видео').trim() || 'Видео';
+    const captionText = 'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
     const form = new FormData();
     form.append('file', mediaBuffer, {
         filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
@@ -318,6 +322,16 @@ const startsWithPaymentRequest = (text) => {
     return normalized.startsWith('к оплате');
 };
 
+const startsWithKazpostCommand = (text) => {
+    const normalized = String(text || '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    return normalized.startsWith('казпочта');
+};
+
 const normalizeAlias = (value) =>
     String(value || '')
         .replace(/\u00A0/g, ' ')
@@ -337,6 +351,15 @@ const normalizePhoneToTenDigits = (value) => {
     }
 
     return '';
+};
+
+const cleanupKazpostCommandDedupe = () => {
+    const now = Date.now();
+    for (const [messageId, timestamp] of processedKazpostCommandByMessageId.entries()) {
+        if (now - timestamp > KAZPOST_COMMAND_DEDUP_TTL_MS) {
+            processedKazpostCommandByMessageId.delete(messageId);
+        }
+    }
 };
 
 const parseJsonFromAiContent = (content) => {
@@ -724,6 +747,106 @@ const createOrderFromOrderDraft = async ({
             }));
         }
 
+        throw error;
+    }
+};
+
+const createOrderFromKazpostOutgoingCommand = async ({
+    textMessage,
+    recipientChatId,
+    recipientPhoneRaw,
+    messageId
+}) => {
+    if (messageId) {
+        cleanupKazpostCommandDedupe();
+        if (processedKazpostCommandByMessageId.has(messageId)) {
+            console.log(`[WhatsApp webhook][Kazpost] Duplicate message ignored by messageId=${messageId}`);
+            return null;
+        }
+    }
+
+    const recipientPhone = normalizePhoneToTenDigits(recipientPhoneRaw || recipientChatId);
+    if (!recipientPhone || recipientPhone.length !== 10) {
+        console.log('[WhatsApp webhook][Kazpost] Skip: recipient phone not detected');
+        return null;
+    }
+
+    const aiInput = `${String(textMessage || '').trim()}\nТелефон получателя: ${recipientPhone}`;
+    const typeRow = await ProductType.findByPk(KAZPOST_COMMAND_TYPE_ID);
+    if (!typeRow) {
+        throw new Error(`Тип товара с ID ${KAZPOST_COMMAND_TYPE_ID} не найден`);
+    }
+    if (Number(typeRow.productId) !== KAZPOST_COMMAND_PRODUCT_ID) {
+        throw new Error(
+            `Тип товара ${KAZPOST_COMMAND_TYPE_ID} не принадлежит товару ${KAZPOST_COMMAND_PRODUCT_ID}`
+        );
+    }
+
+    let stockDecreased = false;
+
+    try {
+        const clientFields = await parseOrderClientDataByAi(aiInput, recipientChatId);
+        if (typeRow.stockQuantity !== null && Number(typeRow.stockQuantity) < 1) {
+            throw new Error(`Недостаточно остатка для типа ${KAZPOST_COMMAND_TYPE_ID}`);
+        }
+        if (typeRow.stockQuantity !== null) {
+            await typeRow.update({
+                stockQuantity: Number(typeRow.stockQuantity) - 1
+            });
+            stockDecreased = true;
+        }
+
+        const unitPrice = Math.max(0, Number(typeRow.price) || 0);
+        const createdOrder = await Order.create({
+            customerName: clientFields.customerName,
+            addressIndex: clientFields.addressIndex,
+            city: clientFields.city,
+            street: clientFields.street,
+            houseNumber: clientFields.houseNumber,
+            phoneNumber: clientFields.phoneNumber,
+            kaspiNumber: clientFields.phoneNumber,
+            deliveryMethod: 'kazpost',
+            paymentMethod: 'kaspi',
+            products: [
+                {
+                    productId: KAZPOST_COMMAND_PRODUCT_ID,
+                    typeId: KAZPOST_COMMAND_TYPE_ID,
+                    quantity: 1
+                }
+            ],
+            totalPrice: unitPrice
+        });
+
+        if (messageId) {
+            processedKazpostCommandByMessageId.set(messageId, Date.now());
+        }
+
+        console.log('[WhatsApp webhook][Kazpost] Order created:\n' + safeStringify({
+            messageId,
+            orderId: createdOrder.id,
+            recipientChatId,
+            recipientPhone,
+            productId: KAZPOST_COMMAND_PRODUCT_ID,
+            typeId: KAZPOST_COMMAND_TYPE_ID
+        }));
+
+        try {
+            await sendMessageToChannel(createdOrder);
+            console.log(`[WhatsApp webhook][Kazpost] Order #${createdOrder.id} notification sent to channel`);
+        } catch (_error) {
+            console.log(`[WhatsApp webhook][Kazpost] Order #${createdOrder.id} notification failed, ignored`);
+        }
+
+        return createdOrder;
+    } catch (error) {
+        if (stockDecreased) {
+            const freshTypeRow = await ProductType.findByPk(KAZPOST_COMMAND_TYPE_ID);
+            if (freshTypeRow && freshTypeRow.stockQuantity !== null) {
+                await freshTypeRow.update({
+                    stockQuantity: Number(freshTypeRow.stockQuantity) + 1
+                });
+            }
+        }
         throw error;
     }
 };
@@ -1841,6 +1964,24 @@ const processIncomingMessageWebhook = async (content) => {
     const messageId = String(content?.idMessage || '').trim() || null;
 
     if (!textMessage || !recipientChatId) {
+        return;
+    }
+
+    if (isOutgoingWebhook && startsWithKazpostCommand(textMessage)) {
+        try {
+            await createOrderFromKazpostOutgoingCommand({
+                textMessage,
+                recipientChatId,
+                recipientPhoneRaw:
+                    content?.recipientPhone ||
+                    content?.recipientData?.recipient ||
+                    content?.senderPhone ||
+                    null,
+                messageId
+            });
+        } catch (error) {
+            console.error('[WhatsApp webhook][Kazpost] Failed to create order:', error.message);
+        }
         return;
     }
 
