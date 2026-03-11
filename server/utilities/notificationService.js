@@ -30,6 +30,31 @@ const logOutgoing = (event, details = {}) => {
     console.log(`[WhatsApp outgoing] ${event}: ${JSON.stringify(details)}`);
 };
 
+const extractOutgoingTextPreview = (payload) => {
+    const type = String(payload?.type || '').trim();
+    if (type === 'text') {
+        return String(payload?.text?.body || '').trim() || null;
+    }
+
+    if (type === 'template') {
+        const templateName = String(payload?.template?.name || '').trim();
+        const components = Array.isArray(payload?.template?.components) ? payload.template.components : [];
+        const params = [];
+        for (const component of components) {
+            const parameters = Array.isArray(component?.parameters) ? component.parameters : [];
+            for (const parameter of parameters) {
+                if (parameter?.type === 'text' && String(parameter?.text || '').trim()) {
+                    params.push(String(parameter.text).trim());
+                }
+            }
+        }
+        const paramsText = params.length > 0 ? ` params=[${params.join(' | ')}]` : '';
+        return `${templateName || 'template'}${paramsText}`;
+    }
+
+    return null;
+};
+
 const safeClone = (value) => {
     try {
         return JSON.parse(JSON.stringify(value));
@@ -125,6 +150,12 @@ const sendWabaPayload = async (payload) => {
     }
 
     const url = `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`;
+    const outgoingTextPreview = extractOutgoingTextPreview(payload);
+    if (outgoingTextPreview) {
+        console.log(
+            `[WhatsApp outgoing][api-send] to=${String(payload?.to || '').trim() || 'unknown'} type=${String(payload?.type || '').trim() || 'unknown'} text=${outgoingTextPreview}`
+        );
+    }
     logOutgoing('request', {
         url,
         apiKey: maskApiKey(WHATSAPP_360DIALOG_API_KEY),
