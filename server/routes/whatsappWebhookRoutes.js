@@ -3,6 +3,7 @@ const axios = require('axios');
 const Sequelize = require('sequelize');
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 const pdfParse = require('pdf-parse');
 const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
@@ -171,36 +172,48 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
         throw new Error('Invalid phone number for 360dialog video send');
     }
 
-    const payload = {
-        messaging_product: 'whatsapp',
-        to,
-        type: 'video',
-        video: {
-            link: String(url || '').trim(),
-            caption: String(fileName || 'Видео').trim()
-        }
-    };
-    console.log('[WhatsApp outgoing] video_request:', safeStringify({
-        to,
-        type: payload.type,
-        payload
-    }));
-
     try {
+        const sourceUrl = String(url || '').trim();
+        const mediaResponse = await axios.get(sourceUrl, {
+            responseType: 'arraybuffer',
+            timeout: 60000
+        });
+        const mediaBuffer = Buffer.from(mediaResponse.data);
+        if (!mediaBuffer || mediaBuffer.length === 0) {
+            throw new Error('Downloaded media buffer is empty');
+        }
+
+        const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
+        const form = new FormData();
+        form.append('file', mediaBuffer, {
+            filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
+            contentType: 'video/mp4'
+        });
+        form.append('messaging_product', 'whatsapp');
+        form.append('to', to);
+
+        console.log('[WhatsApp outgoing] video_upload_request:', safeStringify({
+            to,
+            fileName: safeFileName,
+            sourceUrlPreview: sourceUrl.slice(0, 120),
+            size: mediaBuffer.length
+        }));
+
         const response = await axios.post(
             `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
-            payload,
+            form,
             {
                 headers: {
                     'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                    'Content-Type': 'application/json'
+                    ...form.getHeaders()
                 },
-                timeout: 30000
+                maxBodyLength: Infinity,
+                timeout: 60000
             }
         );
-        console.log('Response from 360dialog (video):', response.data);
+        console.log('Response from 360dialog (video upload):', response.data);
     } catch (error) {
-        console.error('[WhatsApp webhook] sendFileByUrl (video via 360dialog) failed:', {
+        console.error('[WhatsApp webhook] sendFileByUrl (video upload via 360dialog) failed:', {
             status: error.response?.status || null,
             data: error.response?.data || null,
             message: error.message

@@ -16,6 +16,7 @@
     "debug": "^4.3.4",
     "dotenv": "^16.4.5",
     "express": "~4.16.1",
+    "form-data": "^4.0.5",
     "http-errors": "~1.6.3",
     "jsonwebtoken": "^9.0.2",
     "meilisearch": "^0.36.0",
