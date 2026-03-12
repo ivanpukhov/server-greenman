@@ -50,7 +50,7 @@ const KAZPOST_COMMAND_PRODUCT_ID = 61;
 const KAZPOST_COMMAND_TYPE_ID = 137;
 const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
 const KAZPOST_FALLBACK_ADMIN_PHONE = '7073670497';
-const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 36;
+const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 24 * 14;
 const INCOMING_MESSAGE_GREETING =
     'Вас приветствует команда травника Greenman 🌿\n\n' +
     '‼️Чтобы получить качественную консультацию и быстро оформить заказ,          внимательно заполните анкету.\n\n' +
@@ -1961,7 +1961,7 @@ const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
     try {
         await sendMessageByChatId(senderChatId, INCOMING_MESSAGE_GREETING);
         console.log(
-            `[WhatsApp webhook] Greeting sent to ${senderChatId} (phone=${customerPhone}, firstOrIdleOver36h=true).`
+            `[WhatsApp webhook] Greeting sent to ${senderChatId} (phone=${customerPhone}, firstOrIdleOver14d=true).`
         );
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to send greeting message:', error.response?.data || error.message);
