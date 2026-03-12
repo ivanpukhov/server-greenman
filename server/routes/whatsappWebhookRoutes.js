@@ -1923,11 +1923,6 @@ const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
         return;
     }
 
-    const adminProfile = await getAdminByPhone(customerPhone);
-    if (adminProfile) {
-        return;
-    }
-
     const now = new Date();
     let shouldSendGreeting = false;
 
