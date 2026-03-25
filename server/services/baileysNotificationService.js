@@ -44,6 +44,14 @@ const markUpdated = () => {
     state.updatedAt = new Date().toISOString();
 };
 
+const logBaileys = (message, meta = null) => {
+    if (meta && Object.keys(meta).length > 0) {
+        console.log(`[Baileys][session] ${message} ${JSON.stringify(meta)}`);
+        return;
+    }
+    console.log(`[Baileys][session] ${message}`);
+};
+
 const cloneSafe = (value) => {
     try {
         return JSON.parse(
@@ -623,9 +631,16 @@ const clearReconnectTimer = () => {
 
 const scheduleReconnect = () => {
     clearReconnectTimer();
+    logBaileys('scheduleReconnect', {
+        delayMs: 2500,
+        lastDisconnectReason: state.lastDisconnectReason
+    });
     reconnectTimer = setTimeout(() => {
         startSession().catch((error) => {
             state.lastError = String(error?.message || error);
+            logBaileys('reconnect failed', {
+                error: String(error?.message || error)
+            });
             markUpdated();
         });
     }, 2500);
@@ -638,6 +653,11 @@ const onConnectionUpdate = async (update) => {
     const updateSocket = update?.socket || update?.ws || null;
 
     if (connection || qr || statusCode) {
+        logBaileys('connection.update', {
+            connection: connection || null,
+            hasQr: Boolean(qr),
+            lastDisconnectReason: statusCode
+        });
         addEvent({
             type: 'connection.update',
             level: connection === 'close' ? 'warning' : 'info',
@@ -648,6 +668,9 @@ const onConnectionUpdate = async (update) => {
     }
 
     if (qr) {
+        logBaileys('qr received', {
+            length: qr.length
+        });
         state.connection = 'qr';
         state.qr = qr;
         state.lastError = null;
@@ -661,6 +684,7 @@ const onConnectionUpdate = async (update) => {
     }
 
     if (connection === 'open') {
+        logBaileys('connection opened');
         state.connection = 'open';
         state.lastError = null;
         state.lastDisconnectReason = null;
@@ -670,6 +694,9 @@ const onConnectionUpdate = async (update) => {
     }
 
     if (connection === 'close') {
+        logBaileys('connection closed', {
+            statusCode
+        });
         if (!updateSocket || socket === updateSocket) {
             socket = null;
             saveCredsRef = null;
@@ -834,16 +861,23 @@ const onMessagesUpsert = async (payload) => {
 
 const startSession = async () => {
     if (socket && ['connecting', 'qr', 'open'].includes(state.connection)) {
+        logBaileys('startSession skipped because socket is already active', {
+            connection: state.connection
+        });
         return;
     }
 
     if (connectingPromise) {
+        logBaileys('startSession joined existing connectingPromise');
         return connectingPromise;
     }
 
     connectingPromise = (async () => {
         clearReconnectTimer();
         isStopping = false;
+        logBaileys('startSession begin', {
+            hasAuthState: hasAuthState()
+        });
         state.connection = 'connecting';
         state.lastError = null;
         if (!state.startedAt) {
@@ -855,6 +889,9 @@ const startSession = async () => {
 
         const { state: authState, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         const { version } = await fetchLatestBaileysVersion();
+        logBaileys('creating socket', {
+            version
+        });
         const sock = makeWASocket({
             auth: authState,
             version,
@@ -887,6 +924,9 @@ const startSession = async () => {
     try {
         await connectingPromise;
     } finally {
+        logBaileys('startSession finished', {
+            connection: state.connection
+        });
         connectingPromise = null;
     }
 };
@@ -894,6 +934,9 @@ const startSession = async () => {
 const stopSession = async () => {
     isStopping = true;
     clearReconnectTimer();
+    logBaileys('stopSession begin', {
+        hadSocket: Boolean(socket)
+    });
     for (const timer of deferredResolveQueue.values()) {
         clearTimeout(timer);
     }
@@ -914,12 +957,16 @@ const stopSession = async () => {
     state.connection = 'idle';
     state.qr = null;
     state.qrImageDataUrl = null;
+    logBaileys('stopSession finished');
     markUpdated();
 };
 
 const clearAuthState = () => {
     try {
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        logBaileys('auth state cleared', {
+            authDir: AUTH_DIR
+        });
     } catch (_error) {
         // noop
     }
@@ -928,6 +975,9 @@ const clearAuthState = () => {
 const logoutSession = async () => {
     isStopping = true;
     clearReconnectTimer();
+    logBaileys('logoutSession begin', {
+        hadSocket: Boolean(socket)
+    });
     for (const timer of deferredResolveQueue.values()) {
         clearTimeout(timer);
     }
@@ -955,15 +1005,21 @@ const logoutSession = async () => {
     state.lastError = null;
     state.lastDisconnectReason = null;
     state.startedAt = null;
+    logBaileys('logoutSession finished');
     markUpdated();
 };
 
 const restartSession = async () => {
+    logBaileys('restartSession begin');
     await stopSession();
     await startSession();
+    logBaileys('restartSession finished', {
+        connection: state.connection
+    });
 };
 
 const resetSessionForQr = async () => {
+    logBaileys('resetSessionForQr begin');
     await stopSession();
     clearAuthState();
     state.connection = 'idle';
@@ -974,6 +1030,9 @@ const resetSessionForQr = async () => {
     state.startedAt = null;
     markUpdated();
     await startSession();
+    logBaileys('resetSessionForQr finished', {
+        connection: state.connection
+    });
 };
 
 const waitForQr = async (timeoutMs = QR_WAIT_TIMEOUT_MS) => {
