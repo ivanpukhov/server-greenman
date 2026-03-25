@@ -1569,6 +1569,7 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
     }
 
     const messageId = String(content?.idMessage || '').trim();
+    const messageTimestamp = Number(content?.messageTimestamp) || null;
     const webhookType = String(content?.typeWebhook || '').trim();
     const isOutgoing = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
     const chatId = String(
@@ -1587,6 +1588,7 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
             chatId,
             messageId,
             fromMe: isOutgoing,
+            timestamp: messageTimestamp,
             participant: isOutgoing
                 ? (content?.senderData?.chatId || '')
                 : (content?.senderData?.chatId || '')

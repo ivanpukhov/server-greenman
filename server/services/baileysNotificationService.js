@@ -423,6 +423,32 @@ const truncateText = (value, max = 120) => {
     return `${text.slice(0, max)}...`;
 };
 
+const normalizeMessageTimestamp = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.trunc(value);
+    }
+
+    if (typeof value === 'bigint') {
+        return Number(value);
+    }
+
+    if (value && typeof value === 'object') {
+        if (typeof value.toNumber === 'function') {
+            const converted = value.toNumber();
+            if (Number.isFinite(converted)) {
+                return Math.trunc(converted);
+            }
+        }
+
+        if ('low' in value && Number.isFinite(Number(value.low))) {
+            return Math.trunc(Number(value.low));
+        }
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+};
+
 const getFileNameFromMessageNode = (messageNode = {}) => {
     const node = unwrapMessageNode(messageNode);
     if (node.documentMessage?.fileName) {
@@ -532,6 +558,7 @@ const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {
 
     const payload = {
         idMessage: String(msg?.key?.id || '').trim() || null,
+        messageTimestamp: normalizeMessageTimestamp(msg?.messageTimestamp),
         typeWebhook: fromMe ? 'outgoingMessageReceived' : 'incomingMessageReceived',
         chatId: recipientChatId,
         senderPhone,
@@ -622,9 +649,10 @@ const processByWebhookBridge = async (msg, resolvedJids = {}) => {
     }
 };
 
-const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = false, participant = null }) => {
+const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = false, participant = null, timestamp = null }) => {
     const normalizedChatId = normalizeChatId(chatId);
     const normalizedMessageId = String(messageId || '').trim();
+    const normalizedTimestamp = normalizeMessageTimestamp(timestamp);
 
     if (!socket) {
         throw new Error('Baileys session is not active');
@@ -638,7 +666,7 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
         throw new Error('messageId is required to delete message');
     }
 
-    const deleteKey = {
+    const messageKey = {
         remoteJid: normalizedChatId,
         fromMe: Boolean(fromMe),
         id: normalizedMessageId
@@ -646,12 +674,26 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
 
     const normalizedParticipant = normalizeChatId(participant);
     if (normalizedParticipant) {
-        deleteKey.participant = normalizedParticipant;
+        messageKey.participant = normalizedParticipant;
     }
 
-    await socket.sendMessage(normalizedChatId, {
-        delete: deleteKey
-    });
+    if (fromMe) {
+        await socket.sendMessage(normalizedChatId, {
+            delete: messageKey
+        });
+    } else {
+        if (!normalizedTimestamp) {
+            throw new Error('timestamp is required to delete incoming message for current session');
+        }
+
+        await socket.chatModify({
+            deleteForMe: {
+                deleteMedia: false,
+                key: messageKey,
+                timestamp: normalizedTimestamp
+            }
+        }, normalizedChatId);
+    }
 
     addEvent({
         type: 'message.delete',
@@ -659,7 +701,8 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
         chatId: normalizedChatId,
         messageId: normalizedMessageId,
         fromMe: Boolean(fromMe),
-        participant: normalizedParticipant || null
+        participant: normalizedParticipant || null,
+        messageTimestamp: normalizedTimestamp
     });
 };
 
