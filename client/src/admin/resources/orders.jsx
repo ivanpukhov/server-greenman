@@ -1451,22 +1451,36 @@ body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
         }, 300);
     };
 
-    printFrame.onload = () => {
-        const frameWindow = printFrame.contentWindow;
-        if (!frameWindow) {
-            cleanup();
-            window.alert('Не удалось открыть окно печати');
-            return;
-        }
+    document.body.appendChild(printFrame);
 
+    const frameWindow = printFrame.contentWindow;
+    const frameDocument = frameWindow?.document;
+
+    if (!frameWindow || !frameDocument) {
+        cleanup();
+        window.alert('Не удалось открыть окно печати');
+        return;
+    }
+
+    frameDocument.open();
+    frameDocument.write(html);
+    frameDocument.close();
+
+    const triggerPrint = () => {
         frameWindow.onafterprint = cleanup;
         frameWindow.focus();
         frameWindow.print();
         window.setTimeout(cleanup, 1500);
     };
 
-    printFrame.srcdoc = html;
-    document.body.appendChild(printFrame);
+    if (frameDocument.readyState === 'complete') {
+        window.setTimeout(triggerPrint, 150);
+        return;
+    }
+
+    frameWindow.onload = () => {
+        window.setTimeout(triggerPrint, 150);
+    };
 };
 
 const OrderShowContent = () => {
