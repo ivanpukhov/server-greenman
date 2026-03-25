@@ -9,8 +9,17 @@ module.exports = {
 
     async requestBaileysQr(_req, res) {
         try {
-            await baileysService.startSession();
-            await baileysService.waitForQr();
+            let qr = null;
+
+            await baileysService.restartSession();
+            qr = await baileysService.waitForQr(10000);
+
+            if (!qr) {
+                await baileysService.logoutSession();
+                await baileysService.startSession();
+                qr = await baileysService.waitForQr(15000);
+            }
+
             return res.json({
                 data: baileysService.getStatus()
             });
@@ -24,8 +33,7 @@ module.exports = {
 
     async restartBaileysSession(_req, res) {
         try {
-            await baileysService.stopSession();
-            await baileysService.startSession();
+            await baileysService.restartSession();
             await baileysService.waitForQr(7000);
             return res.json({
                 data: baileysService.getStatus()

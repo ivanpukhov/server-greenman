@@ -948,6 +948,11 @@ const logoutSession = async () => {
     markUpdated();
 };
 
+const restartSession = async () => {
+    await stopSession();
+    await startSession();
+};
+
 const waitForQr = async (timeoutMs = QR_WAIT_TIMEOUT_MS) => {
     if (state.qrImageDataUrl || state.qr) {
         return state.qrImageDataUrl || state.qr;
@@ -1020,6 +1025,7 @@ const setWebhookProcessor = (processor) => {
 module.exports = {
     startSession,
     stopSession,
+    restartSession,
     logoutSession,
     waitForQr,
     getStatus,
