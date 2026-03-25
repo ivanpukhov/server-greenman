@@ -34,6 +34,7 @@ const { Op } = Sequelize;
 const GREEN_API_SEND_FILE_URL =
     'https://7700.api.greenapi.com/waInstance7700541881/sendFileByUrl/2112835cf7a7459ba6de00c353163555b08baeb8d4b6413da2';
 const QR_MIRROR_CHAT_ID = '77775464450@c.us';
+const PDF_PROOF_DEBUG_PHONE = '77073670497';
 
 const DEFAULT_CAPTION =
     'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
@@ -1545,6 +1546,27 @@ const extractSellerIinFromNormalizedPdf = (normalizedPdfText) => {
 
 const PDF_PROOF_AUTO_DELETE_ADMIN_NAMES = ['Даша', 'Иван'];
 
+const sanitizeLogToken = (value, maxLength = 80) => {
+    const normalized = String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!normalized) {
+        return '-';
+    }
+
+    return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+};
+
+const sendPdfProofDebugLog = async (message) => {
+    const text = sanitizeLogToken(message, 900);
+    try {
+        await sendNotification(PDF_PROOF_DEBUG_PHONE, text, { enforce24h: true });
+    } catch (error) {
+        console.error('[WhatsApp webhook] Failed to send PDF debug log:', error.message);
+    }
+};
+
 const shouldDeleteProcessedPdfMessage = async (sellerIin) => {
     const normalizedSellerIin = normalizeAdminIinStrict(sellerIin);
     if (!normalizedSellerIin) {
@@ -1565,7 +1587,11 @@ const shouldDeleteProcessedPdfMessage = async (sellerIin) => {
 const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
     const shouldDelete = await shouldDeleteProcessedPdfMessage(sellerIin);
     if (!shouldDelete) {
-        return false;
+        return {
+            ok: false,
+            skipped: true,
+            reason: 'seller_iin_not_in_target_list'
+        };
     }
 
     const messageId = String(content?.idMessage || '').trim();
@@ -1580,11 +1606,18 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
 
     if (!chatId || !messageId) {
         console.log('[WhatsApp webhook] Processed PDF message deletion skipped: chatId or messageId is missing.');
-        return false;
+        return {
+            ok: false,
+            skipped: true,
+            reason: 'chatId_or_messageId_missing',
+            chatId,
+            messageId,
+            messageTimestamp
+        };
     }
 
     try {
-        await baileysNotificationService.deleteMessageForCurrentSession({
+        const result = await baileysNotificationService.deleteMessageForCurrentSession({
             chatId,
             messageId,
             fromMe: isOutgoing,
@@ -1594,13 +1627,26 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
                 : (content?.senderData?.chatId || '')
         });
         console.log(`[WhatsApp webhook] Processed PDF message deleted for ${chatId}, messageId=${messageId}.`);
-        return true;
+        return {
+            ok: true,
+            skipped: false,
+            ...result
+        };
     } catch (error) {
         console.error(
             `[WhatsApp webhook] Failed to delete processed PDF message ${messageId} for ${chatId}:`,
             error.message
         );
-        return false;
+        return {
+            ok: false,
+            skipped: false,
+            reason: 'delete_failed',
+            error: error.message,
+            chatId,
+            messageId,
+            messageTimestamp,
+            fromMe: isOutgoing
+        };
     }
 };
 
@@ -1813,6 +1859,8 @@ const processIncomingPdfProofWebhook = async (content) => {
         return;
     }
 
+    const shouldDeleteProcessedPdf = await shouldDeleteProcessedPdfMessage(sellerIin);
+
     let customerPhone = normalizePhoneNumber(senderChatId);
     if (!customerPhone) {
         const lastByChat = await SentPaymentLink.findOne({
@@ -1869,6 +1917,12 @@ const processIncomingPdfProofWebhook = async (content) => {
         });
         console.log(
             `[WhatsApp webhook] PDF applied to existing connection #${connection.id}: ${paidAmount} by ${sellerAdmin.fullName}.`
+        );
+    }
+
+    if (shouldDeleteProcessedPdf) {
+        await sendPdfProofDebugLog(
+            `PDF_MATCH admin=${sanitizeLogToken(sellerAdmin.fullName, 24)} iin=${sellerIin} amount=${paidAmount} chat=${sanitizeLogToken(senderChatId, 40)} msg=${sanitizeLogToken(content?.idMessage, 64)} ts=${sanitizeLogToken(content?.messageTimestamp, 20)} connection=${sanitizeLogToken(connection?.id, 20)}`
         );
     }
 
@@ -1950,7 +2004,18 @@ const processIncomingPdfProofWebhook = async (content) => {
         }
         console.log('[WhatsApp webhook][OrderDraft] Deferred QR image sent after payment confirmation');
     } finally {
-        await deleteProcessedPdfMessageIfNeeded(content, sellerIin);
+        const deleteResult = await deleteProcessedPdfMessageIfNeeded(content, sellerIin);
+        if (shouldDeleteProcessedPdf) {
+            if (deleteResult?.ok) {
+                await sendPdfProofDebugLog(
+                    `PDF_DELETE_OK method=${sanitizeLogToken(deleteResult.method, 24)} chat=${sanitizeLogToken(deleteResult.chatId, 40)} msg=${sanitizeLogToken(deleteResult.messageId, 64)} ts=${sanitizeLogToken(deleteResult.messageTimestamp, 20)}`
+                );
+            } else {
+                await sendPdfProofDebugLog(
+                    `PDF_DELETE_FAIL reason=${sanitizeLogToken(deleteResult?.reason, 40)} chat=${sanitizeLogToken(deleteResult?.chatId || senderChatId, 40)} msg=${sanitizeLogToken(deleteResult?.messageId || content?.idMessage, 64)} ts=${sanitizeLogToken(deleteResult?.messageTimestamp || content?.messageTimestamp, 20)} error=${sanitizeLogToken(deleteResult?.error, 180)}`
+                );
+            }
+        }
     }
 };
 

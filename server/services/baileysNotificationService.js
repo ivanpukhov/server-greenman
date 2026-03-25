@@ -96,6 +96,11 @@ const isPnChatId = (chatId) => {
     return normalized.endsWith('@c.us') || normalized.endsWith('@s.whatsapp.net') || normalized.endsWith('@hosted');
 };
 
+const isGroupChatId = (chatId) => {
+    const normalized = String(chatId || '').trim();
+    return normalized.endsWith('@g.us');
+};
+
 const toNormalizedJid = (value) => {
     const raw = String(value || '').trim();
     if (!raw || !raw.includes('@')) {
@@ -673,7 +678,7 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
     };
 
     const normalizedParticipant = normalizeChatId(participant);
-    if (normalizedParticipant) {
+    if (normalizedParticipant && isGroupChatId(normalizedChatId)) {
         messageKey.participant = normalizedParticipant;
     }
 
@@ -692,7 +697,7 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
                 key: messageKey,
                 timestamp: normalizedTimestamp
             }
-        }, normalizedChatId);
+        }, normalizedChatId, []);
     }
 
     addEvent({
@@ -704,6 +709,16 @@ const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = fals
         participant: normalizedParticipant || null,
         messageTimestamp: normalizedTimestamp
     });
+
+    return {
+        ok: true,
+        method: fromMe ? 'delete' : 'deleteForMe',
+        chatId: normalizedChatId,
+        messageId: normalizedMessageId,
+        messageTimestamp: normalizedTimestamp,
+        fromMe: Boolean(fromMe),
+        participant: normalizedParticipant || null
+    };
 };
 
 const clearReconnectTimer = () => {
