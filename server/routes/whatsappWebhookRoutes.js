@@ -15,6 +15,7 @@ const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
+const baileysNotificationService = require('../services/baileysNotificationService');
 const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
 const { WHATSAPP_360DIALOG_API_URL, WHATSAPP_360DIALOG_API_KEY } = require('../config/whatsapp360dialog');
 const {
@@ -1542,6 +1543,65 @@ const extractSellerIinFromNormalizedPdf = (normalizedPdfText) => {
     return String(match[1]);
 };
 
+const PDF_PROOF_AUTO_DELETE_ADMIN_NAMES = ['Даша', 'Иван'];
+
+const shouldDeleteProcessedPdfMessage = async (sellerIin) => {
+    const normalizedSellerIin = normalizeAdminIinStrict(sellerIin);
+    if (!normalizedSellerIin) {
+        return false;
+    }
+
+    const admins = await getActiveAdmins();
+    const targetIins = new Set(
+        admins
+            .filter((admin) => PDF_PROOF_AUTO_DELETE_ADMIN_NAMES.includes(String(admin?.fullName || '').trim()))
+            .map((admin) => normalizeAdminIinStrict(admin?.iin))
+            .filter(Boolean)
+    );
+
+    return targetIins.has(normalizedSellerIin);
+};
+
+const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
+    const shouldDelete = await shouldDeleteProcessedPdfMessage(sellerIin);
+    if (!shouldDelete) {
+        return false;
+    }
+
+    const messageId = String(content?.idMessage || '').trim();
+    const webhookType = String(content?.typeWebhook || '').trim();
+    const isOutgoing = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const chatId = String(
+        isOutgoing
+            ? (content?.recipientData?.chatId || content?.senderData?.chatId || '')
+            : (content?.senderData?.chatId || content?.recipientData?.chatId || '')
+    ).trim();
+
+    if (!chatId || !messageId) {
+        console.log('[WhatsApp webhook] Processed PDF message deletion skipped: chatId or messageId is missing.');
+        return false;
+    }
+
+    try {
+        await baileysNotificationService.deleteMessageForCurrentSession({
+            chatId,
+            messageId,
+            fromMe: isOutgoing,
+            participant: isOutgoing
+                ? (content?.senderData?.chatId || '')
+                : (content?.senderData?.chatId || '')
+        });
+        console.log(`[WhatsApp webhook] Processed PDF message deleted for ${chatId}, messageId=${messageId}.`);
+        return true;
+    } catch (error) {
+        console.error(
+            `[WhatsApp webhook] Failed to delete processed PDF message ${messageId} for ${chatId}:`,
+            error.message
+        );
+        return false;
+    }
+};
+
 const findActiveAdminByIin = async (iin) => {
     const normalizedIin = normalizeAdminIin(iin);
     if (!normalizedIin) {
@@ -1810,82 +1870,86 @@ const processIncomingPdfProofWebhook = async (content) => {
         );
     }
 
-    let bundleCode = parseOrderDraftSourceMeta(connection.sourceDescription)?.bundleCode || null;
-    if (!bundleCode) {
-        const relatedConnections = await SentPaymentLink.findAll({
-            where: {
-                customerChatId: senderChatId
-            },
-            order: [['receivedAt', 'DESC']],
-            limit: 20
-        });
-
-        for (const relatedConnection of relatedConnections) {
-            const relatedJson = relatedConnection.toJSON();
-            const sourceMeta = parseOrderDraftSourceMeta(relatedJson.sourceDescription);
-            if (!sourceMeta?.bundleCode) {
-                continue;
-            }
-
-            const amountMatchesExpected = isSameRoundedAmount(relatedJson.expectedAmount, paidAmount);
-            const amountMatchesMeta = isSameRoundedAmount(sourceMeta.totalToPay, paidAmount);
-            if (!amountMatchesExpected && !amountMatchesMeta) {
-                continue;
-            }
-
-            bundleCode = sourceMeta.bundleCode;
-            if (!parseOrderDraftSourceMeta(connection.sourceDescription)) {
-                await connection.update({ sourceDescription: relatedJson.sourceDescription });
-            }
-            console.log(
-                `[WhatsApp webhook][OrderDraft] Bundle meta restored from connection #${relatedJson.id} for chat ${senderChatId}.`
-            );
-            break;
-        }
-    }
-
-    if (!bundleCode) {
-        console.log('[WhatsApp webhook][OrderDraft] Paid connection has no deferred bundle metadata, QR will not be sent.');
-    } else {
-        try {
-            const orderFromBundle = await createOrderFromPaidBundle({
-                connection,
-                senderChatId,
-                bundleCode,
-                paidAmount,
-                sellerAdmin
+    try {
+        let bundleCode = parseOrderDraftSourceMeta(connection.sourceDescription)?.bundleCode || null;
+        if (!bundleCode) {
+            const relatedConnections = await SentPaymentLink.findAll({
+                where: {
+                    customerChatId: senderChatId
+                },
+                order: [['receivedAt', 'DESC']],
+                limit: 20
             });
-            if (orderFromBundle) {
-                console.log(`[WhatsApp webhook][OrderDraft] Auto-created paid order #${orderFromBundle.id} from bundle ${bundleCode}.`);
+
+            for (const relatedConnection of relatedConnections) {
+                const relatedJson = relatedConnection.toJSON();
+                const sourceMeta = parseOrderDraftSourceMeta(relatedJson.sourceDescription);
+                if (!sourceMeta?.bundleCode) {
+                    continue;
+                }
+
+                const amountMatchesExpected = isSameRoundedAmount(relatedJson.expectedAmount, paidAmount);
+                const amountMatchesMeta = isSameRoundedAmount(sourceMeta.totalToPay, paidAmount);
+                if (!amountMatchesExpected && !amountMatchesMeta) {
+                    continue;
+                }
+
+                bundleCode = sourceMeta.bundleCode;
+                if (!parseOrderDraftSourceMeta(connection.sourceDescription)) {
+                    await connection.update({ sourceDescription: relatedJson.sourceDescription });
+                }
+                console.log(
+                    `[WhatsApp webhook][OrderDraft] Bundle meta restored from connection #${relatedJson.id} for chat ${senderChatId}.`
+                );
+                break;
             }
-        } catch (error) {
-            console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order after payment:', error.message);
-            await sendMessageByChatId(senderChatId, `Не удалось автоматически создать заказ после оплаты: ${error.message}`);
         }
+
+        if (!bundleCode) {
+            console.log('[WhatsApp webhook][OrderDraft] Paid connection has no deferred bundle metadata, QR will not be sent.');
+        } else {
+            try {
+                const orderFromBundle = await createOrderFromPaidBundle({
+                    connection,
+                    senderChatId,
+                    bundleCode,
+                    paidAmount,
+                    sellerAdmin
+                });
+                if (orderFromBundle) {
+                    console.log(`[WhatsApp webhook][OrderDraft] Auto-created paid order #${orderFromBundle.id} from bundle ${bundleCode}.`);
+                }
+            } catch (error) {
+                console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order after payment:', error.message);
+                await sendMessageByChatId(senderChatId, `Не удалось автоматически создать заказ после оплаты: ${error.message}`);
+            }
+        }
+
+        const isOrderAssigned = await assignOrderToSellerFromPdf(connection, paidAmount, sellerAdmin);
+        if (!isOrderAssigned) {
+            console.log(
+                `[WhatsApp webhook] PDF connection #${connection.id} saved, but matching order was not assigned (phone=${customerPhone}, amount=${paidAmount}).`
+            );
+        }
+
+        if (!bundleCode) {
+            return;
+        }
+
+        const qrCodeUrl = buildQrCodeByData(bundleCode);
+        console.log(`[WhatsApp webhook][OrderDraft] Paid connection detected, sending deferred QR to ${senderChatId}`);
+        const qrFileName = `order-qr-${Date.now()}.png`;
+        const qrCaption = buildCustomerPhoneCaptionByChatId(senderChatId);
+
+        await sendFileByUrlToChatId(senderChatId, qrCodeUrl, qrFileName, qrCaption);
+
+        if (String(senderChatId) !== QR_MIRROR_CHAT_ID) {
+            await sendFileByUrlToChatId(QR_MIRROR_CHAT_ID, qrCodeUrl, qrFileName, qrCaption);
+        }
+        console.log('[WhatsApp webhook][OrderDraft] Deferred QR image sent after payment confirmation');
+    } finally {
+        await deleteProcessedPdfMessageIfNeeded(content, sellerIin);
     }
-
-    const isOrderAssigned = await assignOrderToSellerFromPdf(connection, paidAmount, sellerAdmin);
-    if (!isOrderAssigned) {
-        console.log(
-            `[WhatsApp webhook] PDF connection #${connection.id} saved, but matching order was not assigned (phone=${customerPhone}, amount=${paidAmount}).`
-        );
-    }
-
-    if (!bundleCode) {
-        return;
-    }
-
-    const qrCodeUrl = buildQrCodeByData(bundleCode);
-    console.log(`[WhatsApp webhook][OrderDraft] Paid connection detected, sending deferred QR to ${senderChatId}`);
-    const qrFileName = `order-qr-${Date.now()}.png`;
-    const qrCaption = buildCustomerPhoneCaptionByChatId(senderChatId);
-
-    await sendFileByUrlToChatId(senderChatId, qrCodeUrl, qrFileName, qrCaption);
-
-    if (String(senderChatId) !== QR_MIRROR_CHAT_ID) {
-        await sendFileByUrlToChatId(QR_MIRROR_CHAT_ID, qrCodeUrl, qrFileName, qrCaption);
-    }
-    console.log('[WhatsApp webhook][OrderDraft] Deferred QR image sent after payment confirmation');
 };
 
 const parseIncomingAdminExpenseCommand = (text) => {

@@ -622,6 +622,47 @@ const processByWebhookBridge = async (msg, resolvedJids = {}) => {
     }
 };
 
+const deleteMessageForCurrentSession = async ({ chatId, messageId, fromMe = false, participant = null }) => {
+    const normalizedChatId = normalizeChatId(chatId);
+    const normalizedMessageId = String(messageId || '').trim();
+
+    if (!socket) {
+        throw new Error('Baileys session is not active');
+    }
+
+    if (!normalizedChatId) {
+        throw new Error('chatId is required to delete message');
+    }
+
+    if (!normalizedMessageId) {
+        throw new Error('messageId is required to delete message');
+    }
+
+    const deleteKey = {
+        remoteJid: normalizedChatId,
+        fromMe: Boolean(fromMe),
+        id: normalizedMessageId
+    };
+
+    const normalizedParticipant = normalizeChatId(participant);
+    if (normalizedParticipant) {
+        deleteKey.participant = normalizedParticipant;
+    }
+
+    await socket.sendMessage(normalizedChatId, {
+        delete: deleteKey
+    });
+
+    addEvent({
+        type: 'message.delete',
+        level: 'info',
+        chatId: normalizedChatId,
+        messageId: normalizedMessageId,
+        fromMe: Boolean(fromMe),
+        participant: normalizedParticipant || null
+    });
+};
+
 const clearReconnectTimer = () => {
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
@@ -1114,5 +1155,6 @@ module.exports = {
     getStatus,
     getEvents,
     setWebhookProcessor,
-    autoStartIfAuthenticated
+    autoStartIfAuthenticated,
+    deleteMessageForCurrentSession
 };
