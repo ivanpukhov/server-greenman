@@ -485,6 +485,11 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
             responseData: error?.response?.data || null,
             message: error?.message || null
         }));
+        if (error?.response?.status === 401) {
+            throw new Error(
+                'OpenRouter вернул 401 Unauthorized. Проверьте актуальность OPENROUTER_API_KEY/ORDER_DRAFT_AI_API_KEY и аккаунт, к которому привязан этот ключ.'
+            );
+        }
         throw error;
     }
 

@@ -1397,12 +1397,6 @@ const printTrackingLabel = (record) => {
     }
 
     const receiverLines = buildReceiverLines(record);
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=980,height=700');
-    if (!printWindow) {
-        window.alert('Браузер заблокировал окно печати');
-        return;
-    }
-
     const html = `<!doctype html>
 <html lang="ru">
 <head>
@@ -1437,18 +1431,42 @@ body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
             </div>
         </div>
     </div>
-    <script>
-        window.onload = function () {
-            window.focus();
-            window.print();
-        };
-    </script>
 </body>
 </html>`;
 
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
+    const printFrame = document.createElement('iframe');
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+
+    const cleanup = () => {
+        window.setTimeout(() => {
+            if (printFrame.parentNode) {
+                printFrame.parentNode.removeChild(printFrame);
+            }
+        }, 300);
+    };
+
+    printFrame.onload = () => {
+        const frameWindow = printFrame.contentWindow;
+        if (!frameWindow) {
+            cleanup();
+            window.alert('Не удалось открыть окно печати');
+            return;
+        }
+
+        frameWindow.onafterprint = cleanup;
+        frameWindow.focus();
+        frameWindow.print();
+        window.setTimeout(cleanup, 1500);
+    };
+
+    printFrame.srcdoc = html;
+    document.body.appendChild(printFrame);
 };
 
 const OrderShowContent = () => {
