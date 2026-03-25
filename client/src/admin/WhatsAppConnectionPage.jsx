@@ -252,6 +252,12 @@ const WhatsAppConnectionPage = () => {
                             />
                         </Box>
                     ) : null}
+
+                    {!status?.qrImageDataUrl && status?.connection === 'closed' ? (
+                        <Alert severity="warning">
+                            Соединение закрыто{status?.lastDisconnectReason ? ` (код ${status.lastDisconnectReason})` : ''}. Если новый QR не появился автоматически в течение нескольких секунд, нажмите «Перезапустить» или «Получить QR».
+                        </Alert>
+                    ) : null}
                 </Stack>
             </Paper>
 

@@ -635,6 +635,7 @@ const onConnectionUpdate = async (update) => {
     const connection = String(update?.connection || '').trim();
     const qr = typeof update?.qr === 'string' ? update.qr : null;
     const statusCode = update?.lastDisconnect?.error?.output?.statusCode || null;
+    const updateSocket = update?.socket || update?.ws || null;
 
     if (qr) {
         state.connection = 'qr';
@@ -659,6 +660,10 @@ const onConnectionUpdate = async (update) => {
     }
 
     if (connection === 'close') {
+        if (!updateSocket || socket === updateSocket) {
+            socket = null;
+            saveCredsRef = null;
+        }
         state.connection = 'closed';
         state.lastDisconnectReason = statusCode;
         state.lastError = statusCode ? `connection closed (${statusCode})` : 'connection closed';
@@ -818,6 +823,10 @@ const onMessagesUpsert = async (payload) => {
 };
 
 const startSession = async () => {
+    if (socket && ['connecting', 'qr', 'open'].includes(state.connection)) {
+        return;
+    }
+
     if (connectingPromise) {
         return connectingPromise;
     }
