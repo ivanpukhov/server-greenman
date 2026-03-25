@@ -637,6 +637,16 @@ const onConnectionUpdate = async (update) => {
     const statusCode = update?.lastDisconnect?.error?.output?.statusCode || null;
     const updateSocket = update?.socket || update?.ws || null;
 
+    if (connection || qr || statusCode) {
+        addEvent({
+            type: 'connection.update',
+            level: connection === 'close' ? 'warning' : 'info',
+            connection: connection || null,
+            hasQr: Boolean(qr),
+            lastDisconnectReason: statusCode
+        });
+    }
+
     if (qr) {
         state.connection = 'qr';
         state.qr = qr;
@@ -953,6 +963,19 @@ const restartSession = async () => {
     await startSession();
 };
 
+const resetSessionForQr = async () => {
+    await stopSession();
+    clearAuthState();
+    state.connection = 'idle';
+    state.qr = null;
+    state.qrImageDataUrl = null;
+    state.lastError = null;
+    state.lastDisconnectReason = null;
+    state.startedAt = null;
+    markUpdated();
+    await startSession();
+};
+
 const waitForQr = async (timeoutMs = QR_WAIT_TIMEOUT_MS) => {
     if (state.qrImageDataUrl || state.qr) {
         return state.qrImageDataUrl || state.qr;
@@ -1026,6 +1049,7 @@ module.exports = {
     startSession,
     stopSession,
     restartSession,
+    resetSessionForQr,
     logoutSession,
     waitForQr,
     getStatus,

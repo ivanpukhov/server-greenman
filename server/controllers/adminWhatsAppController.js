@@ -9,16 +9,8 @@ module.exports = {
 
     async requestBaileysQr(_req, res) {
         try {
-            let qr = null;
-
-            await baileysService.restartSession();
-            qr = await baileysService.waitForQr(10000);
-
-            if (!qr) {
-                await baileysService.logoutSession();
-                await baileysService.startSession();
-                qr = await baileysService.waitForQr(15000);
-            }
+            await baileysService.resetSessionForQr();
+            await baileysService.waitForQr(15000);
 
             return res.json({
                 data: baileysService.getStatus()
