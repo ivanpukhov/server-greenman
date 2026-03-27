@@ -8,6 +8,7 @@ const pdfParse = require('pdf-parse');
 const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const OrderBundle = require('../models/orders/OrderBundle');
+const KazpostRequest = require('../models/orders/KazpostRequest');
 const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const User = require('../models/orders/User');
@@ -51,6 +52,7 @@ const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
 const KAZPOST_COMMAND_PRODUCT_ID = 61;
 const KAZPOST_COMMAND_TYPE_ID = 137;
 const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
+const KAZPOST_REQUEST_TIMEOUT_MS = 1000 * 60 * 10;
 const KAZPOST_FALLBACK_ADMIN_PHONE = '7073670497';
 const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 24 * 14;
 const INCOMING_MESSAGE_GREETING =
@@ -198,6 +200,16 @@ const sendFileByUrl = async (url, phoneNumber, fileName) => {
         });
         throw error;
     }
+};
+
+const isWhatsAppEncryptedMediaUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+        return false;
+    }
+
+    return /(?:^https:\/\/|\/\/)?(?:mmg\.whatsapp\.net|lookaside\.whatsapp\.com)\//i.test(raw) ||
+        /\.enc(?:$|\?)/i.test(raw);
 };
 
 const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
@@ -369,6 +381,81 @@ const cleanupKazpostCommandDedupe = () => {
             processedKazpostCommandByMessageId.delete(messageId);
         }
     }
+};
+
+const buildKazpostDeadlineAt = () => new Date(Date.now() + KAZPOST_REQUEST_TIMEOUT_MS);
+
+const createKazpostRequestRecord = async ({
+    messageId,
+    customerPhone,
+    customerChatId,
+    sourceText
+}) => {
+    const basePayload = {
+        customerPhone: customerPhone || null,
+        customerChatId: customerChatId || null,
+        sourceText: String(sourceText || '').trim(),
+        processingStatus: 'received',
+        deadlineAt: buildKazpostDeadlineAt(),
+        lastError: null
+    };
+
+    if (messageId) {
+        const [record] = await KazpostRequest.findOrCreate({
+            where: { sourceMessageId: messageId },
+            defaults: {
+                sourceMessageId: messageId,
+                ...basePayload
+            }
+        });
+
+        const patch = {};
+        if (!record.customerPhone && basePayload.customerPhone) {
+            patch.customerPhone = basePayload.customerPhone;
+        }
+        if (!record.customerChatId && basePayload.customerChatId) {
+            patch.customerChatId = basePayload.customerChatId;
+        }
+        if (!record.sourceText && basePayload.sourceText) {
+            patch.sourceText = basePayload.sourceText;
+        }
+        if (!record.deadlineAt) {
+            patch.deadlineAt = basePayload.deadlineAt;
+        }
+        if (Object.keys(patch).length > 0) {
+            await record.update(patch);
+        }
+        return record;
+    }
+
+    return KazpostRequest.create(basePayload);
+};
+
+const markKazpostRequestProcessing = async (record, patch = {}) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        processingStatus: 'processing',
+        lastError: null,
+        ...patch
+    });
+
+    return record;
+};
+
+const markKazpostRequestFailed = async (record, error) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        processingStatus: 'error',
+        lastError: String(error?.message || error || '').trim() || 'Неизвестная ошибка'
+    });
+
+    return record;
 };
 
 const parseJsonFromAiContent = (content) => {
@@ -554,7 +641,8 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
         street: address.street,
         houseNumber: address.houseNumber,
         phoneNumber,
-        aiJsonText
+        aiJsonText,
+        aiRawText: String(content || '').trim()
     };
 };
 
@@ -765,28 +853,11 @@ const createOrderFromOrderDraft = async ({
     }
 };
 
-const createOrderFromKazpostOutgoingCommand = async ({
-    textMessage,
-    recipientChatId,
-    recipientPhoneRaw,
-    messageId
+const buildKazpostOrderPayload = async ({
+    clientFields,
+    recipientPhone,
+    recipientChatId
 }) => {
-    if (messageId) {
-        cleanupKazpostCommandDedupe();
-        if (processedKazpostCommandByMessageId.has(messageId)) {
-            console.log(`[WhatsApp webhook][Kazpost] Duplicate message ignored by messageId=${messageId}`);
-            return null;
-        }
-    }
-
-    const recipientPhone = normalizePhoneToTenDigits(recipientPhoneRaw || recipientChatId);
-    if (!recipientPhone || recipientPhone.length !== 10) {
-        console.log('[WhatsApp webhook][Kazpost] Skip: recipient phone not detected');
-        return null;
-    }
-
-    const commandBody = stripKazpostCommandPrefix(textMessage);
-    const aiInput = `${commandBody}\nТелефон получателя: ${recipientPhone}`.trim();
     const typeRow = await ProductType.findByPk(KAZPOST_COMMAND_TYPE_ID);
     if (!typeRow) {
         throw new Error(`Тип товара с ID ${KAZPOST_COMMAND_TYPE_ID} не найден`);
@@ -797,105 +868,142 @@ const createOrderFromKazpostOutgoingCommand = async ({
         );
     }
 
-    let stockDecreased = false;
+    const unitPrice = Math.max(0, Number(typeRow.price) || 0);
+    const orderPayload = {
+        customerName: clientFields.customerName,
+        addressIndex: clientFields.addressIndex,
+        city: clientFields.city,
+        street: clientFields.street,
+        houseNumber: clientFields.houseNumber,
+        phoneNumber: clientFields.phoneNumber,
+        kaspiNumber: clientFields.phoneNumber,
+        deliveryMethod: 'kazpost',
+        paymentMethod: 'link',
+        products: [
+            {
+                productId: KAZPOST_COMMAND_PRODUCT_ID,
+                typeId: KAZPOST_COMMAND_TYPE_ID,
+                quantity: 1
+            }
+        ],
+        totalPrice: unitPrice
+    };
 
-    try {
-        const clientFields = await parseOrderClientDataByAi(aiInput, recipientChatId);
-        if (typeRow.stockQuantity !== null && Number(typeRow.stockQuantity) < 1) {
-            throw new Error(`Недостаточно остатка для типа ${KAZPOST_COMMAND_TYPE_ID}`);
+    let paymentLinkConnection = await SentPaymentLink.findOne({
+        where: {
+            customerPhone: recipientPhone,
+            linkedOrderId: null
+        },
+        order: [['receivedAt', 'DESC']]
+    });
+
+    if (paymentLinkConnection) {
+        orderPayload.paymentLink = String(paymentLinkConnection.paymentLink || '').trim() || null;
+        if (paymentLinkConnection.sellerIin) {
+            orderPayload.paymentSellerIin = String(paymentLinkConnection.sellerIin);
         }
+        if (paymentLinkConnection.sellerAdminName) {
+            orderPayload.paymentSellerName = String(paymentLinkConnection.sellerAdminName);
+        }
+    }
+
+    const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
+    const ivanSellerIin = String(normalizeAdminIin(ivanAdmin?.iin) || '').replace(/\D/g, '');
+    const ivanSellerName = String(ivanAdmin?.fullName || 'Иван').trim();
+
+    if (!paymentLinkConnection) {
+        const ivanPaymentLink = await PaymentLink.findOne({
+            where: {
+                adminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
+                isActive: true
+            },
+            order: [['id', 'DESC']]
+        });
+
+        if (ivanPaymentLink) {
+            orderPayload.paymentLink = String(ivanPaymentLink.url || '').trim() || null;
+            paymentLinkConnection = await SentPaymentLink.create({
+                customerPhone: recipientPhone,
+                customerChatId: String(recipientChatId || '').trim() || `${recipientPhone}@c.us`,
+                paymentLink: orderPayload.paymentLink,
+                sourceDescription: '[Kazpost fallback] Auto-attached Ivan payment link',
+                expectedAmount: Math.round(unitPrice),
+                sellerIin: ivanSellerIin || null,
+                sellerAdminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
+                sellerAdminName: ivanSellerName || null
+            });
+        }
+    }
+
+    if (!orderPayload.paymentSellerIin && ivanSellerIin) {
+        orderPayload.paymentSellerIin = ivanSellerIin;
+    }
+    if (!orderPayload.paymentSellerName && ivanSellerName) {
+        orderPayload.paymentSellerName = ivanSellerName;
+    }
+
+    const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
+    const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
+    const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
+
+    if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
+        throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
+    }
+
+    orderPayload.paymentLink = orderPaymentLink;
+    orderPayload.paymentSellerIin = orderSellerIin;
+    orderPayload.paymentSellerName = orderSellerName;
+
+    return {
+        typeRow,
+        unitPrice,
+        orderPayload,
+        paymentLinkConnection
+    };
+};
+
+const createOrUpdateKazpostOrder = async ({
+    clientFields,
+    recipientPhone,
+    recipientChatId,
+    existingOrderId = null
+}) => {
+    const { typeRow, orderPayload, paymentLinkConnection } = await buildKazpostOrderPayload({
+        clientFields,
+        recipientPhone,
+        recipientChatId
+    });
+
+    const existingOrder = existingOrderId ? await Order.findByPk(existingOrderId) : null;
+
+    if (existingOrder) {
+        await existingOrder.update({
+            ...orderPayload,
+            trackingNumber: existingOrder.trackingNumber
+        });
+
+        if (paymentLinkConnection?.id && !paymentLinkConnection.linkedOrderId) {
+            await markPaymentLinkConnectionAsUsed(paymentLinkConnection.id, existingOrder.id).catch(() => false);
+        }
+
+        return {
+            order: existingOrder,
+            action: 'updated'
+        };
+    }
+
+    if (typeRow.stockQuantity !== null && Number(typeRow.stockQuantity) < 1) {
+        throw new Error(`Недостаточно остатка для типа ${KAZPOST_COMMAND_TYPE_ID}`);
+    }
+
+    let stockDecreased = false;
+    try {
         if (typeRow.stockQuantity !== null) {
             await typeRow.update({
                 stockQuantity: Number(typeRow.stockQuantity) - 1
             });
             stockDecreased = true;
         }
-
-        const unitPrice = Math.max(0, Number(typeRow.price) || 0);
-        const orderPayload = {
-            customerName: clientFields.customerName,
-            addressIndex: clientFields.addressIndex,
-            city: clientFields.city,
-            street: clientFields.street,
-            houseNumber: clientFields.houseNumber,
-            phoneNumber: clientFields.phoneNumber,
-            kaspiNumber: clientFields.phoneNumber,
-            deliveryMethod: 'kazpost',
-            paymentMethod: 'link',
-            products: [
-                {
-                    productId: KAZPOST_COMMAND_PRODUCT_ID,
-                    typeId: KAZPOST_COMMAND_TYPE_ID,
-                    quantity: 1
-                }
-            ],
-            totalPrice: unitPrice
-        };
-
-        let paymentLinkConnection = await SentPaymentLink.findOne({
-            where: {
-                customerPhone: recipientPhone,
-                linkedOrderId: null
-            },
-            order: [['receivedAt', 'DESC']]
-        });
-
-        if (paymentLinkConnection) {
-            orderPayload.paymentLink = String(paymentLinkConnection.paymentLink || '').trim() || null;
-            if (paymentLinkConnection.sellerIin) {
-                orderPayload.paymentSellerIin = String(paymentLinkConnection.sellerIin);
-            }
-            if (paymentLinkConnection.sellerAdminName) {
-                orderPayload.paymentSellerName = String(paymentLinkConnection.sellerAdminName);
-            }
-        }
-
-        const ivanAdmin = await getAdminByPhone(KAZPOST_FALLBACK_ADMIN_PHONE);
-        const ivanSellerIin = String(normalizeAdminIin(ivanAdmin?.iin) || '').replace(/\D/g, '');
-        const ivanSellerName = String(ivanAdmin?.fullName || 'Иван').trim();
-
-        if (!paymentLinkConnection) {
-            const ivanPaymentLink = await PaymentLink.findOne({
-                where: {
-                    adminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
-                    isActive: true
-                },
-                order: [['id', 'DESC']]
-            });
-
-            if (ivanPaymentLink) {
-                orderPayload.paymentLink = String(ivanPaymentLink.url || '').trim() || null;
-                paymentLinkConnection = await SentPaymentLink.create({
-                    customerPhone: recipientPhone,
-                    customerChatId: String(recipientChatId || '').trim() || `${recipientPhone}@c.us`,
-                    paymentLink: orderPayload.paymentLink,
-                    sourceDescription: '[Kazpost fallback] Auto-attached Ivan payment link',
-                    expectedAmount: Math.round(unitPrice),
-                    sellerIin: ivanSellerIin || null,
-                    sellerAdminPhone: KAZPOST_FALLBACK_ADMIN_PHONE,
-                    sellerAdminName: ivanSellerName || null
-                });
-            }
-        }
-
-        if (!orderPayload.paymentSellerIin && ivanSellerIin) {
-            orderPayload.paymentSellerIin = ivanSellerIin;
-        }
-        if (!orderPayload.paymentSellerName && ivanSellerName) {
-            orderPayload.paymentSellerName = ivanSellerName;
-        }
-
-        const orderPaymentLink = String(orderPayload.paymentLink || '').trim();
-        const orderSellerIin = String(orderPayload.paymentSellerIin || '').replace(/\D/g, '');
-        const orderSellerName = String(orderPayload.paymentSellerName || '').trim();
-
-        if (!orderPaymentLink || orderSellerIin.length !== 12 || !orderSellerName) {
-            throw new Error('Заказ со способом оплаты "link" нельзя создать без ссылки и администратора');
-        }
-
-        orderPayload.paymentLink = orderPaymentLink;
-        orderPayload.paymentSellerIin = orderSellerIin;
-        orderPayload.paymentSellerName = orderSellerName;
 
         const createdOrder = await Order.create(orderPayload);
         if (paymentLinkConnection?.id) {
@@ -906,19 +1014,6 @@ const createOrderFromKazpostOutgoingCommand = async ({
             }
         }
 
-        if (messageId) {
-            processedKazpostCommandByMessageId.set(messageId, Date.now());
-        }
-
-        console.log('[WhatsApp webhook][Kazpost] Order created:\n' + safeStringify({
-            messageId,
-            orderId: createdOrder.id,
-            recipientChatId,
-            recipientPhone,
-            productId: KAZPOST_COMMAND_PRODUCT_ID,
-            typeId: KAZPOST_COMMAND_TYPE_ID
-        }));
-
         try {
             await sendMessageToChannel(createdOrder);
             console.log(`[WhatsApp webhook][Kazpost] Order #${createdOrder.id} notification sent to channel`);
@@ -926,7 +1021,10 @@ const createOrderFromKazpostOutgoingCommand = async ({
             console.log(`[WhatsApp webhook][Kazpost] Order #${createdOrder.id} notification failed, ignored`);
         }
 
-        return createdOrder;
+        return {
+            order: createdOrder,
+            action: 'created'
+        };
     } catch (error) {
         if (stockDecreased) {
             const freshTypeRow = await ProductType.findByPk(KAZPOST_COMMAND_TYPE_ID);
@@ -938,6 +1036,144 @@ const createOrderFromKazpostOutgoingCommand = async ({
         }
         throw error;
     }
+};
+
+const processKazpostRequest = async ({
+    textMessage,
+    recipientChatId,
+    recipientPhoneRaw,
+    messageId,
+    requestRecord = null,
+    incrementRetry = false
+}) => {
+    if (messageId) {
+        cleanupKazpostCommandDedupe();
+        if (processedKazpostCommandByMessageId.has(messageId) && !requestRecord) {
+            console.log(`[WhatsApp webhook][Kazpost] Duplicate message ignored by messageId=${messageId}`);
+            return null;
+        }
+    }
+
+    const recipientPhone = normalizePhoneToTenDigits(recipientPhoneRaw || recipientChatId);
+    const kazpostRequest =
+        requestRecord ||
+        (await createKazpostRequestRecord({
+            messageId,
+            customerPhone: recipientPhone || normalizePhoneToTenDigits(recipientPhoneRaw) || null,
+            customerChatId: recipientChatId,
+            sourceText: textMessage
+        }));
+
+    if (!recipientPhone || recipientPhone.length !== 10) {
+        const phoneError = new Error('Не удалось определить номер телефона получателя');
+        await markKazpostRequestFailed(kazpostRequest, phoneError);
+        console.log('[WhatsApp webhook][Kazpost] Skip: recipient phone not detected');
+        throw phoneError;
+    }
+
+    if (kazpostRequest.orderId && !incrementRetry) {
+        const existingOrder = await Order.findByPk(kazpostRequest.orderId);
+        if (existingOrder) {
+            if (messageId) {
+                processedKazpostCommandByMessageId.set(messageId, Date.now());
+            }
+            console.log(`[WhatsApp webhook][Kazpost] Existing order reused for request #${kazpostRequest.id}`);
+            return existingOrder;
+        }
+    }
+
+    const commandBody = stripKazpostCommandPrefix(textMessage);
+    const aiInput = `${commandBody}\nТелефон получателя: ${recipientPhone}`.trim();
+
+    await markKazpostRequestProcessing(kazpostRequest, {
+        customerPhone: recipientPhone,
+        customerChatId: recipientChatId || kazpostRequest.customerChatId || null,
+        sourceText: String(textMessage || '').trim(),
+        aiInputText: aiInput,
+        deadlineAt: buildKazpostDeadlineAt(),
+        ...(incrementRetry ? { retryCount: Number(kazpostRequest.retryCount || 0) + 1 } : {})
+    });
+
+    try {
+        const clientFields = await parseOrderClientDataByAi(aiInput, recipientChatId);
+        await kazpostRequest.update({
+            aiResponseText: clientFields.aiRawText || null,
+            aiJsonText: clientFields.aiJsonText || null,
+            aiProcessedAt: new Date(),
+            processingStatus: 'ai_processed',
+            lastError: null
+        });
+
+        const orderMeta = await createOrUpdateKazpostOrder({
+            clientFields,
+            recipientPhone,
+            recipientChatId,
+            existingOrderId: kazpostRequest.orderId || null
+        });
+
+        await kazpostRequest.update({
+            customerPhone: clientFields.phoneNumber || recipientPhone,
+            orderId: orderMeta.order.id,
+            orderLinkedAt: new Date(),
+            processingStatus: 'order_created',
+            lastError: null
+        });
+
+        if (messageId) {
+            processedKazpostCommandByMessageId.set(messageId, Date.now());
+        }
+
+        console.log('[WhatsApp webhook][Kazpost] Order linked to request:\n' + safeStringify({
+            requestId: kazpostRequest.id,
+            messageId,
+            orderId: orderMeta.order.id,
+            action: orderMeta.action,
+            recipientChatId,
+            recipientPhone
+        }));
+
+        return orderMeta.order;
+    } catch (error) {
+        await markKazpostRequestFailed(kazpostRequest, error);
+        throw error;
+    }
+};
+
+const createOrderFromKazpostOutgoingCommand = async ({
+    textMessage,
+    recipientChatId,
+    recipientPhoneRaw,
+    messageId
+}) =>
+    processKazpostRequest({
+        textMessage,
+        recipientChatId,
+        recipientPhoneRaw,
+        messageId
+    });
+
+const retryKazpostRequestProcessing = async ({
+    requestId,
+    sourceText
+}) => {
+    const requestRecord = await KazpostRequest.findByPk(requestId);
+    if (!requestRecord) {
+        throw new Error('Запись казпочты не найдена');
+    }
+
+    const nextSourceText = String(sourceText || requestRecord.sourceText || '').trim();
+    if (!startsWithKazpostCommand(nextSourceText)) {
+        throw new Error('Текст должен начинаться со слова "казпочта"');
+    }
+
+    return processKazpostRequest({
+        textMessage: nextSourceText,
+        recipientChatId: String(requestRecord.customerChatId || '').trim(),
+        recipientPhoneRaw: requestRecord.customerPhone,
+        messageId: requestRecord.sourceMessageId || null,
+        requestRecord,
+        incrementRetry: true
+    });
 };
 
 const buildBundleNoteText = (noteText, chatId) => {
@@ -2423,6 +2659,12 @@ const processIncomingVideoMessageWebhook = async (content) => {
 
     if (downloadUrl) {
         try {
+            if (isWhatsAppEncryptedMediaUrl(downloadUrl)) {
+                console.error(
+                    '[WhatsApp webhook][video] skip url-fallback: encrypted WhatsApp CDN URL requires successful Baileys download first'
+                );
+                return;
+            }
             console.log('[WhatsApp webhook][video] forward source=url-fallback');
             await sendFileByUrl(downloadUrl, to, fileName);
         } catch (error) {
@@ -2468,3 +2710,4 @@ router.post('/', async (req, res) => {
 
 module.exports = router;
 module.exports.processWebhookContent = processWebhookContent;
+module.exports.retryKazpostRequestProcessing = retryKazpostRequestProcessing;

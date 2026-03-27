@@ -491,6 +491,32 @@ const extractMediaSummary = (messageNode = {}) => {
     return null;
 };
 
+const getMediaNodeForDownload = (messageNode = {}) => {
+    const node = unwrapMessageNode(messageNode);
+    if (node.documentMessage) {
+        return {
+            node: node.documentMessage,
+            mediaType: 'document'
+        };
+    }
+    if (node.videoMessage) {
+        return {
+            node: node.videoMessage,
+            mediaType: 'video'
+        };
+    }
+    if (node.imageMessage) {
+        return {
+            node: node.imageMessage,
+            mediaType: 'image'
+        };
+    }
+    return {
+        node: null,
+        mediaType: 'unknown'
+    };
+};
+
 const safeDownloadMediaBuffer = async (msg) => {
     if (!socket) {
         return null;
@@ -499,10 +525,10 @@ const safeDownloadMediaBuffer = async (msg) => {
     const hasDocumentWithCaption = Boolean(
         msg?.message?.documentWithCaptionMessage?.message?.documentMessage
     );
-
-    try {
-        const buffer = await downloadMediaMessage(
-            msg,
+    const mediaSummary = extractMediaSummary(msg?.message || {});
+    const attemptDownload = async (targetMsg) =>
+        downloadMediaMessage(
+            targetMsg,
             'buffer',
             {},
             {
@@ -510,24 +536,20 @@ const safeDownloadMediaBuffer = async (msg) => {
                 reuploadRequest: socket.updateMediaMessage
             }
         );
+
+    try {
+        const buffer = await attemptDownload(msg);
         return Buffer.isBuffer(buffer) ? buffer : null;
     } catch (firstError) {
         // Fallback for wrapped media nodes (documentWithCaptionMessage / viewOnce / ephemeral)
+        const unwrapped = unwrapMessageNode(msg?.message || {});
+        const fallbackMsg = {
+            ...msg,
+            message: unwrapped
+        };
+
         try {
-            const unwrapped = unwrapMessageNode(msg?.message || {});
-            const fallbackMsg = {
-                ...msg,
-                message: unwrapped
-            };
-            const buffer = await downloadMediaMessage(
-                fallbackMsg,
-                'buffer',
-                {},
-                {
-                    logger: pino({ level: 'silent' }),
-                    reuploadRequest: socket.updateMediaMessage
-                }
-            );
+            const buffer = await attemptDownload(fallbackMsg);
             if (hasDocumentWithCaption) {
                 const fileName =
                     msg?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName ||
@@ -535,9 +557,28 @@ const safeDownloadMediaBuffer = async (msg) => {
                 console.log(`[Baileys][pdf] extracted from documentWithCaptionMessage: ${fileName}`);
             }
             return Buffer.isBuffer(buffer) ? buffer : null;
-        } catch (_secondError) {
+        } catch (secondError) {
+            try {
+                // Force media URL refresh once before giving up. This helps when the
+                // incoming media message carries an expired CDN URL.
+                const refreshTarget = hasDocumentWithCaption ? fallbackMsg : msg;
+                await socket.updateMediaMessage(refreshTarget);
+                const retriedBuffer = await attemptDownload(refreshTarget);
+                if (Buffer.isBuffer(retriedBuffer) && retriedBuffer.length > 0) {
+                    console.log(
+                        `[Baileys][media] download recovered after updateMediaMessage type=${mediaSummary}`
+                    );
+                    return retriedBuffer;
+                }
+            } catch (thirdError) {
+                const { node: mediaNode, mediaType } = getMediaNodeForDownload(unwrapped);
+                console.log(
+                    `[Baileys][media] download failed type=${mediaType || mediaSummary} first=${String(firstError?.message || firstError)} second=${String(secondError?.message || secondError)} third=${String(thirdError?.message || thirdError)} url=${String(mediaNode?.url || '').slice(0, 120)}`
+                );
+            }
+
             console.log(
-                `[Baileys][pdf] download failed: ${String(firstError?.message || firstError)}`
+                `[Baileys][media] download failed type=${mediaSummary}: ${String(firstError?.message || firstError)}`
             );
             return null;
         }

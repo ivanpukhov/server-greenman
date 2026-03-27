@@ -6,6 +6,7 @@ const Expense = require('../models/orders/Expense');
 const AdminUser = require('../models/orders/AdminUser');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const OrderBundle = require('../models/orders/OrderBundle');
+const KazpostRequest = require('../models/orders/KazpostRequest');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
 const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
@@ -26,6 +27,7 @@ const {
     getVisibleDispatchPlan,
     saveVisibleDispatchPlan
 } = require('../utilities/paymentLinkDispatchPlan');
+const { retryKazpostRequestProcessing } = require('../routes/whatsappWebhookRoutes');
 
 const { Op } = Sequelize;
 const IVAN_ADMIN_PHONE = '7073670497';
@@ -140,6 +142,76 @@ const parseSort = (query, defaultField = 'id', defaultOrder = 'DESC') => {
     const sortOrder = String(query.sortOrder || defaultOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     return [sortField, sortOrder];
+};
+
+const normalizePhoneToTenDigits = (value) => {
+    const normalized = normalizePhoneNumber(value);
+    if (normalized) {
+        return normalized;
+    }
+
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length >= 10) {
+        return digits.slice(-10);
+    }
+
+    return '';
+};
+
+const buildKazpostRequestState = (requestRow, orderRow) => {
+    const now = Date.now();
+    const deadlineTs = requestRow?.deadlineAt ? new Date(requestRow.deadlineAt).getTime() : NaN;
+    const hasDeadlinePassed = Number.isFinite(deadlineTs) ? deadlineTs <= now : false;
+    const trackingNumber = String(orderRow?.trackingNumber || '').trim();
+    const orderId = orderRow?.id || requestRow?.orderId || null;
+    const lastError = String(requestRow?.lastError || '').trim();
+
+    if (trackingNumber) {
+        return {
+            code: 'done',
+            label: 'Трек создан',
+            needsAttention: false,
+            trackingNumber
+        };
+    }
+
+    if (lastError) {
+        return {
+            code: 'error',
+            label: 'Ошибка',
+            needsAttention: true,
+            trackingNumber: '',
+            errorText: lastError
+        };
+    }
+
+    if (hasDeadlinePassed) {
+        return {
+            code: 'timeout',
+            label: 'Ошибка: нет трека 10 минут',
+            needsAttention: true,
+            trackingNumber: '',
+            errorText: orderId
+                ? 'Прошло больше 10 минут, но трек-номер так и не появился.'
+                : 'Прошло больше 10 минут, но заказ по сообщению не был создан.'
+        };
+    }
+
+    if (orderId) {
+        return {
+            code: 'waiting_tracking',
+            label: 'Ждём трек',
+            needsAttention: false,
+            trackingNumber: ''
+        };
+    }
+
+    return {
+        code: 'processing',
+        label: 'Обрабатывается',
+        needsAttention: false,
+        trackingNumber: ''
+    };
 };
 
 const parseDiseases = (diseasesRaw) => {
@@ -1951,6 +2023,121 @@ ${productDetails}`;
             return res.json({ data: orderJson });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось удалить заказ', error: error.message });
+        }
+    },
+
+    async getKazpostRequests(req, res) {
+        try {
+            const { offset, limit } = parsePagination(req.query);
+            const [sortField, sortOrder] = parseSort(req.query, 'createdAt', 'DESC');
+            const filter = parseJsonParam(req.query.filter, {});
+            const query = String(filter.q || filter.phoneNumber || '').trim();
+            const needsAttentionOnly =
+                filter.needsAttention === true || String(filter.needsAttention || '').toLowerCase() === 'true';
+
+            const where = {};
+            if (query) {
+                const normalizedPhone = normalizePhoneToTenDigits(query);
+                where[Op.or] = [
+                    {
+                        customerPhone: {
+                            [Op.like]: `%${normalizedPhone || query.replace(/\D/g, '')}%`
+                        }
+                    },
+                    {
+                        sourceText: {
+                            [Op.like]: `%${query}%`
+                        }
+                    },
+                    {
+                        aiJsonText: {
+                            [Op.like]: `%${query}%`
+                        }
+                    }
+                ];
+            }
+
+            const { rows, count } = await KazpostRequest.findAndCountAll({
+                where,
+                order: [[sortField, sortOrder]],
+                offset,
+                limit
+            });
+
+            const orderIds = [...new Set(rows.map((row) => Number(row.orderId)).filter(Number.isInteger))];
+            const orders = orderIds.length > 0
+                ? await Order.findAll({
+                    where: {
+                        id: {
+                            [Op.in]: orderIds
+                        }
+                    }
+                })
+                : [];
+            const orderById = new Map(orders.map((order) => [Number(order.id), order]));
+
+            const data = rows
+                .map((row) => {
+                    const rowJson = row.toJSON();
+                    const linkedOrder = rowJson.orderId ? orderById.get(Number(rowJson.orderId)) : null;
+                    const orderJson = linkedOrder ? linkedOrder.toJSON() : null;
+                    const state = buildKazpostRequestState(rowJson, orderJson);
+
+                    return {
+                        ...rowJson,
+                        orderId: orderJson?.id || rowJson.orderId || null,
+                        trackingNumber: state.trackingNumber || String(orderJson?.trackingNumber || '').trim() || null,
+                        orderStatus: orderJson?.status || null,
+                        customerName: orderJson?.customerName || null,
+                        addressIndex: orderJson?.addressIndex || null,
+                        city: orderJson?.city || null,
+                        street: orderJson?.street || null,
+                        houseNumber: orderJson?.houseNumber || null,
+                        stateCode: state.code,
+                        stateLabel: state.label,
+                        needsAttention: state.needsAttention,
+                        errorText: state.errorText || '',
+                        deadlineExceeded: state.code === 'timeout'
+                    };
+                })
+                .filter((row) => (needsAttentionOnly ? row.needsAttention : true));
+
+            return res.json({
+                data,
+                total: needsAttentionOnly ? data.length : count
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить список запросов казпочты', error: error.message });
+        }
+    },
+
+    async retryKazpostRequest(req, res) {
+        try {
+            const requestId = Number(req.params.id);
+            if (!Number.isInteger(requestId) || requestId <= 0) {
+                return res.status(400).json({ message: 'Некорректный id запроса казпочты' });
+            }
+
+            const sourceText = String(req.body.sourceText || '').trim();
+            if (!sourceText) {
+                return res.status(400).json({ message: 'Укажите текст сообщения для повторной обработки' });
+            }
+
+            await retryKazpostRequestProcessing({
+                requestId,
+                sourceText
+            });
+
+            const updatedRequest = await KazpostRequest.findByPk(requestId);
+            if (!updatedRequest) {
+                return res.status(404).json({ message: 'Запрос казпочты не найден' });
+            }
+
+            return res.json({
+                data: updatedRequest.toJSON()
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось повторно обработать запрос казпочты', error: error.message });
         }
     },
 

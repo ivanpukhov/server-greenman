@@ -21,6 +21,7 @@ const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
 require('./models/orders/SentPaymentLink');
 require('./models/orders/OrderBundle');
+require('./models/orders/KazpostRequest');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -247,6 +248,118 @@ const ensureSentPaymentLinksSchema = async () => {
     }
 };
 
+const ensureKazpostRequestsSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('kazpost_requests');
+
+        if (!tableDefinition.sourceMessageId) {
+            await queryInterface.addColumn('kazpost_requests', 'sourceMessageId', {
+                type: Sequelize.STRING,
+                allowNull: true,
+                unique: true
+            });
+        }
+
+        if (!tableDefinition.customerPhone) {
+            await queryInterface.addColumn('kazpost_requests', 'customerPhone', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.customerChatId) {
+            await queryInterface.addColumn('kazpost_requests', 'customerChatId', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.sourceText) {
+            await queryInterface.addColumn('kazpost_requests', 'sourceText', {
+                type: Sequelize.TEXT,
+                allowNull: false,
+                defaultValue: ''
+            });
+        }
+
+        if (!tableDefinition.aiInputText) {
+            await queryInterface.addColumn('kazpost_requests', 'aiInputText', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aiResponseText) {
+            await queryInterface.addColumn('kazpost_requests', 'aiResponseText', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aiJsonText) {
+            await queryInterface.addColumn('kazpost_requests', 'aiJsonText', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.orderId) {
+            await queryInterface.addColumn('kazpost_requests', 'orderId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.processingStatus) {
+            await queryInterface.addColumn('kazpost_requests', 'processingStatus', {
+                type: Sequelize.STRING,
+                allowNull: false,
+                defaultValue: 'received'
+            });
+        }
+
+        if (!tableDefinition.lastError) {
+            await queryInterface.addColumn('kazpost_requests', 'lastError', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.deadlineAt) {
+            await queryInterface.addColumn('kazpost_requests', 'deadlineAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aiProcessedAt) {
+            await queryInterface.addColumn('kazpost_requests', 'aiProcessedAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.orderLinkedAt) {
+            await queryInterface.addColumn('kazpost_requests', 'orderLinkedAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.retryCount) {
+            await queryInterface.addColumn('kazpost_requests', 'retryCount', {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+                defaultValue: 0
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы kazpost_requests:', error);
+    }
+};
+
 const ensureAdminUsersSchema = async () => {
     const queryInterface = orderDB.getQueryInterface();
 
@@ -353,6 +466,7 @@ sequelize.sync().then(async () => {
         await ensureDefaultAdmins();
         await ensureOrderSchema();
         await ensureSentPaymentLinksSchema();
+        await ensureKazpostRequestsSchema();
         console.log('База данных заказов синхронизирована.');
     }).catch(err => {
         console.error('Ошибка синхронизации базы данных заказов:', err);

@@ -58,5 +58,7 @@ router.post('/inventory/receive', adminController.receiveInventory);
 router.get('/inventory/qr-codes', adminController.getQrCodes);
 router.get('/order-bundles/:code', adminController.getOrderBundle);
 router.put('/inventory/types/:id/alias', adminController.updateInventoryTypeAlias);
+router.get('/kazpost-requests', adminController.getKazpostRequests);
+router.post('/kazpost-requests/:id/retry', adminController.retryKazpostRequest);
 
 module.exports = router;

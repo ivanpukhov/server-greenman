@@ -9,6 +9,7 @@ import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import SmsOutlinedIcon from '@mui/icons-material/SmsOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import { Box, Button, Typography } from '@mui/material';
 import { Admin, AppBar, Layout, Menu, Resource, useLogout } from 'react-admin';
 import authProvider from './authProvider';
@@ -26,6 +27,7 @@ import AddExpensePage from './AddExpensePage';
 import AliasesPage from './AliasesPage';
 import WhatsAppTemplateTestPage from './WhatsAppTemplateTestPage';
 import WhatsAppConnectionPage from './WhatsAppConnectionPage';
+import KazpostRequestsPage from './KazpostRequestsPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import { adminAuthStorage } from './authProvider';
@@ -181,6 +183,12 @@ const AdminApp = () => {
             options={{ label: 'QR коды' }}
             list={QrCodesPage}
             icon={QrCode2OutlinedIcon}
+        />
+        <Resource
+            name="kazpost-requests"
+            options={{ label: 'Казпочта треки' }}
+            list={KazpostRequestsPage}
+            icon={LocalShippingOutlinedIcon}
         />
         </Admin>
     );
