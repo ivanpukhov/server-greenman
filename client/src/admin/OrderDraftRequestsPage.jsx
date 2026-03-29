@@ -354,7 +354,10 @@ const OrderDraftRequestsPage = () => {
     }, [loadAliases, loadData]);
 
     const needsAttentionCount = useMemo(
-        () => rows.filter((row) => row.paymentStatusCode === 'awaiting_alias_fix').length,
+        () =>
+            rows.filter((row) =>
+                ['awaiting_alias_fix', 'error'].includes(String(row.paymentStatusCode || '').trim())
+            ).length,
         [rows]
     );
 
