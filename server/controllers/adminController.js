@@ -231,11 +231,21 @@ const parseStoredJsonArray = (value) => {
 const buildOrderDraftPaymentStatus = (requestRow, orderRow) => {
     const trackingNumber = String(orderRow?.trackingNumber || '').trim();
     const hasPaidFlag = Boolean(requestRow?.paidAt) || isPaidOrderStatus(orderRow?.status);
+    const hasUnknownAliases = parseStoredJsonArray(requestRow?.unknownAliasesJson).length > 0;
+    const lastError = String(requestRow?.lastError || '').trim();
+
+    if (lastError) {
+        return {
+            code: hasUnknownAliases ? 'awaiting_alias_fix' : 'error',
+            label: hasUnknownAliases ? 'Ошибка: псевдонимы' : 'Ошибка',
+            trackingNumber
+        };
+    }
 
     if (!requestRow?.paymentRequestedAt) {
         return {
             code: requestRow?.processingStatus === 'awaiting_alias_fix' ? 'awaiting_alias_fix' : 'processing',
-            label: requestRow?.processingStatus === 'awaiting_alias_fix' ? 'Нужно исправить псевдонимы' : 'В обработке',
+            label: requestRow?.processingStatus === 'awaiting_alias_fix' ? 'Ошибка: псевдонимы' : 'В обработке',
             trackingNumber
         };
     }

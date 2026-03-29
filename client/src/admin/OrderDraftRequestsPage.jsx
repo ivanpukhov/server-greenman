@@ -257,6 +257,7 @@ const statusColorMap = {
     paid: 'success',
     awaiting_payment: 'warning',
     awaiting_alias_fix: 'error',
+    error: 'error',
     processing: 'default'
 };
 
@@ -622,7 +623,7 @@ const OrderDraftRequestsPage = () => {
                 )}
             </Paper>
 
-            <Dialog open={Boolean(retryRow)} onClose={closeRetryDialog} fullWidth maxWidth="md">
+            <Dialog open={Boolean(retryRow)} onClose={closeRetryDialog} fullWidth maxWidth="md" fullScreen={isSmall}>
                 <DialogTitle>Исправить псевдонимы</DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={1.5}>
@@ -650,13 +651,14 @@ const OrderDraftRequestsPage = () => {
                                 key={item.id}
                                 direction={{ xs: 'column', md: 'row' }}
                                 spacing={1}
-                                alignItems={{ md: 'center' }}
+                                alignItems={{ md: 'stretch' }}
                             >
                                 <TextField
                                     label="Исходный псевдоним"
                                     value={item.original}
                                     onChange={(event) => updateCorrection(item.id, 'original', event.target.value)}
-                                    sx={{ minWidth: { md: 220 } }}
+                                    fullWidth
+                                    sx={{ flex: 1 }}
                                 />
                                 <Autocomplete
                                     freeSolo
@@ -664,6 +666,7 @@ const OrderDraftRequestsPage = () => {
                                     value={item.replacement}
                                     onInputChange={(_event, value) => updateCorrection(item.id, 'replacement', value)}
                                     onChange={(_event, value) => updateCorrection(item.id, 'replacement', value || '')}
+                                    sx={{ flex: 1 }}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
@@ -672,7 +675,11 @@ const OrderDraftRequestsPage = () => {
                                         />
                                     )}
                                 />
-                                <IconButton onClick={() => removeCorrection(item.id)} aria-label="Удалить строку">
+                                <IconButton
+                                    onClick={() => removeCorrection(item.id)}
+                                    aria-label="Удалить строку"
+                                    sx={{ alignSelf: { xs: 'flex-end', md: 'center' } }}
+                                >
                                     <CloseOutlinedIcon />
                                 </IconButton>
                             </Stack>
