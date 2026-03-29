@@ -10,6 +10,25 @@ import Banner from "../Banner/Banner.jsx";
 import {TailSpin} from "react-loader-spinner";
 import ScrollToTop from "../ScrollToTop";
 
+const STATUS_FILTERS = [
+    { value: 'all', label: 'Все' },
+    { value: 'в обработке', label: 'В обработке' },
+    { value: 'Оплачено', label: 'Оплачено' },
+    { value: 'Отправлено', label: 'Отправлено' },
+    { value: 'Доставлено', label: 'Доставлено' },
+    { value: 'Отменено', label: 'Отменено' }
+];
+
+const STATUS_SORT_PRIORITY = {
+    'в обработке': 0,
+    'оплачено': 1,
+    'отправлено': 2,
+    'доставлено': 3,
+    'отменено': 4
+};
+
+const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
+
 const Track = (order) => {
     return (
         <div className="profile-bottom__item">
@@ -25,6 +44,8 @@ const Profile = () => {
     const {logout} = useAuth();
     const [profileData, setProfileData] = useState(null);
     const [expandedOrders, setExpandedOrders] = useState({});
+    const [selectedStatus, setSelectedStatus] = useState('all');
+
     useEffect(() => {
         if (!hasValidSiteSession()) {
             navigate('/auth');
@@ -55,12 +76,29 @@ const Profile = () => {
         }));
     };
 
+    const orders = profileData?.orders || [];
+    const availableStatuses = STATUS_FILTERS.filter(({value}) =>
+        value === 'all' || orders.some(order => normalizeStatus(order.status) === normalizeStatus(value))
+    );
+    const filteredOrders = [...orders]
+        .filter(order => selectedStatus === 'all' || normalizeStatus(order.status) === normalizeStatus(selectedStatus))
+        .sort((firstOrder, secondOrder) => {
+            const firstPriority = STATUS_SORT_PRIORITY[normalizeStatus(firstOrder.status)] ?? Number.MAX_SAFE_INTEGER;
+            const secondPriority = STATUS_SORT_PRIORITY[normalizeStatus(secondOrder.status)] ?? Number.MAX_SAFE_INTEGER;
+
+            if (firstPriority !== secondPriority) {
+                return firstPriority - secondPriority;
+            }
+
+            return secondOrder.id - firstOrder.id;
+        });
+
     return (
         <div>
             <ScrollToTop/>
 
             {profileData ? (
-                profileData.orders.length > 0 ? (
+                orders.length > 0 ? (
                     <div className="profile">
                         <div className="profile__top">
                             <div className="profile__img">
@@ -77,8 +115,20 @@ const Profile = () => {
                         <div className="profile__title">
                             Заказы
                         </div>
+                        <div className="profile__filters">
+                            {availableStatuses.map(statusOption => (
+                                <button
+                                    key={statusOption.value}
+                                    type="button"
+                                    className={`profile__filter-btn ${selectedStatus === statusOption.value ? 'active' : ''}`}
+                                    onClick={() => setSelectedStatus(statusOption.value)}
+                                >
+                                    {statusOption.label}
+                                </button>
+                            ))}
+                        </div>
                         <div className="profile__orders">
-                            {profileData.orders.map(order => (
+                            {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                 <div key={order.id}
                                      className={`profile__order ${expandedOrders[order.id] ? 'expanded' : ''}`}>
                                     <div className="profile__order-status"
@@ -125,7 +175,11 @@ const Profile = () => {
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="profile__orders-empty">
+                                    Заказов со статусом "{availableStatuses.find(status => status.value === selectedStatus)?.label || selectedStatus}" пока нет.
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (

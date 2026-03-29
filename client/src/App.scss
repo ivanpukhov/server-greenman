@@ -1581,8 +1581,49 @@ textarea {
   margin-top: 28px;
 }
 
+.profile__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 16px;
+}
+
+.profile__filter-btn {
+  border: 1px solid #d5e4da;
+  background: #ffffff;
+  color: #2b4a3d;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile__filter-btn.active {
+  background: linear-gradient(120deg, #00ab6d, #136f63);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 12px 24px rgba(0, 171, 109, 0.24);
+}
+
+.profile__filter-btn:active {
+  transform: translateY(1px);
+}
+
 .profile__orders {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+}
+
+.profile__orders-empty {
+  border: 1px solid var(--gm-border);
+  background: linear-gradient(160deg, #ffffff, #f4faf6);
+  border-radius: 18px;
+  padding: 18px;
+  color: #5a7566;
+  box-shadow: 0 10px 24px rgba(16, 40, 29, 0.06);
 }
 
 .profile__order {
