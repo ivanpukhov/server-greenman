@@ -6,6 +6,7 @@ import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import {
     Alert,
     Autocomplete,
@@ -288,6 +289,7 @@ const OrderDraftRequestsPage = () => {
     const [corrections, setCorrections] = useState([]);
     const [aliasOptions, setAliasOptions] = useState([]);
     const [retryingId, setRetryingId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
 
     const loadAliases = useCallback(async () => {
         try {
@@ -433,6 +435,39 @@ const OrderDraftRequestsPage = () => {
         }
     };
 
+    const deleteRow = async (row) => {
+        if (!row?.id || deletingId) {
+            return;
+        }
+
+        const confirmed = window.confirm('Удалить эту запись "Ваш заказ"?');
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(row.id);
+        try {
+            const token = adminAuthStorage.getToken();
+            const response = await fetch(apiUrl(`/admin/order-draft-requests/${row.id}`), {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(body.message || 'Не удалось удалить запись');
+            }
+
+            notify('Запись удалена', { type: 'success' });
+            await loadData(query, period);
+        } catch (error) {
+            notify(error.message, { type: 'error' });
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     const renderRowActions = (row) => (
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             {row.orderId ? (
@@ -457,6 +492,16 @@ const OrderDraftRequestsPage = () => {
                 onClick={() => openRetryDialog(row)}
             >
                 Повторить
+            </Button>
+            <Button
+                size="small"
+                color="error"
+                variant="outlined"
+                startIcon={<DeleteOutlineOutlinedIcon />}
+                disabled={deletingId === row.id}
+                onClick={() => deleteRow(row)}
+            >
+                Удалить
             </Button>
         </Stack>
     );

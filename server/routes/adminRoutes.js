@@ -62,5 +62,6 @@ router.get('/kazpost-requests', adminController.getKazpostRequests);
 router.post('/kazpost-requests/:id/retry', adminController.retryKazpostRequest);
 router.get('/order-draft-requests', adminController.getOrderDraftRequests);
 router.post('/order-draft-requests/:id/retry', adminController.retryOrderDraftRequest);
+router.delete('/order-draft-requests/:id', adminController.deleteOrderDraftRequest);
 
 module.exports = router;

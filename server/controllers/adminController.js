@@ -2343,6 +2343,29 @@ ${productDetails}`;
         }
     },
 
+    async deleteOrderDraftRequest(req, res) {
+        try {
+            const requestId = Number(req.params.id);
+            if (!Number.isInteger(requestId) || requestId <= 0) {
+                return res.status(400).json({ message: 'Некорректный id записи "Ваш заказ"' });
+            }
+
+            const requestRow = await OrderDraftRequest.findByPk(requestId);
+            if (!requestRow) {
+                return res.status(404).json({ message: 'Запись "Ваш заказ" не найдена' });
+            }
+
+            const payload = requestRow.toJSON();
+            await requestRow.destroy();
+
+            return res.json({
+                data: payload
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось удалить запись "Ваш заказ"', error: error.message });
+        }
+    },
+
     async getDashboardAnalytics(req, res) {
         try {
             const ranges = getDashboardRanges(req.query.period);
