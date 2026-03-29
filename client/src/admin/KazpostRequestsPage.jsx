@@ -398,7 +398,7 @@ const KazpostRequestsPage = () => {
                             <Typography variant="h6">Казпочта: трек-страница</Typography>
                         </Stack>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.8 }}>
-                            Здесь хранится связка: сообщение `казпочта` -> ответ ИИ -> заказ -> трек-номер.
+                            Здесь хранится связка: сообщение "казпочта", ответ ИИ, заказ и трек-номер.
                         </Typography>
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.2 }}>
                             <Chip
