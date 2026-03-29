@@ -9,6 +9,7 @@ const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const OrderBundle = require('../models/orders/OrderBundle');
 const KazpostRequest = require('../models/orders/KazpostRequest');
+const OrderDraftRequest = require('../models/orders/OrderDraftRequest');
 const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const User = require('../models/orders/User');
@@ -353,6 +354,20 @@ const stripKazpostCommandPrefix = (text) => {
         .trim();
 };
 
+const startsWithOrderDraftHeader = (text) => {
+    const firstLine = String(text || '')
+        .split(/\r?\n/)
+        .map((line) => String(line || '').trim())
+        .find(Boolean);
+
+    if (!firstLine) {
+        return false;
+    }
+
+    const normalized = normalizeAlias(firstLine).replace(/\s*[:：]\s*$/, '');
+    return normalized === 'ваш заказ';
+};
+
 const normalizeAlias = (value) =>
     String(value || '')
         .replace(/\u00A0/g, ' ')
@@ -456,6 +471,225 @@ const markKazpostRequestFailed = async (record, error) => {
     });
 
     return record;
+};
+
+const stringifyJson = (value) => {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    try {
+        return JSON.stringify(value);
+    } catch (_error) {
+        return null;
+    }
+};
+
+const createOrGetOrderDraftRequestRecord = async ({
+    messageId,
+    customerPhone,
+    customerChatId,
+    sourceText
+}) => {
+    const payload = {
+        customerPhone: customerPhone || null,
+        customerChatId: customerChatId || null,
+        sourceText: String(sourceText || '').trim(),
+        processingStatus: 'received',
+        lastError: null
+    };
+
+    if (messageId) {
+        const [record] = await OrderDraftRequest.findOrCreate({
+            where: { sourceMessageId: messageId },
+            defaults: {
+                sourceMessageId: messageId,
+                ...payload
+            }
+        });
+
+        const patch = {};
+        if (!record.customerPhone && payload.customerPhone) {
+            patch.customerPhone = payload.customerPhone;
+        }
+        if (!record.customerChatId && payload.customerChatId) {
+            patch.customerChatId = payload.customerChatId;
+        }
+        if (!record.sourceText && payload.sourceText) {
+            patch.sourceText = payload.sourceText;
+        }
+        if (Object.keys(patch).length > 0) {
+            await record.update(patch);
+        }
+
+        return record;
+    }
+
+    return OrderDraftRequest.create(payload);
+};
+
+const markOrderDraftRequestFailed = async (record, error) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        processingStatus: 'error',
+        lastError: String(error?.message || error || '').trim() || 'Неизвестная ошибка'
+    });
+
+    return record;
+};
+
+const markOrderDraftUnknownAliases = async (record, parsedDraft, unknownAliases) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        parsedAliasesJson: stringifyJson(parsedDraft?.aliases || []),
+        unknownAliasesJson: stringifyJson(unknownAliases || []),
+        processingStatus: 'awaiting_alias_fix',
+        lastError: unknownAliases && unknownAliases.length > 0 ? `Не найдены псевдонимы: ${unknownAliases.join(', ')}` : null
+    });
+
+    return record;
+};
+
+const markOrderDraftPaymentRequested = async (record, {
+    parsedDraft,
+    bundleCode,
+    expectedAmount,
+    paymentConnectionId
+}) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        parsedAliasesJson: stringifyJson(parsedDraft?.aliases || []),
+        unknownAliasesJson: stringifyJson([]),
+        bundleCode: bundleCode || null,
+        expectedAmount: Number.isFinite(Number(expectedAmount)) ? Math.round(Number(expectedAmount)) : null,
+        paymentConnectionId: paymentConnectionId || null,
+        paymentRequestedAt: new Date(),
+        processingStatus: 'awaiting_payment',
+        lastError: null
+    });
+
+    return record;
+};
+
+const markOrderDraftPaid = async ({ bundleCode, connectionId, paidAt }) => {
+    const where = {};
+    if (bundleCode) {
+        where.bundleCode = String(bundleCode || '').trim();
+    } else if (connectionId) {
+        where.paymentConnectionId = Number(connectionId);
+    } else {
+        return null;
+    }
+
+    const requestRecord = await OrderDraftRequest.findOne({
+        where,
+        order: [['createdAt', 'DESC']]
+    });
+
+    if (!requestRecord) {
+        return null;
+    }
+
+    await requestRecord.update({
+        paidAt: paidAt || new Date(),
+        processingStatus: 'paid',
+        lastError: null
+    });
+
+    return requestRecord;
+};
+
+const linkOrderDraftRequestToOrder = async ({ bundleCode, orderId, aiJsonText }) => {
+    if (!bundleCode || !orderId) {
+        return null;
+    }
+
+    const requestRecord = await OrderDraftRequest.findOne({
+        where: {
+            bundleCode: String(bundleCode || '').trim()
+        },
+        order: [['createdAt', 'DESC']]
+    });
+
+    if (!requestRecord) {
+        return null;
+    }
+
+    await requestRecord.update({
+        orderId,
+        aiJsonText: aiJsonText || requestRecord.aiJsonText || null,
+        processingStatus: requestRecord.paidAt ? 'paid' : 'awaiting_payment',
+        lastError: null
+    });
+
+    return requestRecord;
+};
+
+const buildOrderDraftTextWithCorrections = (sourceText, corrections = []) => {
+    const parsedDraft = parseOrderDraftMessage(sourceText);
+    if (!parsedDraft) {
+        throw new Error('Не удалось заново разобрать сообщение "Ваш заказ"');
+    }
+
+    const normalizedCorrections = corrections
+        .map((item) => ({
+            original: String(item?.original || '').trim(),
+            replacement: String(item?.replacement || '').trim()
+        }))
+        .filter((item) => item.original || item.replacement);
+
+    const replacementByOriginal = new Map();
+    const extraAliases = [];
+
+    normalizedCorrections.forEach((item) => {
+        const normalizedOriginal = normalizeAlias(item.original);
+        const normalizedReplacement = String(item.replacement || '').trim();
+
+        if (!normalizedReplacement) {
+            return;
+        }
+
+        if (!normalizedOriginal) {
+            extraAliases.push({
+                alias: normalizedReplacement,
+                quantity: 1
+            });
+            return;
+        }
+
+        replacementByOriginal.set(normalizedOriginal, normalizedReplacement);
+    });
+
+    const aliasLines = parsedDraft.aliases
+        .map((entry) => {
+            const originalAlias = String(entry?.alias || '').trim();
+            const quantity = Math.max(1, Math.floor(Number(entry?.quantity) || 1));
+            const normalizedOriginal = normalizeAlias(originalAlias);
+            const replacement = replacementByOriginal.get(normalizedOriginal) || originalAlias;
+            return quantity > 1 ? `${replacement} ${quantity} шт` : replacement;
+        });
+
+    extraAliases.forEach((entry) => {
+        aliasLines.push(entry.quantity > 1 ? `${entry.alias} ${entry.quantity} шт` : entry.alias);
+    });
+
+    const lines = [
+        'Ваш заказ',
+        ...aliasLines,
+        `Доставка ${Math.round(Number(parsedDraft.deliveryPrice) || 0)}`,
+        String(parsedDraft.noteText || '').trim()
+    ].filter(Boolean);
+
+    return lines.join('\n');
 };
 
 const parseJsonFromAiContent = (content) => {
@@ -1176,6 +1410,39 @@ const retryKazpostRequestProcessing = async ({
     });
 };
 
+const retryOrderDraftRequestProcessing = async ({
+    requestId,
+    corrections = []
+}) => {
+    const requestRecord = await OrderDraftRequest.findByPk(requestId);
+    if (!requestRecord) {
+        throw new Error('Запись "Ваш заказ" не найдена');
+    }
+
+    const nextSourceText = buildOrderDraftTextWithCorrections(requestRecord.sourceText, corrections);
+    const parsedOrderDraft = parseOrderDraftMessage(nextSourceText);
+    if (!parsedOrderDraft) {
+        throw new Error('Не удалось обработать исправленное сообщение "Ваш заказ"');
+    }
+
+    await requestRecord.update({
+        sourceText: nextSourceText,
+        unknownAliasesJson: null,
+        lastError: null,
+        processingStatus: 'retry_processing',
+        retryCount: Number(requestRecord.retryCount || 0) + 1
+    });
+
+    await processOrderDraftRequest({
+        textMessage: nextSourceText,
+        recipientChatId: String(requestRecord.customerChatId || '').trim(),
+        parsedOrderDraft,
+        orderDraftRequest: requestRecord
+    });
+
+    return requestRecord.reload();
+};
+
 const buildBundleNoteText = (noteText, chatId) => {
     const normalizedNote = String(noteText || '').trim();
     const normalizedPhone = normalizePhoneNumber(chatId);
@@ -1584,6 +1851,107 @@ const resolveOrderAliases = async (aliases) => {
     };
 };
 
+const processOrderDraftRequest = async ({
+    textMessage,
+    recipientChatId,
+    parsedOrderDraft,
+    orderDraftRequest = null
+}) => {
+    console.log(
+        `[WhatsApp webhook] Order draft detected. chatId=${recipientChatId}, aliases=${parsedOrderDraft.aliases.length}, delivery=${parsedOrderDraft.deliveryPrice}`
+    );
+
+    const resolved = await resolveOrderAliases(parsedOrderDraft.aliases);
+    console.log(
+        `[WhatsApp webhook][OrderDraft] Resolve result: items=${resolved.items.length}, unknown=${resolved.unknownAliases.length}`
+    );
+
+    if (resolved.unknownAliases.length > 0) {
+        console.log(
+            `[WhatsApp webhook][OrderDraft] Unknown aliases found: ${resolved.unknownAliases.join(', ')}`
+        );
+        await markOrderDraftUnknownAliases(orderDraftRequest, parsedOrderDraft, resolved.unknownAliases);
+        await sendMessageByChatId(
+            recipientChatId,
+            `Не найдены псевдонимы: ${resolved.unknownAliases.join(', ')}`
+        );
+        console.log('[WhatsApp webhook][OrderDraft] Sent unknown aliases message to chat');
+        return null;
+    }
+
+    if (resolved.items.length === 0) {
+        console.log('[WhatsApp webhook][OrderDraft] Resolved items are empty, notifying chat');
+        await markOrderDraftRequestFailed(orderDraftRequest, 'Список товаров после разбора оказался пустым');
+        await sendMessageByChatId(recipientChatId, 'Не удалось собрать заказ: список товаров пуст.');
+        return null;
+    }
+
+    const productsTotal = resolved.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const totalToPay = productsTotal + parsedOrderDraft.deliveryPrice;
+    console.log(
+        `[WhatsApp webhook][OrderDraft] Totals: products=${productsTotal}, delivery=${parsedOrderDraft.deliveryPrice}, total=${totalToPay}`
+    );
+
+    const bundlePayload = {
+        v: 1,
+        deliveryPrice: parsedOrderDraft.deliveryPrice,
+        noteText: buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
+        items: resolved.items.map((item) => ({
+            productId: item.productId,
+            typeId: item.typeId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice
+        }))
+    };
+
+    const bundleRow = await saveOrderBundle(bundlePayload);
+    const bundleCode = String(bundleRow.code || '').trim();
+    console.log(
+        `[WhatsApp webhook][OrderDraft] Bundle saved: id=${bundleRow.id}, codeLength=${bundleCode.length}`
+    );
+
+    setPendingOrderDraft(recipientChatId, {
+        bundleCode,
+        totalToPay,
+        sourceText: textMessage
+    });
+    console.log('[WhatsApp webhook][OrderDraft] Deferred QR saved in pending map');
+    console.log('[WhatsApp webhook][OrderDraft] Sending total-to-pay message...');
+    await sendMessageByChatId(recipientChatId, `К оплате ${totalToPay}`);
+    console.log('[WhatsApp webhook][OrderDraft] Total-to-pay message sent');
+    const orderDraftPaymentSource = buildOrderDraftSourceDescription({
+        sourceText: `К оплате ${totalToPay}`,
+        bundleCode,
+        totalToPay
+    });
+    const sentPaymentConnection = await sendPlannedPaymentLinkAndTrack({
+        recipientChatId,
+        expectedAmount: totalToPay,
+        sourceDescription: orderDraftPaymentSource,
+        messageId: null
+    });
+    await markOrderDraftPaymentRequested(orderDraftRequest, {
+        parsedDraft: parsedOrderDraft,
+        bundleCode,
+        expectedAmount: totalToPay,
+        paymentConnectionId: sentPaymentConnection?.id || null
+    });
+    if (sentPaymentConnection) {
+        pendingOrderDraftByChatId.delete(recipientChatId);
+        console.log('[WhatsApp webhook][OrderDraft] Planned payment link sent immediately after total-to-pay message');
+    }
+
+    console.log(
+        `[WhatsApp webhook] Order draft accepted. QR deferred until payment. chatId=${recipientChatId}, items=${resolved.items.length}, total=${totalToPay}`
+    );
+
+    return {
+        bundleCode,
+        totalToPay,
+        sentPaymentConnectionId: sentPaymentConnection?.id || null
+    };
+};
+
 const generateOrderBundleCode = (length = 10) => {
     let result = '';
     for (let index = 0; index < length; index += 1) {
@@ -1701,6 +2069,11 @@ const createOrderFromPaidBundle = async ({
         paymentSellerName: sellerName
     };
     await createdOrder.update(paymentUpdate);
+    await linkOrderDraftRequestToOrder({
+        bundleCode,
+        orderId: createdOrder.id,
+        aiJsonText: createdOrderMeta.aiJsonText || null
+    });
 
     const linked = await markPaymentLinkConnectionAsUsed(connection.id, createdOrder.id);
     if (!linked) {
@@ -2205,6 +2578,11 @@ const processIncomingPdfProofWebhook = async (content) => {
         if (!bundleCode) {
             console.log('[WhatsApp webhook][OrderDraft] Paid connection has no deferred bundle metadata, QR will not be sent.');
         } else {
+            await markOrderDraftPaid({
+                bundleCode,
+                connectionId: connection.id,
+                paidAt: connection.paidAt || new Date()
+            });
             try {
                 const orderFromBundle = await createOrderFromPaidBundle({
                     connection,
@@ -2220,6 +2598,13 @@ const processIncomingPdfProofWebhook = async (content) => {
                 console.error('[WhatsApp webhook][OrderDraft] Failed to auto-create order after payment:', error.message);
                 await sendMessageByChatId(senderChatId, `Не удалось автоматически создать заказ после оплаты: ${error.message}`);
             }
+        }
+
+        if (!bundleCode) {
+            await markOrderDraftPaid({
+                connectionId: connection.id,
+                paidAt: connection.paidAt || new Date()
+            });
         }
 
         const isOrderAssigned = await assignOrderToSellerFromPdf(connection, paidAmount, sellerAdmin);
@@ -2416,6 +2801,31 @@ const processIncomingMessageWebhook = async (content) => {
         return;
     }
 
+    const recipientPhoneForDraft = normalizePhoneNumber(
+        isOutgoingWebhook
+            ? (
+                content?.recipientPhone ||
+                content?.recipientData?.recipient ||
+                content?.senderPhone ||
+                ''
+            )
+            : (
+                content?.senderPhone ||
+                content?.senderData?.sender ||
+                content?.recipientPhone ||
+                ''
+            )
+    );
+    const startsWithOrderDraft = startsWithOrderDraftHeader(textMessage);
+    const orderDraftRequest = startsWithOrderDraft
+        ? await createOrGetOrderDraftRequestRecord({
+            messageId,
+            customerPhone: recipientPhoneForDraft || null,
+            customerChatId: recipientChatId,
+            sourceText: textMessage
+        })
+        : null;
+
     if (isOutgoingWebhook && startsWithKazpostCommand(textMessage)) {
         try {
             await createOrderFromKazpostOutgoingCommand({
@@ -2439,86 +2849,16 @@ const processIncomingMessageWebhook = async (content) => {
         webhookType === 'outgoingMessageReceived' ||
         webhookType === 'outgoingAPIMessageReceived';
     const parsedOrderDraft = shouldParseOrderDraft ? parseOrderDraftMessage(textMessage) : null;
+    if (startsWithOrderDraft && !parsedOrderDraft && orderDraftRequest) {
+        await markOrderDraftRequestFailed(orderDraftRequest, 'Сообщение начинается с "Ваш заказ", но не прошло разбор формата');
+    }
     if (parsedOrderDraft) {
-        console.log(
-            `[WhatsApp webhook] Order draft detected. chatId=${recipientChatId}, aliases=${parsedOrderDraft.aliases.length}, delivery=${parsedOrderDraft.deliveryPrice}`
-        );
-
-        const resolved = await resolveOrderAliases(parsedOrderDraft.aliases);
-        console.log(
-            `[WhatsApp webhook][OrderDraft] Resolve result: items=${resolved.items.length}, unknown=${resolved.unknownAliases.length}`
-        );
-
-        if (resolved.unknownAliases.length > 0) {
-            console.log(
-                `[WhatsApp webhook][OrderDraft] Unknown aliases found: ${resolved.unknownAliases.join(', ')}`
-            );
-            await sendMessageByChatId(
-                recipientChatId,
-                `Не найдены псевдонимы: ${resolved.unknownAliases.join(', ')}`
-            );
-            console.log('[WhatsApp webhook][OrderDraft] Sent unknown aliases message to chat');
-            return;
-        }
-
-        if (resolved.items.length === 0) {
-            console.log('[WhatsApp webhook][OrderDraft] Resolved items are empty, notifying chat');
-            await sendMessageByChatId(recipientChatId, 'Не удалось собрать заказ: список товаров пуст.');
-            return;
-        }
-
-        const productsTotal = resolved.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-        const totalToPay = productsTotal + parsedOrderDraft.deliveryPrice;
-        console.log(
-            `[WhatsApp webhook][OrderDraft] Totals: products=${productsTotal}, delivery=${parsedOrderDraft.deliveryPrice}, total=${totalToPay}`
-        );
-
-        const bundlePayload = {
-            v: 1,
-            deliveryPrice: parsedOrderDraft.deliveryPrice,
-            noteText: buildBundleNoteText(parsedOrderDraft.noteText, recipientChatId),
-            items: resolved.items.map((item) => ({
-                productId: item.productId,
-                typeId: item.typeId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice
-            }))
-        };
-
-        const bundleRow = await saveOrderBundle(bundlePayload);
-        const bundleCode = String(bundleRow.code || '').trim();
-        console.log(
-            `[WhatsApp webhook][OrderDraft] Bundle saved: id=${bundleRow.id}, codeLength=${bundleCode.length}`
-        );
-
-        setPendingOrderDraft(recipientChatId, {
-            bundleCode,
-            totalToPay,
-            sourceText: textMessage
-        });
-        console.log('[WhatsApp webhook][OrderDraft] Deferred QR saved in pending map');
-        console.log('[WhatsApp webhook][OrderDraft] Sending total-to-pay message...');
-        await sendMessageByChatId(recipientChatId, `К оплате ${totalToPay}`);
-        console.log('[WhatsApp webhook][OrderDraft] Total-to-pay message sent');
-        const orderDraftPaymentSource = buildOrderDraftSourceDescription({
-            sourceText: `К оплате ${totalToPay}`,
-            bundleCode,
-            totalToPay
-        });
-        const sentPaymentConnection = await sendPlannedPaymentLinkAndTrack({
+        await processOrderDraftRequest({
+            textMessage,
             recipientChatId,
-            expectedAmount: totalToPay,
-            sourceDescription: orderDraftPaymentSource,
-            messageId: null
+            parsedOrderDraft,
+            orderDraftRequest
         });
-        if (sentPaymentConnection) {
-            pendingOrderDraftByChatId.delete(recipientChatId);
-            console.log('[WhatsApp webhook][OrderDraft] Planned payment link sent immediately after total-to-pay message');
-        }
-
-        console.log(
-            `[WhatsApp webhook] Order draft accepted. QR deferred until payment. chatId=${recipientChatId}, items=${resolved.items.length}, total=${totalToPay}`
-        );
         return;
     }
 
@@ -2711,3 +3051,4 @@ router.post('/', async (req, res) => {
 module.exports = router;
 module.exports.processWebhookContent = processWebhookContent;
 module.exports.retryKazpostRequestProcessing = retryKazpostRequestProcessing;
+module.exports.retryOrderDraftRequestProcessing = retryOrderDraftRequestProcessing;

@@ -10,6 +10,7 @@ import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import SmsOutlinedIcon from '@mui/icons-material/SmsOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import { Box, Button, Typography } from '@mui/material';
 import { Admin, AppBar, Layout, Menu, Resource, useLogout } from 'react-admin';
 import authProvider from './authProvider';
@@ -28,6 +29,7 @@ import AliasesPage from './AliasesPage';
 import WhatsAppTemplateTestPage from './WhatsAppTemplateTestPage';
 import WhatsAppConnectionPage from './WhatsAppConnectionPage';
 import KazpostRequestsPage from './KazpostRequestsPage';
+import OrderDraftRequestsPage from './OrderDraftRequestsPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import { adminAuthStorage } from './authProvider';
@@ -189,6 +191,12 @@ const AdminApp = () => {
             options={{ label: 'Казпочта треки' }}
             list={KazpostRequestsPage}
             icon={LocalShippingOutlinedIcon}
+        />
+        <Resource
+            name="order-draft-requests"
+            options={{ label: 'Ваш заказ' }}
+            list={OrderDraftRequestsPage}
+            icon={AssignmentOutlinedIcon}
         />
         </Admin>
     );

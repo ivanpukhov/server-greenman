@@ -7,6 +7,7 @@ const AdminUser = require('../models/orders/AdminUser');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
 const OrderBundle = require('../models/orders/OrderBundle');
 const KazpostRequest = require('../models/orders/KazpostRequest');
+const OrderDraftRequest = require('../models/orders/OrderDraftRequest');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
 const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
@@ -27,7 +28,7 @@ const {
     getVisibleDispatchPlan,
     saveVisibleDispatchPlan
 } = require('../utilities/paymentLinkDispatchPlan');
-const { retryKazpostRequestProcessing } = require('../routes/whatsappWebhookRoutes');
+const { retryKazpostRequestProcessing, retryOrderDraftRequestProcessing } = require('../routes/whatsappWebhookRoutes');
 
 const { Op } = Sequelize;
 const IVAN_ADMIN_PHONE = '7073670497';
@@ -211,6 +212,46 @@ const buildKazpostRequestState = (requestRow, orderRow) => {
         label: 'Обрабатывается',
         needsAttention: false,
         trackingNumber: ''
+    };
+};
+
+const parseStoredJsonArray = (value) => {
+    if (!value) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        return [];
+    }
+};
+
+const buildOrderDraftPaymentStatus = (requestRow, orderRow) => {
+    const trackingNumber = String(orderRow?.trackingNumber || '').trim();
+    const hasPaidFlag = Boolean(requestRow?.paidAt) || isPaidOrderStatus(orderRow?.status);
+
+    if (!requestRow?.paymentRequestedAt) {
+        return {
+            code: requestRow?.processingStatus === 'awaiting_alias_fix' ? 'awaiting_alias_fix' : 'processing',
+            label: requestRow?.processingStatus === 'awaiting_alias_fix' ? 'Нужно исправить псевдонимы' : 'В обработке',
+            trackingNumber
+        };
+    }
+
+    if (hasPaidFlag) {
+        return {
+            code: 'paid',
+            label: 'Оплачено',
+            trackingNumber
+        };
+    }
+
+    return {
+        code: 'awaiting_payment',
+        label: 'Ожидает оплаты',
+        trackingNumber
     };
 };
 
@@ -453,6 +494,14 @@ const getOrderPeriodRange = (periodRaw) => {
         return { start, end };
     }
 
+    if (period === 'daybeforeyesterday' || period === 'beforeyesterday' || period === 'pozavchera') {
+        start.setDate(start.getDate() - 2);
+        end.setDate(end.getDate() - 2);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+    }
+
     if (period === 'week') {
         start.setDate(start.getDate() - 6);
         start.setHours(0, 0, 0, 0);
@@ -472,6 +521,10 @@ const getOrderPeriodRange = (periodRaw) => {
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
         return { start, end };
+    }
+
+    if (period === 'all') {
+        return null;
     }
 
     return null;
@@ -2034,6 +2087,7 @@ ${productDetails}`;
             const query = String(filter.q || filter.phoneNumber || '').trim();
             const needsAttentionOnly =
                 filter.needsAttention === true || String(filter.needsAttention || '').toLowerCase() === 'true';
+            const periodRange = filter.period ? getOrderPeriodRange(filter.period) : null;
 
             const where = {};
             if (query) {
@@ -2055,6 +2109,13 @@ ${productDetails}`;
                         }
                     }
                 ];
+            }
+
+            if (periodRange) {
+                where.createdAt = {
+                    [Op.gte]: periodRange.start,
+                    [Op.lte]: periodRange.end
+                };
             }
 
             const { rows, count } = await KazpostRequest.findAndCountAll({
@@ -2111,6 +2172,114 @@ ${productDetails}`;
         }
     },
 
+    async getOrderDraftRequests(req, res) {
+        try {
+            const { offset, limit } = parsePagination(req.query);
+            const [sortField, sortOrder] = parseSort(req.query, 'createdAt', 'DESC');
+            const filter = parseJsonParam(req.query.filter, {});
+            const query = String(filter.q || filter.phoneNumber || '').trim();
+            const periodRange = filter.period ? getOrderPeriodRange(filter.period) : null;
+
+            const where = {};
+            if (query) {
+                const normalizedPhone = normalizePhoneToTenDigits(query);
+                where[Op.or] = [
+                    {
+                        customerPhone: {
+                            [Op.like]: `%${normalizedPhone || query.replace(/\D/g, '')}%`
+                        }
+                    },
+                    {
+                        sourceText: {
+                            [Op.like]: `%${query}%`
+                        }
+                    },
+                    {
+                        aiJsonText: {
+                            [Op.like]: `%${query}%`
+                        }
+                    }
+                ];
+            }
+
+            if (periodRange) {
+                where.createdAt = {
+                    [Op.gte]: periodRange.start,
+                    [Op.lte]: periodRange.end
+                };
+            }
+
+            const { rows, count } = await OrderDraftRequest.findAndCountAll({
+                where,
+                order: [[sortField, sortOrder]],
+                offset,
+                limit
+            });
+
+            const orderIds = [...new Set(rows.map((row) => Number(row.orderId)).filter(Number.isInteger))];
+            const connectionIds = [...new Set(rows.map((row) => Number(row.paymentConnectionId)).filter(Number.isInteger))];
+
+            const [orders, connections] = await Promise.all([
+                orderIds.length > 0
+                    ? Order.findAll({
+                        where: {
+                            id: {
+                                [Op.in]: orderIds
+                            }
+                        }
+                    })
+                    : Promise.resolve([]),
+                connectionIds.length > 0
+                    ? SentPaymentLink.findAll({
+                        where: {
+                            id: {
+                                [Op.in]: connectionIds
+                            }
+                        }
+                    })
+                    : Promise.resolve([])
+            ]);
+
+            const orderById = new Map(orders.map((order) => [Number(order.id), order]));
+            const connectionById = new Map(connections.map((row) => [Number(row.id), row]));
+
+            const data = rows.map((row) => {
+                const rowJson = row.toJSON();
+                const orderJson = rowJson.orderId ? orderById.get(Number(rowJson.orderId))?.toJSON() || null : null;
+                const connectionJson = rowJson.paymentConnectionId
+                    ? connectionById.get(Number(rowJson.paymentConnectionId))?.toJSON() || null
+                    : null;
+                const status = buildOrderDraftPaymentStatus(rowJson, orderJson);
+                const unknownAliases = parseStoredJsonArray(rowJson.unknownAliasesJson);
+                const parsedAliases = parseStoredJsonArray(rowJson.parsedAliasesJson);
+
+                return {
+                    ...rowJson,
+                    orderId: orderJson?.id || rowJson.orderId || null,
+                    trackingNumber: status.trackingNumber || null,
+                    orderStatus: orderJson?.status || null,
+                    paymentStatusCode: status.code,
+                    paymentStatusLabel: status.label,
+                    customerName: orderJson?.customerName || null,
+                    addressIndex: orderJson?.addressIndex || null,
+                    city: orderJson?.city || null,
+                    street: orderJson?.street || null,
+                    houseNumber: orderJson?.houseNumber || null,
+                    unknownAliases,
+                    parsedAliases,
+                    paidAmount: connectionJson?.paidAmount || null
+                };
+            });
+
+            return res.json({
+                data,
+                total: count
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось получить список сообщений "Ваш заказ"', error: error.message });
+        }
+    },
+
     async retryKazpostRequest(req, res) {
         try {
             const requestId = Number(req.params.id);
@@ -2138,6 +2307,27 @@ ${productDetails}`;
             });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось повторно обработать запрос казпочты', error: error.message });
+        }
+    },
+
+    async retryOrderDraftRequest(req, res) {
+        try {
+            const requestId = Number(req.params.id);
+            if (!Number.isInteger(requestId) || requestId <= 0) {
+                return res.status(400).json({ message: 'Некорректный id записи "Ваш заказ"' });
+            }
+
+            const corrections = Array.isArray(req.body?.corrections) ? req.body.corrections : [];
+            const updatedRequest = await retryOrderDraftRequestProcessing({
+                requestId,
+                corrections
+            });
+
+            return res.json({
+                data: updatedRequest?.toJSON ? updatedRequest.toJSON() : updatedRequest
+            });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось повторно обработать сообщение "Ваш заказ"', error: error.message });
         }
     },
 

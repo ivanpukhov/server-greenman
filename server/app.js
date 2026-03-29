@@ -22,6 +22,7 @@ require('./models/orders/PaymentLink');
 require('./models/orders/SentPaymentLink');
 require('./models/orders/OrderBundle');
 require('./models/orders/KazpostRequest');
+require('./models/orders/OrderDraftRequest');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -360,6 +361,132 @@ const ensureKazpostRequestsSchema = async () => {
     }
 };
 
+const ensureOrderDraftRequestsSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('order_draft_requests');
+
+        if (!tableDefinition.sourceMessageId) {
+            await queryInterface.addColumn('order_draft_requests', 'sourceMessageId', {
+                type: Sequelize.STRING,
+                allowNull: true,
+                unique: true
+            });
+        }
+
+        if (!tableDefinition.customerPhone) {
+            await queryInterface.addColumn('order_draft_requests', 'customerPhone', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.customerChatId) {
+            await queryInterface.addColumn('order_draft_requests', 'customerChatId', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.sourceText) {
+            await queryInterface.addColumn('order_draft_requests', 'sourceText', {
+                type: Sequelize.TEXT,
+                allowNull: false,
+                defaultValue: ''
+            });
+        }
+
+        if (!tableDefinition.parsedAliasesJson) {
+            await queryInterface.addColumn('order_draft_requests', 'parsedAliasesJson', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.unknownAliasesJson) {
+            await queryInterface.addColumn('order_draft_requests', 'unknownAliasesJson', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.bundleCode) {
+            await queryInterface.addColumn('order_draft_requests', 'bundleCode', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.expectedAmount) {
+            await queryInterface.addColumn('order_draft_requests', 'expectedAmount', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paymentConnectionId) {
+            await queryInterface.addColumn('order_draft_requests', 'paymentConnectionId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paymentRequestedAt) {
+            await queryInterface.addColumn('order_draft_requests', 'paymentRequestedAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.paidAt) {
+            await queryInterface.addColumn('order_draft_requests', 'paidAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aiJsonText) {
+            await queryInterface.addColumn('order_draft_requests', 'aiJsonText', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.orderId) {
+            await queryInterface.addColumn('order_draft_requests', 'orderId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.processingStatus) {
+            await queryInterface.addColumn('order_draft_requests', 'processingStatus', {
+                type: Sequelize.STRING,
+                allowNull: false,
+                defaultValue: 'received'
+            });
+        }
+
+        if (!tableDefinition.lastError) {
+            await queryInterface.addColumn('order_draft_requests', 'lastError', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.retryCount) {
+            await queryInterface.addColumn('order_draft_requests', 'retryCount', {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+                defaultValue: 0
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке структуры таблицы order_draft_requests:', error);
+    }
+};
+
 const ensureAdminUsersSchema = async () => {
     const queryInterface = orderDB.getQueryInterface();
 
@@ -467,6 +594,7 @@ sequelize.sync().then(async () => {
         await ensureOrderSchema();
         await ensureSentPaymentLinksSchema();
         await ensureKazpostRequestsSchema();
+        await ensureOrderDraftRequestsSchema();
         console.log('База данных заказов синхронизирована.');
     }).catch(err => {
         console.error('Ошибка синхронизации базы данных заказов:', err);

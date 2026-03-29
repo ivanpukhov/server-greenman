@@ -1,11 +1,14 @@
-import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Card,
@@ -15,6 +18,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    IconButton,
     Paper,
     Stack,
     Table,
@@ -40,6 +44,15 @@ const senderLines = [
     'Улица Лазутина, 240'
 ];
 
+const periodOptions = [
+    { id: 'today', label: 'Сегодня' },
+    { id: 'yesterday', label: 'Вчера' },
+    { id: 'daybeforeyesterday', label: 'Позавчера' },
+    { id: 'week', label: 'Неделя' },
+    { id: 'month', label: 'Месяц' },
+    { id: 'all', label: 'Все' }
+];
+
 const escapeHtml = (value) =>
     String(value || '')
         .replace(/&/g, '&amp;')
@@ -54,11 +67,7 @@ const formatDateTime = (value) => {
     }
 
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return '—';
-    }
-
-    return date.toLocaleString('ru-RU');
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('ru-RU');
 };
 
 const sanitizeTrackingNumber = (value) =>
@@ -206,6 +215,7 @@ body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
     frame.style.width = '0';
     frame.style.height = '0';
     frame.style.border = '0';
+    document.body.appendChild(frame);
 
     const cleanup = () => {
         window.setTimeout(() => {
@@ -215,7 +225,6 @@ body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
         }, 300);
     };
 
-    document.body.appendChild(frame);
     const frameWindow = frame.contentWindow;
     const frameDocument = frameWindow?.document;
     if (!frameWindow || !frameDocument) {
@@ -245,36 +254,64 @@ body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
 };
 
 const statusColorMap = {
-    done: 'success',
-    timeout: 'error',
-    error: 'error',
-    waiting_tracking: 'warning',
+    paid: 'success',
+    awaiting_payment: 'warning',
+    awaiting_alias_fix: 'error',
     processing: 'default'
 };
 
-const periodOptions = [
-    { id: 'today', label: 'Сегодня' },
-    { id: 'yesterday', label: 'Вчера' },
-    { id: 'daybeforeyesterday', label: 'Позавчера' },
-    { id: 'week', label: 'Неделя' },
-    { id: 'month', label: 'Месяц' },
-    { id: 'all', label: 'Все' }
-];
+const buildInitialCorrections = (unknownAliases = []) =>
+    unknownAliases.length > 0
+        ? unknownAliases.map((alias, index) => ({
+            id: `unknown-${index}-${alias}`,
+            original: String(alias || '').trim(),
+            replacement: ''
+        }))
+        : [
+            {
+                id: 'extra-0',
+                original: '',
+                replacement: ''
+            }
+        ];
 
-const KazpostRequestsPage = () => {
+const OrderDraftRequestsPage = () => {
     const notify = useNotify();
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('md'));
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
-    const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
     const [period, setPeriod] = useState('all');
     const [retryRow, setRetryRow] = useState(null);
-    const [retryText, setRetryText] = useState('');
+    const [corrections, setCorrections] = useState([]);
+    const [aliasOptions, setAliasOptions] = useState([]);
     const [retryingId, setRetryingId] = useState(null);
 
+    const loadAliases = useCallback(async () => {
+        try {
+            const token = adminAuthStorage.getToken();
+            const response = await fetch(apiUrl('/admin/inventory/qr-codes'), {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(body.message || 'Не удалось загрузить псевдонимы');
+            }
+
+            const options = [...new Set((Array.isArray(body.data) ? body.data : [])
+                .map((item) => String(item.alias || '').trim())
+                .filter(Boolean))]
+                .sort((left, right) => left.localeCompare(right, 'ru-RU'));
+            setAliasOptions(options);
+        } catch (error) {
+            notify(error.message, { type: 'error' });
+        }
+    }, [notify]);
+
     const loadData = useCallback(
-        async (searchQuery = '', onlyAttention = false, nextPeriod = 'all') => {
+        async (searchQuery = '', nextPeriod = 'all') => {
             setLoading(true);
             try {
                 const token = adminAuthStorage.getToken();
@@ -283,19 +320,18 @@ const KazpostRequestsPage = () => {
                     range: JSON.stringify([0, 999]),
                     filter: JSON.stringify({
                         q: searchQuery || '',
-                        needsAttention: onlyAttention,
                         period: nextPeriod
                     })
                 });
 
-                const response = await fetch(apiUrl(`/admin/kazpost-requests?${params.toString()}`), {
+                const response = await fetch(apiUrl(`/admin/order-draft-requests?${params.toString()}`), {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
                 });
                 const body = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    throw new Error(body.message || 'Не удалось загрузить запросы казпочты');
+                    throw new Error(body.message || 'Не удалось загрузить сообщения "Ваш заказ"');
                 }
 
                 setRows(Array.isArray(body.data) ? body.data : []);
@@ -309,14 +345,18 @@ const KazpostRequestsPage = () => {
     );
 
     useEffect(() => {
-        loadData('', false, 'all');
-    }, [loadData]);
+        loadData('', 'all');
+        loadAliases();
+    }, [loadAliases, loadData]);
 
-    const attentionCount = useMemo(() => rows.filter((row) => row.needsAttention).length, [rows]);
+    const needsAttentionCount = useMemo(
+        () => rows.filter((row) => row.paymentStatusCode === 'awaiting_alias_fix').length,
+        [rows]
+    );
 
     const openRetryDialog = (row) => {
         setRetryRow(row);
-        setRetryText(String(row.sourceText || '').trim());
+        setCorrections(buildInitialCorrections(row.unknownAliases || []));
     };
 
     const closeRetryDialog = () => {
@@ -324,35 +364,63 @@ const KazpostRequestsPage = () => {
             return;
         }
         setRetryRow(null);
-        setRetryText('');
+        setCorrections([]);
+    };
+
+    const updateCorrection = (id, field, value) => {
+        setCorrections((prev) =>
+            prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        );
+    };
+
+    const addCorrection = () => {
+        setCorrections((prev) => [
+            ...prev,
+            {
+                id: `extra-${Date.now()}-${prev.length}`,
+                original: '',
+                replacement: ''
+            }
+        ]);
+    };
+
+    const removeCorrection = (id) => {
+        setCorrections((prev) => prev.filter((item) => item.id !== id));
     };
 
     const submitRetry = async () => {
-        if (!retryRow || !retryText.trim()) {
+        if (!retryRow) {
             return;
         }
+
+        const payloadCorrections = corrections
+            .map((item) => ({
+                original: String(item.original || '').trim(),
+                replacement: String(item.replacement || '').trim()
+            }))
+            .filter((item) => item.original || item.replacement);
 
         setRetryingId(retryRow.id);
         try {
             const token = adminAuthStorage.getToken();
-            const response = await fetch(apiUrl(`/admin/kazpost-requests/${retryRow.id}/retry`), {
+            const response = await fetch(apiUrl(`/admin/order-draft-requests/${retryRow.id}/retry`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    sourceText: retryText.trim()
+                    corrections: payloadCorrections
                 })
             });
             const body = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(body.message || body.error || 'Не удалось повторить обработку');
+                throw new Error(body.message || body.error || 'Не удалось повторно обработать сообщение');
             }
 
-            notify('Запрос повторно отправлен в ИИ', { type: 'success' });
+            notify('Сообщение "Ваш заказ" обработано повторно', { type: 'success' });
             closeRetryDialog();
-            await loadData(query, needsAttentionOnly, period);
+            await loadData(query, period);
         } catch (error) {
             notify(error.message, { type: 'error' });
         } finally {
@@ -378,8 +446,8 @@ const KazpostRequestsPage = () => {
             </Button>
             <Button
                 size="small"
-                variant={row.needsAttention ? 'contained' : 'outlined'}
-                color={row.needsAttention ? 'warning' : 'inherit'}
+                variant={row.paymentStatusCode === 'awaiting_alias_fix' ? 'contained' : 'outlined'}
+                color={row.paymentStatusCode === 'awaiting_alias_fix' ? 'warning' : 'inherit'}
                 startIcon={<ReplayOutlinedIcon />}
                 onClick={() => openRetryDialog(row)}
             >
@@ -394,26 +462,31 @@ const KazpostRequestsPage = () => {
                 <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'center' }}>
                     <Box sx={{ flex: 1 }}>
                         <Stack direction="row" spacing={1} alignItems="center">
-                            <LocalShippingOutlinedIcon color="primary" />
-                            <Typography variant="h6">Казпочта: трек-страница</Typography>
+                            <AssignmentOutlinedIcon color="primary" />
+                            <Typography variant="h6">Ваш заказ</Typography>
                         </Stack>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.8 }}>
-                            Здесь хранится связка: сообщение `казпочта` -> ответ ИИ -> заказ -> трек-номер.
+                            Все сообщения, которые начинаются с фразы `Ваш заказ`, с привязкой к оплате, заказу и треку.
                         </Typography>
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.2 }}>
                             <Chip
                                 icon={<WarningAmberOutlinedIcon />}
-                                label={`Требуют внимания: ${attentionCount}`}
-                                color={attentionCount > 0 ? 'warning' : 'default'}
-                                variant={attentionCount > 0 ? 'filled' : 'outlined'}
+                                label={`Нужно исправить: ${needsAttentionCount}`}
+                                color={needsAttentionCount > 0 ? 'warning' : 'default'}
+                                variant={needsAttentionCount > 0 ? 'filled' : 'outlined'}
                             />
                             <Chip label={`Всего записей: ${rows.length}`} variant="outlined" />
                         </Stack>
                     </Box>
-                    <Stack component="form" direction={{ xs: 'column', md: 'row' }} gap={1} onSubmit={(event) => {
-                        event.preventDefault();
-                        loadData(query, needsAttentionOnly, period);
-                    }}>
+                    <Stack
+                        component="form"
+                        direction={{ xs: 'column', md: 'row' }}
+                        gap={1}
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            loadData(query, period);
+                        }}
+                    >
                         <TextField
                             size="small"
                             placeholder="Поиск по номеру или тексту"
@@ -426,21 +499,9 @@ const KazpostRequestsPage = () => {
                         </Button>
                         <Button
                             type="button"
-                            variant={needsAttentionOnly ? 'contained' : 'outlined'}
-                            color={needsAttentionOnly ? 'warning' : 'inherit'}
-                            onClick={() => {
-                                const nextValue = !needsAttentionOnly;
-                                setNeedsAttentionOnly(nextValue);
-                                loadData(query, nextValue, period);
-                            }}
-                        >
-                            Только ошибки
-                        </Button>
-                        <Button
-                            type="button"
                             variant="outlined"
                             startIcon={<RefreshOutlinedIcon />}
-                            onClick={() => loadData(query, needsAttentionOnly, period)}
+                            onClick={() => loadData(query, period)}
                         >
                             Обновить
                         </Button>
@@ -454,7 +515,7 @@ const KazpostRequestsPage = () => {
                             variant={period === option.id ? 'contained' : 'outlined'}
                             onClick={() => {
                                 setPeriod(option.id);
-                                loadData(query, needsAttentionOnly, option.id);
+                                loadData(query, option.id);
                             }}
                         >
                             {option.label}
@@ -464,7 +525,7 @@ const KazpostRequestsPage = () => {
             </Paper>
 
             {rows.length === 0 && !loading ? (
-                <Alert severity="info">Запросы казпочты пока не найдены.</Alert>
+                <Alert severity="info">Сообщения "Ваш заказ" пока не найдены.</Alert>
             ) : null}
 
             <Paper sx={{ borderRadius: 2.5, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
@@ -477,10 +538,10 @@ const KazpostRequestsPage = () => {
                                         <Stack direction="row" justifyContent="space-between" alignItems="center">
                                             <Typography variant="subtitle2">{row.customerPhone || '—'}</Typography>
                                             <Chip
-                                                label={row.stateLabel}
+                                                label={row.paymentStatusLabel}
                                                 size="small"
-                                                color={statusColorMap[row.stateCode] || 'default'}
-                                                variant={row.stateCode === 'processing' ? 'outlined' : 'filled'}
+                                                color={statusColorMap[row.paymentStatusCode] || 'default'}
+                                                variant={row.paymentStatusCode === 'processing' ? 'outlined' : 'filled'}
                                             />
                                         </Stack>
                                         <Typography variant="body2" color="text.secondary">
@@ -488,8 +549,10 @@ const KazpostRequestsPage = () => {
                                         </Typography>
                                         <Typography variant="body2">Заказ: {row.orderId ? `#${row.orderId}` : '—'}</Typography>
                                         <Typography variant="body2">Трек: {row.trackingNumber || '—'}</Typography>
-                                        {row.errorText ? (
-                                            <Alert severity={row.needsAttention ? 'error' : 'warning'}>{row.errorText}</Alert>
+                                        {row.paymentStatusCode === 'awaiting_alias_fix' ? (
+                                            <Alert severity="warning">
+                                                Не найдены псевдонимы: {(row.unknownAliases || []).join(', ') || '—'}
+                                            </Alert>
                                         ) : null}
                                         {renderRowActions(row)}
                                     </Stack>
@@ -499,15 +562,15 @@ const KazpostRequestsPage = () => {
                     </Stack>
                 ) : (
                     <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small" sx={{ minWidth: 1120 }}>
+                        <Table size="small" sx={{ minWidth: 1180 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell>Телефон</TableCell>
                                     <TableCell>Создано</TableCell>
-                                    <TableCell>Статус</TableCell>
                                     <TableCell>ID заказа</TableCell>
+                                    <TableCell>Статус оплаты</TableCell>
                                     <TableCell>Трек-номер</TableCell>
-                                    <TableCell>Ошибка</TableCell>
+                                    <TableCell>Псевдонимы</TableCell>
                                     <TableCell align="right">Действия</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -516,20 +579,26 @@ const KazpostRequestsPage = () => {
                                     <TableRow key={row.id} hover>
                                         <TableCell>{row.customerPhone || '—'}</TableCell>
                                         <TableCell>{formatDateTime(row.createdAt)}</TableCell>
+                                        <TableCell>{row.orderId ? `#${row.orderId}` : '—'}</TableCell>
                                         <TableCell>
                                             <Chip
-                                                label={row.stateLabel}
+                                                label={row.paymentStatusLabel}
                                                 size="small"
-                                                color={statusColorMap[row.stateCode] || 'default'}
-                                                variant={row.stateCode === 'processing' ? 'outlined' : 'filled'}
+                                                color={statusColorMap[row.paymentStatusCode] || 'default'}
+                                                variant={row.paymentStatusCode === 'processing' ? 'outlined' : 'filled'}
                                             />
                                         </TableCell>
-                                        <TableCell>{row.orderId ? `#${row.orderId}` : '—'}</TableCell>
                                         <TableCell>{row.trackingNumber || '—'}</TableCell>
                                         <TableCell sx={{ maxWidth: 360 }}>
-                                            <Typography variant="body2" color={row.needsAttention ? 'error.main' : 'text.secondary'}>
-                                                {row.errorText || '—'}
-                                            </Typography>
+                                            {row.paymentStatusCode === 'awaiting_alias_fix' ? (
+                                                <Typography variant="body2" color="warning.main">
+                                                    {(row.unknownAliases || []).join(', ') || '—'}
+                                                </Typography>
+                                            ) : (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {(row.parsedAliases || []).map((item) => item.alias).filter(Boolean).join(', ') || '—'}
+                                                </Typography>
+                                            )}
                                         </TableCell>
                                         <TableCell align="right">{renderRowActions(row)}</TableCell>
                                     </TableRow>
@@ -541,22 +610,51 @@ const KazpostRequestsPage = () => {
             </Paper>
 
             <Dialog open={Boolean(retryRow)} onClose={closeRetryDialog} fullWidth maxWidth="md">
-                <DialogTitle>Повторная обработка запроса</DialogTitle>
+                <DialogTitle>Исправить псевдонимы</DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={1.5}>
                         <Typography variant="body2" color="text.secondary">
-                            Здесь можно поправить исходное сообщение `казпочта`, затем снова отправить его в ИИ и обновить заказ.
+                            Исправьте ненайденые псевдонимы или добавьте новые, затем отправьте сообщение на повторную обработку.
                         </Typography>
-                        <TextField
-                            label="Текст сообщения"
-                            fullWidth
-                            multiline
-                            minRows={8}
-                            value={retryText}
-                            onChange={(event) => setRetryText(event.target.value)}
-                        />
+                        {(corrections || []).map((item) => (
+                            <Stack
+                                key={item.id}
+                                direction={{ xs: 'column', md: 'row' }}
+                                spacing={1}
+                                alignItems={{ md: 'center' }}
+                            >
+                                <TextField
+                                    label="Исходный псевдоним"
+                                    value={item.original}
+                                    onChange={(event) => updateCorrection(item.id, 'original', event.target.value)}
+                                    sx={{ minWidth: { md: 220 } }}
+                                />
+                                <Autocomplete
+                                    freeSolo
+                                    options={aliasOptions}
+                                    value={item.replacement}
+                                    onInputChange={(_event, value) => updateCorrection(item.id, 'replacement', value)}
+                                    onChange={(_event, value) => updateCorrection(item.id, 'replacement', value || '')}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Новый псевдоним"
+                                            fullWidth
+                                        />
+                                    )}
+                                />
+                                <IconButton onClick={() => removeCorrection(item.id)} aria-label="Удалить строку">
+                                    <CloseOutlinedIcon />
+                                </IconButton>
+                            </Stack>
+                        ))}
+                        <Box>
+                            <Button startIcon={<AddOutlinedIcon />} onClick={addCorrection}>
+                                Добавить псевдоним
+                            </Button>
+                        </Box>
                         {retryRow?.aiJsonText ? (
-                            <Alert severity="info">Последний сохранённый JSON ИИ: {retryRow.aiJsonText}</Alert>
+                            <Alert severity="info">Последний JSON ИИ: {retryRow.aiJsonText}</Alert>
                         ) : null}
                     </Stack>
                 </DialogContent>
@@ -564,11 +662,7 @@ const KazpostRequestsPage = () => {
                     <Button onClick={closeRetryDialog} disabled={Boolean(retryingId)}>
                         Отмена
                     </Button>
-                    <Button
-                        onClick={submitRetry}
-                        variant="contained"
-                        disabled={Boolean(retryingId) || !retryText.trim()}
-                    >
+                    <Button onClick={submitRetry} variant="contained" disabled={Boolean(retryingId)}>
                         Отправить
                     </Button>
                 </DialogActions>
@@ -577,4 +671,4 @@ const KazpostRequestsPage = () => {
     );
 };
 
-export default KazpostRequestsPage;
+export default OrderDraftRequestsPage;

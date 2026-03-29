@@ -60,5 +60,7 @@ router.get('/order-bundles/:code', adminController.getOrderBundle);
 router.put('/inventory/types/:id/alias', adminController.updateInventoryTypeAlias);
 router.get('/kazpost-requests', adminController.getKazpostRequests);
 router.post('/kazpost-requests/:id/retry', adminController.retryKazpostRequest);
+router.get('/order-draft-requests', adminController.getOrderDraftRequests);
+router.post('/order-draft-requests/:id/retry', adminController.retryOrderDraftRequest);
 
 module.exports = router;
