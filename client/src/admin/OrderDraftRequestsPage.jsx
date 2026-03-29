@@ -283,6 +283,7 @@ const OrderDraftRequestsPage = () => {
     const [query, setQuery] = useState('');
     const [period, setPeriod] = useState('all');
     const [retryRow, setRetryRow] = useState(null);
+    const [sourceText, setSourceText] = useState('');
     const [corrections, setCorrections] = useState([]);
     const [aliasOptions, setAliasOptions] = useState([]);
     const [retryingId, setRetryingId] = useState(null);
@@ -356,6 +357,7 @@ const OrderDraftRequestsPage = () => {
 
     const openRetryDialog = (row) => {
         setRetryRow(row);
+        setSourceText(String(row.sourceText || '').trim());
         setCorrections(buildInitialCorrections(row.unknownAliases || []));
     };
 
@@ -364,6 +366,7 @@ const OrderDraftRequestsPage = () => {
             return;
         }
         setRetryRow(null);
+        setSourceText('');
         setCorrections([]);
     };
 
@@ -410,7 +413,8 @@ const OrderDraftRequestsPage = () => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    corrections: payloadCorrections
+                    corrections: payloadCorrections,
+                    sourceText: sourceText.trim()
                 })
             });
             const body = await response.json().catch(() => ({}));
@@ -549,6 +553,9 @@ const OrderDraftRequestsPage = () => {
                                         </Typography>
                                         <Typography variant="body2">Заказ: {row.orderId ? `#${row.orderId}` : '—'}</Typography>
                                         <Typography variant="body2">Трек: {row.trackingNumber || '—'}</Typography>
+                                        {row.lastError ? (
+                                            <Alert severity="warning">{row.lastError}</Alert>
+                                        ) : null}
                                         {row.paymentStatusCode === 'awaiting_alias_fix' ? (
                                             <Alert severity="warning">
                                                 Не найдены псевдонимы: {(row.unknownAliases || []).join(', ') || '—'}
@@ -571,6 +578,7 @@ const OrderDraftRequestsPage = () => {
                                     <TableCell>Статус оплаты</TableCell>
                                     <TableCell>Трек-номер</TableCell>
                                     <TableCell>Псевдонимы</TableCell>
+                                    <TableCell>Ошибка</TableCell>
                                     <TableCell align="right">Действия</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -600,6 +608,11 @@ const OrderDraftRequestsPage = () => {
                                                 </Typography>
                                             )}
                                         </TableCell>
+                                        <TableCell sx={{ maxWidth: 360 }}>
+                                            <Typography variant="body2" color={row.lastError ? 'warning.main' : 'text.secondary'}>
+                                                {row.lastError || '—'}
+                                            </Typography>
+                                        </TableCell>
                                         <TableCell align="right">{renderRowActions(row)}</TableCell>
                                     </TableRow>
                                 ))}
@@ -614,8 +627,24 @@ const OrderDraftRequestsPage = () => {
                 <DialogContent dividers>
                     <Stack spacing={1.5}>
                         <Typography variant="body2" color="text.secondary">
-                            Исправьте ненайденые псевдонимы или добавьте новые, затем отправьте сообщение на повторную обработку.
+                            Исправьте ненайденые псевдонимы или поправьте весь текст сообщения, затем отправьте его на повторную обработку.
                         </Typography>
+                        {retryRow?.lastError ? (
+                            <Alert severity="warning">{retryRow.lastError}</Alert>
+                        ) : null}
+                        {(retryRow?.unknownAliases || []).length > 0 ? (
+                            <Alert severity="info">
+                                Ненайденые псевдонимы: {(retryRow.unknownAliases || []).join(', ')}
+                            </Alert>
+                        ) : null}
+                        <TextField
+                            label="Текст сообщения"
+                            fullWidth
+                            multiline
+                            minRows={8}
+                            value={sourceText}
+                            onChange={(event) => setSourceText(event.target.value)}
+                        />
                         {(corrections || []).map((item) => (
                             <Stack
                                 key={item.id}
@@ -662,7 +691,7 @@ const OrderDraftRequestsPage = () => {
                     <Button onClick={closeRetryDialog} disabled={Boolean(retryingId)}>
                         Отмена
                     </Button>
-                    <Button onClick={submitRetry} variant="contained" disabled={Boolean(retryingId)}>
+                    <Button onClick={submitRetry} variant="contained" disabled={Boolean(retryingId) || !sourceText.trim()}>
                         Отправить
                     </Button>
                 </DialogActions>

@@ -2318,9 +2318,11 @@ ${productDetails}`;
             }
 
             const corrections = Array.isArray(req.body?.corrections) ? req.body.corrections : [];
+            const sourceText = String(req.body?.sourceText || '').trim();
             const updatedRequest = await retryOrderDraftRequestProcessing({
                 requestId,
-                corrections
+                corrections,
+                sourceText
             });
 
             return res.json({

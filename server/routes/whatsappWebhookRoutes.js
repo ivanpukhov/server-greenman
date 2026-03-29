@@ -1412,17 +1412,19 @@ const retryKazpostRequestProcessing = async ({
 
 const retryOrderDraftRequestProcessing = async ({
     requestId,
-    corrections = []
+    corrections = [],
+    sourceText = ''
 }) => {
     const requestRecord = await OrderDraftRequest.findByPk(requestId);
     if (!requestRecord) {
         throw new Error('Запись "Ваш заказ" не найдена');
     }
 
-    const nextSourceText = buildOrderDraftTextWithCorrections(requestRecord.sourceText, corrections);
-    const parsedOrderDraft = parseOrderDraftMessage(nextSourceText);
-    if (!parsedOrderDraft) {
-        throw new Error('Не удалось обработать исправленное сообщение "Ваш заказ"');
+    const sourceBaseText = String(sourceText || '').trim() || String(requestRecord.sourceText || '').trim();
+    const nextSourceText = buildOrderDraftTextWithCorrections(sourceBaseText, corrections);
+    const analyzedDraft = analyzeOrderDraftMessage(nextSourceText);
+    if (!analyzedDraft.parsed) {
+        throw new Error(analyzedDraft.error || 'Не удалось обработать исправленное сообщение "Ваш заказ"');
     }
 
     await requestRecord.update({
@@ -1436,7 +1438,7 @@ const retryOrderDraftRequestProcessing = async ({
     await processOrderDraftRequest({
         textMessage: nextSourceText,
         recipientChatId: String(requestRecord.customerChatId || '').trim(),
-        parsedOrderDraft,
+        parsedOrderDraft: analyzedDraft.parsed,
         orderDraftRequest: requestRecord
     });
 
@@ -1695,12 +1697,15 @@ const parseAliasLineWithQuantity = (line) => {
     };
 };
 
-const parseOrderDraftMessage = (text) => {
+const analyzeOrderDraftMessage = (text) => {
     const rawText = String(text || '');
     console.log(`[WhatsApp webhook][OrderDraft] Raw text received (${rawText.length} chars)`);
     if (!rawText) {
         console.log('[WhatsApp webhook][OrderDraft] Skip: empty text');
-        return null;
+        return {
+            parsed: null,
+            error: 'Текст сообщения пустой.'
+        };
     }
 
     const lines = rawText
@@ -1710,7 +1715,10 @@ const parseOrderDraftMessage = (text) => {
 
     if (lines.length < 3) {
         console.log(`[WhatsApp webhook][OrderDraft] Skip: not enough lines (${lines.length})`);
-        return null;
+        return {
+            parsed: null,
+            error: `Недостаточно строк в сообщении: ${lines.length}. Нужны заголовок, товары, доставка и данные клиента.`
+        };
     }
 
     const firstLineNormalized = normalizeAlias(lines[0]).replace(/\s*[:：]\s*$/, '');
@@ -1718,7 +1726,10 @@ const parseOrderDraftMessage = (text) => {
         console.log(
             `[WhatsApp webhook][OrderDraft] Skip: first line is not "Ваш заказ" (got "${lines[0]}")`
         );
-        return null;
+        return {
+            parsed: null,
+            error: `Первая строка должна быть "Ваш заказ", сейчас там: "${lines[0]}".`
+        };
     }
 
     const deliveryLineIndex = lines.findIndex((line, index) => {
@@ -1730,7 +1741,10 @@ const parseOrderDraftMessage = (text) => {
 
     if (deliveryLineIndex < 1) {
         console.log('[WhatsApp webhook][OrderDraft] Skip: delivery line not found');
-        return null;
+        return {
+            parsed: null,
+            error: 'Не найдена строка доставки. Добавьте строку вида "Доставка 1500".'
+        };
     }
 
     const deliveryLine = lines[deliveryLineIndex];
@@ -1739,7 +1753,10 @@ const parseOrderDraftMessage = (text) => {
         console.log(
             `[WhatsApp webhook][OrderDraft] Skip: delivery line does not match pattern (got "${deliveryLine}")`
         );
-        return null;
+        return {
+            parsed: null,
+            error: `Строка доставки заполнена неверно: "${deliveryLine}". Используйте формат "Доставка 1500".`
+        };
     }
 
     const deliveryPrice = Number.parseInt(deliveryMatch[1].replace(/\s+/g, ''), 10);
@@ -1747,7 +1764,10 @@ const parseOrderDraftMessage = (text) => {
         console.log(
             `[WhatsApp webhook][OrderDraft] Skip: invalid delivery price parsed from "${deliveryLine}"`
         );
-        return null;
+        return {
+            parsed: null,
+            error: `Не удалось определить стоимость доставки из строки "${deliveryLine}".`
+        };
     }
 
     const aliasEntries = lines
@@ -1757,7 +1777,10 @@ const parseOrderDraftMessage = (text) => {
 
     if (aliasEntries.length === 0) {
         console.log('[WhatsApp webhook][OrderDraft] Skip: aliases list is empty');
-        return null;
+        return {
+            parsed: null,
+            error: 'Не найдено ни одного товара в блоке заказа.'
+        };
     }
 
     const noteText = lines
@@ -1766,17 +1789,30 @@ const parseOrderDraftMessage = (text) => {
         .filter(Boolean)
         .join('\n');
 
+    if (!noteText) {
+        console.log('[WhatsApp webhook][OrderDraft] Skip: note text is empty');
+        return {
+            parsed: null,
+            error: 'После строки доставки нет данных клиента для трек-номера.'
+        };
+    }
+
     console.log(
         `[WhatsApp webhook][OrderDraft] Parsed successfully: aliases=${aliasEntries.length}, delivery=${deliveryPrice}, noteLength=${noteText.length}`
     );
     console.log('[WhatsApp webhook][OrderDraft] Aliases:', aliasEntries);
 
     return {
-        aliases: aliasEntries,
-        deliveryPrice,
-        noteText
+        parsed: {
+            aliases: aliasEntries,
+            deliveryPrice,
+            noteText
+        },
+        error: null
     };
 };
+
+const parseOrderDraftMessage = (text) => analyzeOrderDraftMessage(text).parsed;
 
 const resolveOrderAliases = async (aliases) => {
     console.log(`[WhatsApp webhook][OrderDraft] Resolving aliases, count=${aliases.length}`);
@@ -2632,15 +2668,9 @@ const processIncomingPdfProofWebhook = async (content) => {
     } finally {
         const deleteResult = await deleteProcessedPdfMessageIfNeeded(content, sellerIin);
         if (shouldDeleteProcessedPdf) {
-            if (deleteResult?.ok) {
-                await sendPdfProofDebugLog(
-                    `PDF_DELETE_OK method=${sanitizeLogToken(deleteResult.method, 24)} chat=${sanitizeLogToken(deleteResult.chatId, 40)} msg=${sanitizeLogToken(deleteResult.messageId, 64)} ts=${sanitizeLogToken(deleteResult.messageTimestamp, 20)}`
-                );
-            } else {
-                await sendPdfProofDebugLog(
-                    `PDF_DELETE_FAIL reason=${sanitizeLogToken(deleteResult?.reason, 40)} chat=${sanitizeLogToken(deleteResult?.chatId || senderChatId, 40)} msg=${sanitizeLogToken(deleteResult?.messageId || content?.idMessage, 64)} ts=${sanitizeLogToken(deleteResult?.messageTimestamp || content?.messageTimestamp, 20)} error=${sanitizeLogToken(deleteResult?.error, 180)}`
-                );
-            }
+            console.log(
+                `[WhatsApp webhook] PDF delete debug suppressed. ok=${Boolean(deleteResult?.ok)} chat=${sanitizeLogToken(deleteResult?.chatId || senderChatId, 40)} msg=${sanitizeLogToken(deleteResult?.messageId || content?.idMessage, 64)}`
+            );
         }
     }
 };
@@ -2848,9 +2878,13 @@ const processIncomingMessageWebhook = async (content) => {
         webhookType === 'incomingMessageReceived' ||
         webhookType === 'outgoingMessageReceived' ||
         webhookType === 'outgoingAPIMessageReceived';
-    const parsedOrderDraft = shouldParseOrderDraft ? parseOrderDraftMessage(textMessage) : null;
+    const analyzedOrderDraft = shouldParseOrderDraft ? analyzeOrderDraftMessage(textMessage) : { parsed: null, error: null };
+    const parsedOrderDraft = analyzedOrderDraft.parsed;
     if (startsWithOrderDraft && !parsedOrderDraft && orderDraftRequest) {
-        await markOrderDraftRequestFailed(orderDraftRequest, 'Сообщение начинается с "Ваш заказ", но не прошло разбор формата');
+        await markOrderDraftRequestFailed(
+            orderDraftRequest,
+            analyzedOrderDraft.error || 'Сообщение начинается с "Ваш заказ", но не прошло разбор формата'
+        );
     }
     if (parsedOrderDraft) {
         await processOrderDraftRequest({
