@@ -19,6 +19,7 @@ const LID_RETRY_DELAY_MAX_MS = 500;
 const LID_DEFERRED_MAX_ATTEMPTS = 120;
 const LID_DEFERRED_DELAY_MS = 3000;
 const WEBHOOK_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
+const MEDIA_DOWNLOAD_RETRY_DELAYS_MS = [0, 1200, 3000, 7000];
 
 let socket = null;
 let saveCredsRef = null;
@@ -536,53 +537,59 @@ const safeDownloadMediaBuffer = async (msg) => {
                 reuploadRequest: socket.updateMediaMessage
             }
         );
+    const unwrapped = unwrapMessageNode(msg?.message || {});
+    const fallbackMsg = {
+        ...msg,
+        message: unwrapped
+    };
+    const refreshTarget = hasDocumentWithCaption ? fallbackMsg : msg;
+    const errors = [];
 
-    try {
-        const buffer = await attemptDownload(msg);
-        return Buffer.isBuffer(buffer) ? buffer : null;
-    } catch (firstError) {
-        // Fallback for wrapped media nodes (documentWithCaptionMessage / viewOnce / ephemeral)
-        const unwrapped = unwrapMessageNode(msg?.message || {});
-        const fallbackMsg = {
-            ...msg,
-            message: unwrapped
-        };
+    for (let index = 0; index < MEDIA_DOWNLOAD_RETRY_DELAYS_MS.length; index += 1) {
+        const attempt = index + 1;
+        const delayMs = MEDIA_DOWNLOAD_RETRY_DELAYS_MS[index];
+        if (delayMs > 0) {
+            await sleep(delayMs);
+        }
+
+        for (const variant of [
+            { label: 'original', target: msg },
+            { label: 'unwrapped', target: fallbackMsg }
+        ]) {
+            try {
+                const buffer = await attemptDownload(variant.target);
+                if (Buffer.isBuffer(buffer) && buffer.length > 0) {
+                    if (hasDocumentWithCaption) {
+                        const fileName =
+                            msg?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName ||
+                            'file.pdf';
+                        console.log(`[Baileys][pdf] extracted from documentWithCaptionMessage: ${fileName}`);
+                    }
+                    if (attempt > 1 || variant.label !== 'original') {
+                        console.log(
+                            `[Baileys][media] download recovered type=${mediaSummary} attempt=${attempt} variant=${variant.label}`
+                        );
+                    }
+                    return buffer;
+                }
+                errors.push(`attempt=${attempt} variant=${variant.label} empty-buffer`);
+            } catch (error) {
+                errors.push(`attempt=${attempt} variant=${variant.label} ${String(error?.message || error)}`);
+            }
+        }
 
         try {
-            const buffer = await attemptDownload(fallbackMsg);
-            if (hasDocumentWithCaption) {
-                const fileName =
-                    msg?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName ||
-                    'file.pdf';
-                console.log(`[Baileys][pdf] extracted from documentWithCaptionMessage: ${fileName}`);
-            }
-            return Buffer.isBuffer(buffer) ? buffer : null;
-        } catch (secondError) {
-            try {
-                // Force media URL refresh once before giving up. This helps when the
-                // incoming media message carries an expired CDN URL.
-                const refreshTarget = hasDocumentWithCaption ? fallbackMsg : msg;
-                await socket.updateMediaMessage(refreshTarget);
-                const retriedBuffer = await attemptDownload(refreshTarget);
-                if (Buffer.isBuffer(retriedBuffer) && retriedBuffer.length > 0) {
-                    console.log(
-                        `[Baileys][media] download recovered after updateMediaMessage type=${mediaSummary}`
-                    );
-                    return retriedBuffer;
-                }
-            } catch (thirdError) {
-                const { node: mediaNode, mediaType } = getMediaNodeForDownload(unwrapped);
-                console.log(
-                    `[Baileys][media] download failed type=${mediaType || mediaSummary} first=${String(firstError?.message || firstError)} second=${String(secondError?.message || secondError)} third=${String(thirdError?.message || thirdError)} url=${String(mediaNode?.url || '').slice(0, 120)}`
-                );
-            }
-
-            console.log(
-                `[Baileys][media] download failed type=${mediaSummary}: ${String(firstError?.message || firstError)}`
-            );
-            return null;
+            await socket.updateMediaMessage(refreshTarget);
+        } catch (refreshError) {
+            errors.push(`attempt=${attempt} updateMediaMessage ${String(refreshError?.message || refreshError)}`);
         }
     }
+
+    const { node: mediaNode, mediaType } = getMediaNodeForDownload(unwrapped);
+    console.log(
+        `[Baileys][media] download failed type=${mediaType || mediaSummary} attempts=${MEDIA_DOWNLOAD_RETRY_DELAYS_MS.length} errors=${errors.join(' | ')} url=${String(mediaNode?.url || '').slice(0, 120)}`
+    );
+    return null;
 };
 
 const buildWebhookPayloadFromMessage = async (msg, resolvedJids = {}) => {

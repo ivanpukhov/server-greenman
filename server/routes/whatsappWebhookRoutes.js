@@ -213,6 +213,40 @@ const isWhatsAppEncryptedMediaUrl = (value) => {
         /\.enc(?:$|\?)/i.test(raw);
 };
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const is360DialogInvalidParameterError = (error) => {
+    const responseData = error?.response?.data || {};
+    const errorBody = responseData?.error || {};
+    return Number(errorBody?.code) === 100 ||
+        String(errorBody?.message || '').includes('Invalid parameter') ||
+        String(errorBody?.error_data?.details || '').includes('Invalid parameter');
+};
+
+const send360DialogVideoMessageByMediaId = async ({ to, mediaId, captionText }) => {
+    const payload = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'video',
+        video: {
+            id: mediaId,
+            caption: captionText
+        }
+    };
+
+    return axios.post(
+        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
+        payload,
+        {
+            headers: {
+                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        }
+    );
+};
+
 const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
     const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
     const captionText = 'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
@@ -230,18 +264,30 @@ const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl =
         size: mediaBuffer.length
     }));
 
-    const uploadResponse = await axios.post(
-        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
-        form,
-        {
-            headers: {
-                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                ...form.getHeaders()
-            },
-            maxBodyLength: Infinity,
-            timeout: 60000
-        }
-    );
+    let uploadResponse;
+    try {
+        uploadResponse = await axios.post(
+            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
+            form,
+            {
+                headers: {
+                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
+                    ...form.getHeaders()
+                },
+                maxBodyLength: Infinity,
+                timeout: 60000
+            }
+        );
+    } catch (error) {
+        console.error('[WhatsApp outgoing] video_media_upload_failed:', safeStringify({
+            to,
+            fileName: safeFileName,
+            size: mediaBuffer.length,
+            status: error.response?.status || null,
+            error: error.response?.data || error.message
+        }));
+        throw error;
+    }
     const mediaId = String(uploadResponse?.data?.id || '').trim();
     if (!mediaId) {
         throw new Error('360dialog media upload did not return media id');
@@ -251,28 +297,46 @@ const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl =
         mediaId
     }));
 
-    const payload = {
-        messaging_product: 'whatsapp',
-        to,
-        type: 'video',
-        video: {
-            id: mediaId,
-            caption: captionText
-        }
-    };
+    const retryDelaysMs = [0, 1200, 2500];
+    let lastError = null;
 
-    const response = await axios.post(
-        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
-        payload,
-        {
-            headers: {
-                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000
+    for (let index = 0; index < retryDelaysMs.length; index += 1) {
+        const attempt = index + 1;
+        const delayMs = retryDelaysMs[index];
+        if (delayMs > 0) {
+            await wait(delayMs);
         }
-    );
-    console.log('Response from 360dialog (video by media id):', response.data);
+
+        try {
+            console.log('[WhatsApp outgoing] video_message_send_attempt:', safeStringify({
+                to,
+                mediaId,
+                attempt,
+                delayMs
+            }));
+            const response = await send360DialogVideoMessageByMediaId({
+                to,
+                mediaId,
+                captionText
+            });
+            console.log('Response from 360dialog (video by media id):', response.data);
+            return response.data;
+        } catch (error) {
+            lastError = error;
+            console.error('[WhatsApp outgoing] video_message_send_failed:', safeStringify({
+                to,
+                mediaId,
+                attempt,
+                status: error.response?.status || null,
+                error: error.response?.data || error.message
+            }));
+            if (!is360DialogInvalidParameterError(error) || attempt >= retryDelaysMs.length) {
+                throw error;
+            }
+        }
+    }
+
+    throw lastError || new Error('360dialog video send failed after retries');
 };
 
 const sendMessageByChatId = async (chatId, message) => {
