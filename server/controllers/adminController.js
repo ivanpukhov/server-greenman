@@ -29,6 +29,7 @@ const {
     saveVisibleDispatchPlan
 } = require('../utilities/paymentLinkDispatchPlan');
 const { retryKazpostRequestProcessing, retryOrderDraftRequestProcessing } = require('../routes/whatsappWebhookRoutes');
+const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDetails');
 
 const { Op } = Sequelize;
 const IVAN_ADMIN_PHONE = '7073670497';
@@ -2316,7 +2317,11 @@ ${productDetails}`;
                 data: updatedRequest.toJSON()
             });
         } catch (error) {
-            return res.status(500).json({ message: 'Не удалось повторно обработать запрос казпочты', error: error.message });
+            return res.status(500).json({
+                message: 'Не удалось повторно обработать запрос казпочты',
+                error: formatErrorMessage(error),
+                errorDetails: buildErrorDetails(error)
+            });
         }
     },
 

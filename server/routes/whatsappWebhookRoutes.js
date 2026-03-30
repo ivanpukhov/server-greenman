@@ -29,6 +29,7 @@ const {
 } = require('../utilities/paymentLinkUtils');
 const { pickNextPaymentLinkByDispatchPlan } = require('../utilities/paymentLinkDispatchPlan');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminIin, normalizeAdminIinStrict } = require('../utilities/adminUsers');
+const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDetails');
 
 const router = express.Router();
 const { Op } = Sequelize;
@@ -531,7 +532,7 @@ const markKazpostRequestFailed = async (record, error) => {
 
     await record.update({
         processingStatus: 'error',
-        lastError: String(error?.message || error || '').trim() || 'Неизвестная ошибка'
+        lastError: formatErrorMessage(error)
     });
 
     return record;
@@ -599,7 +600,7 @@ const markOrderDraftRequestFailed = async (record, error) => {
 
     await record.update({
         processingStatus: 'error',
-        lastError: String(error?.message || error || '').trim() || 'Неизвестная ошибка'
+        lastError: formatErrorMessage(error)
     });
 
     return record;
@@ -865,10 +866,10 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
         );
     } catch (error) {
         console.error('[WhatsApp webhook][AI] OpenRouter request failed:\n' + safeStringify({
-            status: error?.response?.status || null,
-            statusText: error?.response?.statusText || null,
-            responseData: error?.response?.data || null,
-            message: error?.message || null
+            ...buildErrorDetails(error),
+            status: error?.response?.status || error?.status || null,
+            statusText: error?.response?.statusText || error?.statusText || null,
+            responseData: error?.response?.data || null
         }));
         if (error?.response?.status === 401) {
             throw new Error(
