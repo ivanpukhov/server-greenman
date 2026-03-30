@@ -1,6 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const Sequelize = require('sequelize');
+const dns = require('dns');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
@@ -51,6 +53,12 @@ const PAYMENT_LINK_FOOTER =
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
+const openRouterHttpsAgent = new https.Agent({
+    keepAlive: true,
+    lookup(hostname, options, callback) {
+        return dns.lookup(hostname, { ...options, family: 4, all: false }, callback);
+    }
+});
 const KAZPOST_COMMAND_PRODUCT_ID = 61;
 const KAZPOST_COMMAND_TYPE_ID = 137;
 const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
@@ -861,6 +869,7 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
                     'HTTP-Referer': 'https://greenman.kz',
                     'X-Title': 'Order Processor'
                 },
+                httpsAgent: openRouterHttpsAgent,
                 timeout: 30000
             }
         );
