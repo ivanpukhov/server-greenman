@@ -3,6 +3,7 @@ const axios = require('axios');
 const Sequelize = require('sequelize');
 const dns = require('dns');
 const https = require('https');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
@@ -56,7 +57,34 @@ const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
 const openRouterHttpsAgent = new https.Agent({
     keepAlive: true,
     lookup(hostname, options, callback) {
-        return dns.lookup(hostname, { ...options, family: 4, all: false }, callback);
+        if (typeof options === 'function') {
+            callback = options;
+            options = {};
+        }
+
+        const normalizedHostname = String(hostname || '').trim();
+        if (!normalizedHostname) {
+            return callback(new TypeError('OpenRouter lookup hostname is empty'));
+        }
+
+        const ipFamily = net.isIP(normalizedHostname);
+        if (ipFamily === 4) {
+            return callback(null, normalizedHostname, 4);
+        }
+        if (ipFamily === 6) {
+            return callback(new TypeError(`IPv6 is disabled for OpenRouter lookup: ${normalizedHostname}`));
+        }
+
+        return dns.lookup(
+            normalizedHostname,
+            {
+                family: 4,
+                all: false,
+                hints: options?.hints,
+                verbatim: false
+            },
+            callback
+        );
     }
 });
 const KAZPOST_COMMAND_PRODUCT_ID = 61;
