@@ -1,9 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const Sequelize = require('sequelize');
-const dns = require('dns');
 const https = require('https');
-const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
@@ -56,36 +54,7 @@ const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
 const openRouterHttpsAgent = new https.Agent({
     keepAlive: true,
-    lookup(hostname, options, callback) {
-        if (typeof options === 'function') {
-            callback = options;
-            options = {};
-        }
-
-        const normalizedHostname = String(hostname || '').trim();
-        if (!normalizedHostname) {
-            return callback(new TypeError('OpenRouter lookup hostname is empty'));
-        }
-
-        const ipFamily = net.isIP(normalizedHostname);
-        if (ipFamily === 4) {
-            return callback(null, normalizedHostname, 4);
-        }
-        if (ipFamily === 6) {
-            return callback(new TypeError(`IPv6 is disabled for OpenRouter lookup: ${normalizedHostname}`));
-        }
-
-        return dns.lookup(
-            normalizedHostname,
-            {
-                family: 4,
-                all: false,
-                hints: options?.hints,
-                verbatim: false
-            },
-            callback
-        );
-    }
+    family: 4
 });
 const KAZPOST_COMMAND_PRODUCT_ID = 61;
 const KAZPOST_COMMAND_TYPE_ID = 137;
@@ -897,6 +866,7 @@ const parseOrderClientDataByAi = async (noteText, fallbackChatId) => {
                     'HTTP-Referer': 'https://greenman.kz',
                     'X-Title': 'Order Processor'
                 },
+                family: 4,
                 httpsAgent: openRouterHttpsAgent,
                 timeout: 30000
             }
