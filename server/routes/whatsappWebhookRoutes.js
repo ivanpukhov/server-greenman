@@ -2644,7 +2644,7 @@ const processIncomingPdfProofWebhook = async (content) => {
 
     if (shouldDeleteProcessedPdf) {
         await sendPdfProofDebugLog(
-            `PDF_MATCH admin=${sanitizeLogToken(sellerAdmin.fullName, 24)} iin=${sellerIin} amount=${paidAmount} chat=${sanitizeLogToken(senderChatId, 40)} msg=${sanitizeLogToken(content?.idMessage, 64)} ts=${sanitizeLogToken(content?.messageTimestamp, 20)} connection=${sanitizeLogToken(connection?.id, 20)}`
+            `PDF_MATCH `
         );
     }
 
