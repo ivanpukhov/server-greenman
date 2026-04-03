@@ -418,7 +418,10 @@ const buildOrderDraftAliasFixPrompt = ({ sourceText, unknownAliases, catalogLine
 Правила:
 - Используй только псевдонимы из списка каталога ниже.
 - Если исправляешь псевдоним, подставляй именно alias типа, а не название товара.
-- Сохраняй количества ("2 шт" и т.д.).
+- Обязательно сохраняй количество товаров.
+- Если из текста видно, что цена по строке кратна цене одного типа товара, считай это количеством. Например, если alias стоит 7000, а в сообщении указано 14000, значит это 2 штуки.
+- Когда количество больше 1, разворачивай его в повторяющиеся строки с тем же alias, по одной строке на каждую штуку.
+- Не схлопывай несколько штук в формат "2 шт", если количество было определено по сумме.
 - Не добавляй новые товары, которых не было в исходном сообщении.
 - Если есть несколько вариантов, выбери самый вероятный по похожести.
 
@@ -757,7 +760,8 @@ const getAliasCatalogSnapshot = async () => {
             productAlias: String(typeJson.product?.alias || '').trim(),
             typeName: String(typeJson.type || '').trim(),
             alias: String(typeJson.alias || '').trim(),
-            code: String(typeJson.code || '').trim()
+            code: String(typeJson.code || '').trim(),
+            price: Number(typeJson.price) || 0
         };
     });
 };
@@ -775,7 +779,8 @@ const requestAiAliasCorrection = async ({ sourceText, unknownAliases }) => {
         `productAlias="${item.productAlias || '-'}"`,
         `тип="${item.typeName || '-'}"`,
         `alias="${item.alias || '-'}"`,
-        `code="${item.code || '-'}"`
+        `code="${item.code || '-'}"`,
+        `price=${item.price}`
     ].join(' | '));
 
     const aiRequestBody = {
