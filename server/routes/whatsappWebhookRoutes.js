@@ -274,6 +274,12 @@ const normalizeAlias = (value) =>
         .trim()
         .toLowerCase();
 
+const normalizeAliasLookupKey = (value) =>
+    normalizeAlias(value)
+        .replace(/\s*(?:тг|тенге|₸)\s*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
 const normalizePhoneToTenDigits = (value) => {
     const normalized = normalizePhoneNumber(value);
     if (normalized) {
@@ -425,6 +431,12 @@ const buildOrderDraftAliasFixPrompt = ({ sourceText, unknownAliases, catalogLine
 - Не добавляй новые товары, которых не было в исходном сообщении.
 - Если есть несколько вариантов, выбери самый вероятный по похожести.
 
+Пример:
+Если в исходном сообщении строка "Аконит 14000 тг", а подходящий alias в каталоге "Аконит 7000тг" с ценой 7000,
+то в correctedText должно быть:
+Аконит 7000тг
+Аконит 7000тг
+
 Ненайденные псевдонимы: ${unknownAliases.join(', ')}
 
 Каталог товаров и типов:
@@ -482,6 +494,41 @@ const parseOrderDraftDecisionButtonId = (value) => {
         action: match[1] === 'ok' ? 'confirm' : 'cancel',
         requestId: Number.parseInt(match[2], 10)
     };
+};
+
+const parseOrderDraftRawProductLines = (text) => {
+    const lines = String(text || '')
+        .split(/\r?\n/)
+        .map((line) => String(line || '').trim())
+        .filter(Boolean);
+
+    if (lines.length < 3) {
+        return [];
+    }
+
+    const deliveryLineIndex = lines.findIndex((line, index) => {
+        if (index === 0) {
+            return false;
+        }
+
+        return /^доставка\s+[0-9][0-9\s]*/i.test(line);
+    });
+
+    if (deliveryLineIndex < 1) {
+        return [];
+    }
+
+    return lines.slice(1, deliveryLineIndex);
+};
+
+const extractAmountFromDraftProductLine = (line) => {
+    const match = String(line || '').match(/([0-9][0-9\s]*)\s*(?:тг|тенге|₸)\b/i);
+    if (!match || !match[1]) {
+        return null;
+    }
+
+    const amount = Number.parseInt(match[1].replace(/\s+/g, ''), 10);
+    return Number.isFinite(amount) && amount > 0 ? amount : null;
 };
 
 const createOrGetOrderDraftRequestRecord = async ({
@@ -766,6 +813,74 @@ const getAliasCatalogSnapshot = async () => {
     });
 };
 
+const normalizeAiCorrectedDraftTextByAmounts = async ({ sourceText, correctedText, catalog }) => {
+    const sourceParsed = analyzeOrderDraftMessage(sourceText);
+    const correctedParsed = analyzeOrderDraftMessage(correctedText);
+
+    if (!sourceParsed?.parsed || !correctedParsed?.parsed) {
+        return correctedText;
+    }
+
+    const sourceProductLines = parseOrderDraftRawProductLines(sourceText);
+    const correctedAliasEntries = correctedParsed.parsed.aliases || [];
+
+    if (sourceProductLines.length === 0 || correctedAliasEntries.length === 0) {
+        return correctedText;
+    }
+
+    const priceByAlias = new Map();
+    (Array.isArray(catalog) ? catalog : []).forEach((item) => {
+        const normalizedAlias = normalizeAlias(item?.alias);
+        const price = Number(item?.price);
+        if (!normalizedAlias || !Number.isFinite(price) || price <= 0 || priceByAlias.has(normalizedAlias)) {
+            return;
+        }
+        priceByAlias.set(normalizedAlias, Math.round(price));
+    });
+
+    const normalizedAliasLines = [];
+
+    correctedAliasEntries.forEach((entry, index) => {
+        const aliasText = String(entry?.alias || '').trim();
+        const normalizedAlias = normalizeAlias(aliasText);
+        const unitPrice = priceByAlias.get(normalizedAlias);
+        const requestedQty = Math.max(1, Math.floor(Number(entry?.quantity) || 1));
+        const originalLine = sourceProductLines[index] || '';
+        const originalAmount = extractAmountFromDraftProductLine(originalLine);
+
+        if (
+            originalAmount &&
+            unitPrice &&
+            originalAmount >= unitPrice &&
+            originalAmount % unitPrice === 0 &&
+            requestedQty === 1
+        ) {
+            const expandedQty = Math.max(1, Math.floor(originalAmount / unitPrice));
+            for (let itemIndex = 0; itemIndex < expandedQty; itemIndex += 1) {
+                normalizedAliasLines.push(aliasText);
+            }
+            return;
+        }
+
+        for (let itemIndex = 0; itemIndex < requestedQty; itemIndex += 1) {
+            normalizedAliasLines.push(aliasText);
+        }
+    });
+
+    if (normalizedAliasLines.length === 0) {
+        return correctedText;
+    }
+
+    const normalizedLines = [
+        'Ваш заказ',
+        ...normalizedAliasLines,
+        `Доставка ${Math.round(Number(sourceParsed.parsed.deliveryPrice) || 0)}`,
+        String(sourceParsed.parsed.noteText || '').trim()
+    ].filter(Boolean);
+
+    return normalizedLines.join('\n');
+};
+
 const requestAiAliasCorrection = async ({ sourceText, unknownAliases }) => {
     if (!ORDER_DRAFT_AI_API_KEY) {
         throw new Error('OpenRouter API key не найден');
@@ -829,8 +944,14 @@ const requestAiAliasCorrection = async ({ sourceText, unknownAliases }) => {
         throw new Error('ИИ не вернул correctedText');
     }
 
-    return {
+    const normalizedCorrectedText = await normalizeAiCorrectedDraftTextByAmounts({
+        sourceText,
         correctedText,
+        catalog
+    });
+
+    return {
+        correctedText: normalizedCorrectedText,
         changes: Array.isArray(parsed.changes) ? parsed.changes : [],
         comment: String(parsed.comment || '').trim(),
         unknownAliases: Array.isArray(unknownAliases) ? unknownAliases : [],
@@ -2108,7 +2229,7 @@ const resolveOrderAliases = async (aliases) => {
     console.log(`[WhatsApp webhook][OrderDraft] Resolving aliases, count=${aliases.length}`);
     const aliasToRequestedCount = new Map();
     aliases.forEach((aliasEntry) => {
-        const normalized = normalizeAlias(aliasEntry?.alias);
+        const normalized = normalizeAliasLookupKey(aliasEntry?.alias);
         const parsedQuantity = Number(aliasEntry?.quantity);
         const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0
             ? Math.floor(parsedQuantity)
@@ -2135,11 +2256,17 @@ const resolveOrderAliases = async (aliases) => {
 
     const typeByAlias = new Map();
     knownTypes.forEach((typeItem) => {
-        const normalized = normalizeAlias(typeItem.alias);
-        if (!normalized || typeByAlias.has(normalized)) {
+        const exactNormalized = normalizeAlias(typeItem.alias);
+        const lookupNormalized = normalizeAliasLookupKey(typeItem.alias);
+
+        if (exactNormalized && !typeByAlias.has(exactNormalized)) {
+            typeByAlias.set(exactNormalized, typeItem);
+        }
+
+        if (!lookupNormalized || typeByAlias.has(lookupNormalized)) {
             return;
         }
-        typeByAlias.set(normalized, typeItem);
+        typeByAlias.set(lookupNormalized, typeItem);
     });
 
     console.log(
@@ -2213,11 +2340,6 @@ const processOrderDraftRequest = async ({
                 console.error('[WhatsApp webhook][OrderDraft] Failed to prepare AI alias suggestion:', error.message);
             }
         }
-        await sendMessageByChatId(
-            recipientChatId,
-            `Не найдены псевдонимы: ${resolved.unknownAliases.join(', ')}`
-        );
-        console.log('[WhatsApp webhook][OrderDraft] Sent unknown aliases message to chat');
         return null;
     }
 
