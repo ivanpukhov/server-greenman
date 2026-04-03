@@ -426,16 +426,14 @@ const buildOrderDraftAliasFixPrompt = ({ sourceText, unknownAliases, catalogLine
 - Если исправляешь псевдоним, подставляй именно alias типа, а не название товара.
 - Обязательно сохраняй количество товаров.
 - Если из текста видно, что цена по строке кратна цене одного типа товара, считай это количеством. Например, если alias стоит 7000, а в сообщении указано 14000, значит это 2 штуки.
-- Когда количество больше 1, разворачивай его в повторяющиеся строки с тем же alias, по одной строке на каждую штуку.
-- Не схлопывай несколько штук в формат "2 шт", если количество было определено по сумме.
+- Когда количество больше 1, записывай его в той же строке в формате "2 шт" после alias.
 - Не добавляй новые товары, которых не было в исходном сообщении.
 - Если есть несколько вариантов, выбери самый вероятный по похожести.
 
 Пример:
 Если в исходном сообщении строка "Аконит 14000 тг", а подходящий alias в каталоге "Аконит 7000тг" с ценой 7000,
 то в correctedText должно быть:
-Аконит 7000тг
-Аконит 7000тг
+Аконит 7000тг 2 шт
 
 Ненайденные псевдонимы: ${unknownAliases.join(', ')}
 
@@ -446,14 +444,78 @@ ${catalogLines.join('\n')}
 ${String(sourceText || '').trim()}
 `.trim();
 
+const formatAliasLineWithQuantity = (alias, quantity) => {
+    const normalizedAlias = String(alias || '').trim();
+    const normalizedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+    if (!normalizedAlias) {
+        return '';
+    }
+
+    return normalizedQuantity > 1 ? `${normalizedAlias} ${normalizedQuantity} шт` : normalizedAlias;
+};
+
+const buildHighlightedCorrectedOrderDraftText = ({ sourceText, correctedText, suggestion }) => {
+    const sourceProductLines = parseOrderDraftRawProductLines(sourceText);
+    const correctedLines = String(correctedText || '')
+        .split(/\r?\n/)
+        .map((line) => String(line || ''))
+        .filter((line) => line.trim().length > 0);
+
+    if (correctedLines.length === 0) {
+        return '';
+    }
+
+    const changedAliases = new Set(
+        (Array.isArray(suggestion?.changes) ? suggestion.changes : [])
+            .map((item) => normalizeAliasLookupKey(item?.to))
+            .filter(Boolean)
+    );
+
+    let productLineIndex = 0;
+    return correctedLines.map((line) => {
+        const trimmedLine = line.trim();
+
+        if (!trimmedLine || /^ваш заказ$/i.test(trimmedLine) || /^доставка\s+[0-9]/i.test(trimmedLine)) {
+            return trimmedLine;
+        }
+
+        if (productLineIndex >= sourceProductLines.length) {
+            return trimmedLine;
+        }
+
+        const sourceEntry = parseAliasLineWithQuantity(sourceProductLines[productLineIndex]);
+        const correctedEntry = parseAliasLineWithQuantity(trimmedLine);
+        productLineIndex += 1;
+
+        const sourceKey = normalizeAliasLookupKey(sourceEntry?.alias);
+        const correctedKey = normalizeAliasLookupKey(correctedEntry?.alias);
+        const sourceQty = Math.max(1, Math.floor(Number(sourceEntry?.quantity) || 1));
+        const correctedQty = Math.max(1, Math.floor(Number(correctedEntry?.quantity) || 1));
+        const isChanged = Boolean(
+            correctedKey && (
+                correctedKey !== sourceKey ||
+                correctedQty !== sourceQty ||
+                changedAliases.has(correctedKey)
+            )
+        );
+
+        return isChanged ? `*${trimmedLine}*` : trimmedLine;
+    }).join('\n');
+};
+
 const buildOrderDraftAliasDecisionBody = ({ requestId, sourceText, suggestion }) => {
     const unknownAliases = Array.isArray(suggestion?.unknownAliases) ? suggestion.unknownAliases : [];
     const changes = Array.isArray(suggestion?.changes) ? suggestion.changes : [];
     const comment = String(suggestion?.comment || '').trim();
     const correctedText = String(suggestion?.correctedText || '').trim();
+    const highlightedCorrectedText = buildHighlightedCorrectedOrderDraftText({
+        sourceText,
+        correctedText,
+        suggestion
+    });
 
     const changeLines = changes.length > 0
-        ? changes.map((item) => `- ${String(item?.from || '').trim()} -> ${String(item?.to || '').trim()}`).join('\n')
+        ? changes.map((item) => `- ${String(item?.from || '').trim()} -> *${String(item?.to || '').trim()}*`).join('\n')
         : 'Нет списка замен';
 
     return [
@@ -467,7 +529,7 @@ const buildOrderDraftAliasDecisionBody = ({ requestId, sourceText, suggestion })
         changeLines,
         '',
         'Новая версия:',
-        correctedText || 'ИИ не предложил новую версию',
+        highlightedCorrectedText || correctedText || 'ИИ не предложил новую версию',
         comment ? '' : null,
         comment ? `Комментарий ИИ: ${comment}` : null
     ].filter((line) => line !== null).join('\n');
@@ -757,11 +819,11 @@ const buildOrderDraftTextWithCorrections = (sourceText, corrections = []) => {
             const quantity = Math.max(1, Math.floor(Number(entry?.quantity) || 1));
             const normalizedOriginal = normalizeAlias(originalAlias);
             const replacement = replacementByOriginal.get(normalizedOriginal) || originalAlias;
-            return quantity > 1 ? `${replacement} ${quantity} шт` : replacement;
+            return formatAliasLineWithQuantity(replacement, quantity);
         });
 
     extraAliases.forEach((entry) => {
-        aliasLines.push(entry.quantity > 1 ? `${entry.alias} ${entry.quantity} шт` : entry.alias);
+        aliasLines.push(formatAliasLineWithQuantity(entry.alias, entry.quantity));
     });
 
     const lines = [
@@ -856,15 +918,11 @@ const normalizeAiCorrectedDraftTextByAmounts = async ({ sourceText, correctedTex
             requestedQty === 1
         ) {
             const expandedQty = Math.max(1, Math.floor(originalAmount / unitPrice));
-            for (let itemIndex = 0; itemIndex < expandedQty; itemIndex += 1) {
-                normalizedAliasLines.push(aliasText);
-            }
+            normalizedAliasLines.push(formatAliasLineWithQuantity(aliasText, expandedQty));
             return;
         }
 
-        for (let itemIndex = 0; itemIndex < requestedQty; itemIndex += 1) {
-            normalizedAliasLines.push(aliasText);
-        }
+        normalizedAliasLines.push(formatAliasLineWithQuantity(aliasText, requestedQty));
     });
 
     if (normalizedAliasLines.length === 0) {
