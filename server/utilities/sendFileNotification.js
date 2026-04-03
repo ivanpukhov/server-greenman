@@ -1,6 +1,5 @@
-const GREEN_API_MEDIA_URL =
-    'https://7700.media.greenapi.com/waInstance7700541881/sendFileByUpload/2112835cf7a7459ba6de00c353163555b08baeb8d4b6413da2';
 const QR_MIRROR_PHONE_NUMBER = '77775464450';
+const greenApiService = require('./greenApiService');
 
 const normalizePhoneToChatId = (phoneNumber) => {
     const digits = String(phoneNumber || '').replace(/\D/g, '');
@@ -22,36 +21,13 @@ const normalizePhoneCaption = (phoneNumber) => {
     return `+7${localNumber}`;
 };
 
-const sendFileByChatId = async ({ chatId, fileBuffer, fileName, mimeType, caption }) => {
-    const form = new FormData();
-
-    form.append('chatId', chatId);
-    form.append(
-        'file',
-        new Blob([fileBuffer], { type: mimeType || 'application/octet-stream' }),
-        fileName || 'order-photo.jpg'
-    );
-
-    const normalizedCaption = String(caption || '').trim();
-    if (normalizedCaption) {
-        form.append('caption', normalizedCaption);
-    }
-
-    const response = await fetch(GREEN_API_MEDIA_URL, {
-        method: 'POST',
-        body: form
-    });
-
-    const responseBody = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        const providerError = new Error(responseBody?.message || 'Green API вернул ошибку при отправке файла');
-        providerError.status = response.status;
-        providerError.responseBody = responseBody;
-        throw providerError;
-    }
-
-    return responseBody;
-};
+const sendFileByChatId = async ({ chatId, fileBuffer, fileName, mimeType, caption }) => greenApiService.sendFileByUpload({
+    chatId,
+    fileBuffer,
+    fileName: fileName || 'order-photo.jpg',
+    mimeType,
+    caption
+});
 
 const sendFileNotification = async ({ phoneNumber, fileBuffer, fileName, mimeType, caption }) => {
     if (!fileBuffer || !Buffer.isBuffer(fileBuffer) || fileBuffer.length === 0) {

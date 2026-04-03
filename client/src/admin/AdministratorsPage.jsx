@@ -81,8 +81,7 @@ const AdministratorsPage = () => {
         fullName: '',
         phoneNumber: '',
         iin: '',
-        siteOrdersToNataliaEnabled: true,
-        whatsappAgreeTemplateEnabled: true
+        siteOrdersToNataliaEnabled: true
     });
     const [paymentLinkForm, setPaymentLinkForm] = useState({
         url: '',
@@ -394,9 +393,7 @@ const AdministratorsPage = () => {
             fullName: String(admin.fullName || ''),
             phoneNumber: String(admin.phoneNumber || ''),
             iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12),
-            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
-            whatsappAgreeTemplateEnabled:
-                admin.whatsappAgreeTemplateEnabled === undefined ? true : Boolean(admin.whatsappAgreeTemplateEnabled)
+            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
         });
     };
 
@@ -409,8 +406,7 @@ const AdministratorsPage = () => {
             fullName: '',
             phoneNumber: '',
             iin: '',
-            siteOrdersToNataliaEnabled: true,
-            whatsappAgreeTemplateEnabled: true
+            siteOrdersToNataliaEnabled: true
         });
     };
 
@@ -449,8 +445,7 @@ const AdministratorsPage = () => {
                     iin,
                     ...(canEditIvanSiteOrdersToggle(editingAdmin)
                         ? {
-                            siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled),
-                            whatsappAgreeTemplateEnabled: Boolean(editAdminForm.whatsappAgreeTemplateEnabled)
+                            siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled)
                         }
                         : {})
                 })
@@ -669,20 +664,6 @@ const AdministratorsPage = () => {
                                                                 }
                                                                 label="Заказы с сайта учитывать в приход Наталье"
                                                             />
-                                                            <FormControlLabel
-                                                                control={
-                                                                    <Switch
-                                                                        checked={Boolean(editAdminForm.whatsappAgreeTemplateEnabled)}
-                                                                        onChange={(event) =>
-                                                                            setEditAdminForm((prev) => ({
-                                                                                ...prev,
-                                                                                whatsappAgreeTemplateEnabled: event.target.checked
-                                                                            }))
-                                                                        }
-                                                                    />
-                                                                }
-                                                                label="Использовать шаблон agree (24 часа)"
-                                                            />
                                                         </>
                                                     )}
                                                 </>
@@ -800,21 +781,6 @@ const AdministratorsPage = () => {
                                                                         />
                                                                     }
                                                                     label="Заказы с сайта учитывать в приход Наталье"
-                                                                />
-                                                                <FormControlLabel
-                                                                    sx={{ ml: 0 }}
-                                                                    control={
-                                                                        <Switch
-                                                                            checked={Boolean(editAdminForm.whatsappAgreeTemplateEnabled)}
-                                                                            onChange={(event) =>
-                                                                                setEditAdminForm((prev) => ({
-                                                                                    ...prev,
-                                                                                    whatsappAgreeTemplateEnabled: event.target.checked
-                                                                                }))
-                                                                            }
-                                                                        />
-                                                                    }
-                                                                    label="Использовать шаблон agree (24 часа)"
                                                                 />
                                                             </>
                                                         )}

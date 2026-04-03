@@ -28,11 +28,11 @@ router.delete('/orders/:id', adminController.deleteOrder);
 router.post('/orders/:id/send-photo', orderPhotoUpload.single('file'), adminController.sendOrderPhoto);
 router.post('/whatsapp/test-template', adminController.testWhatsAppTemplate);
 router.post('/whatsapp/test-message', adminController.testWhatsAppTemplate);
-router.get('/whatsapp/baileys/status', adminWhatsAppController.getBaileysStatus);
-router.post('/whatsapp/baileys/qr', adminWhatsAppController.requestBaileysQr);
-router.post('/whatsapp/baileys/restart', adminWhatsAppController.restartBaileysSession);
-router.post('/whatsapp/baileys/logout', adminWhatsAppController.logoutBaileysSession);
-router.get('/whatsapp/baileys/events', adminWhatsAppController.getBaileysEvents);
+router.get('/whatsapp/connection/status', adminWhatsAppController.getConnectionStatus);
+router.get('/whatsapp/connection/qr', adminWhatsAppController.getQr);
+router.post('/whatsapp/connection/reboot', adminWhatsAppController.reboot);
+router.post('/whatsapp/connection/logout', adminWhatsAppController.logout);
+router.post('/whatsapp/connection/webhook', adminWhatsAppController.setWebhook);
 
 router.get('/analytics/dashboard', adminController.getDashboardAnalytics);
 router.get('/admins', adminController.getAdmins);

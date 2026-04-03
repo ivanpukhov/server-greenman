@@ -15,7 +15,6 @@ const profileRoutes = require('./routes/profileRoutes');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
-const baileysNotificationService = require('./services/baileysNotificationService');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -48,13 +47,6 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
-
-if (typeof whatsappWebhookRoutes.processWebhookContent === 'function') {
-    baileysNotificationService.setWebhookProcessor(whatsappWebhookRoutes.processWebhookContent);
-    baileysNotificationService.autoStartIfAuthenticated().catch((error) => {
-        console.error('[Baileys] autoStartIfAuthenticated failed:', error.message);
-    });
-}
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {

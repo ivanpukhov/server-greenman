@@ -1,62 +1,94 @@
-const baileysService = require('../services/baileysNotificationService');
+const greenApiService = require('../utilities/greenApiService');
 
 module.exports = {
-    async getBaileysStatus(_req, res) {
-        return res.json({
-            data: baileysService.getStatus()
-        });
-    },
-
-    async requestBaileysQr(_req, res) {
+    async getConnectionStatus(_req, res) {
         try {
-            await baileysService.resetSessionForQr();
-            await baileysService.waitForQr(15000);
+            const [stateInstance, settings, qr] = await Promise.all([
+                greenApiService.getStateInstance(),
+                greenApiService.getSettings(),
+                greenApiService.getQr().catch(() => null)
+            ]);
 
             return res.json({
-                data: baileysService.getStatus()
+                data: {
+                    connection: String(stateInstance?.stateInstance || '').trim() || 'unknown',
+                    stateInstance,
+                    settings,
+                    qr,
+                    updatedAt: new Date().toISOString()
+                }
             });
         } catch (error) {
             return res.status(500).json({
-                message: 'Не удалось запустить WhatsApp Baileys',
+                message: 'Не удалось получить состояние Green API',
                 error: error.message
             });
         }
     },
 
-    async restartBaileysSession(_req, res) {
+    async getQr(_req, res) {
         try {
-            await baileysService.restartSession();
-            await baileysService.waitForQr(7000);
+            const qr = await greenApiService.getQr();
             return res.json({
-                data: baileysService.getStatus()
+                data: qr
             });
         } catch (error) {
             return res.status(500).json({
-                message: 'Не удалось перезапустить WhatsApp Baileys',
+                message: 'Не удалось получить QR Green API',
                 error: error.message
             });
         }
     },
 
-    async logoutBaileysSession(_req, res) {
+    async reboot(_req, res) {
         try {
-            await baileysService.logoutSession();
+            const data = await greenApiService.reboot();
             return res.json({
-                data: baileysService.getStatus()
+                data
             });
         } catch (error) {
             return res.status(500).json({
-                message: 'Не удалось разлогинить WhatsApp Baileys',
+                message: 'Не удалось перезапустить Green API instance',
                 error: error.message
             });
         }
     },
 
-    async getBaileysEvents(req, res) {
-        const sinceId = Number(req.query?.sinceId || 0);
-        const limit = Number(req.query?.limit || 100);
-        return res.json({
-            data: baileysService.getEvents({ sinceId, limit })
-        });
+    async logout(_req, res) {
+        try {
+            const data = await greenApiService.logout();
+            return res.json({
+                data
+            });
+        } catch (error) {
+            return res.status(500).json({
+                message: 'Не удалось разлогинить Green API instance',
+                error: error.message
+            });
+        }
+    },
+
+    async setWebhook(req, res) {
+        try {
+            const webhookUrl = String(req.body?.webhookUrl || '').trim();
+            if (!webhookUrl) {
+                return res.status(400).json({
+                    message: 'Укажите webhookUrl'
+                });
+            }
+
+            const data = await greenApiService.setSettings({
+                webhookUrl
+            });
+
+            return res.json({
+                data
+            });
+        } catch (error) {
+            return res.status(500).json({
+                message: 'Не удалось сохранить webhook Green API',
+                error: error.message
+            });
+        }
     }
 };

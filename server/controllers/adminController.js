@@ -13,7 +13,7 @@ const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
-const { sendTemplateByName, sendOrderTrackingTemplate, sendAuthTemplate } = sendNotification;
+const { sendOrderTrackingTemplate, sendAuthTemplate } = sendNotification;
 const { logError } = require('../utilities/errorLogger');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone, normalizeAdminIin } = require('../utilities/adminUsers');
 const {
@@ -90,15 +90,14 @@ const serializeAdminForResponse = (admin, currentAdminPhone) => {
     }
 
     const canSeeIvanToggle = canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(plainAdmin.phoneNumber);
-    const { siteOrdersToNataliaEnabled, whatsappAgreeTemplateEnabled, ...rest } = plainAdmin;
+    const { siteOrdersToNataliaEnabled, ...rest } = plainAdmin;
     if (!canSeeIvanToggle) {
         return rest;
     }
 
     return {
         ...rest,
-        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled),
-        whatsappAgreeTemplateEnabled: Boolean(whatsappAgreeTemplateEnabled)
+        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled)
     };
 };
 
@@ -1621,12 +1620,6 @@ const adminController = {
                     'Не удалось автоматически создать заказ после оплаты: test error',
                     { enforce24h: false }
                 );
-            } else if (messageType === 'agree_template') {
-                providerResponse = await sendTemplateByName(phoneNumber, 'agree', {
-                    languageCode: 'ru',
-                    components: [],
-                    raiseErrors: true
-                });
             } else if (messageType === 'auth_template') {
                 providerResponse = await sendAuthTemplate(phoneNumber, defaultAuthCode);
             } else if (messageType === 'order_tracking_template') {
@@ -2503,8 +2496,7 @@ ${productDetails}`;
                     iin: admin.iin,
                     ...(canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(admin.phoneNumber)
                         ? {
-                            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
-                            whatsappAgreeTemplateEnabled: Boolean(admin.whatsappAgreeTemplateEnabled)
+                            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
                         }
                         : {})
                 }))
@@ -2644,9 +2636,6 @@ ${productDetails}`;
             if (isIvanPhone(adminUser.phoneNumber) && canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone)) {
                 if (req.body.siteOrdersToNataliaEnabled !== undefined) {
                     payload.siteOrdersToNataliaEnabled = Boolean(req.body.siteOrdersToNataliaEnabled);
-                }
-                if (req.body.whatsappAgreeTemplateEnabled !== undefined) {
-                    payload.whatsappAgreeTemplateEnabled = Boolean(req.body.whatsappAgreeTemplateEnabled);
                 }
             }
 

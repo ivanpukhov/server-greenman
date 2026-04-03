@@ -4,7 +4,6 @@ const Sequelize = require('sequelize');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const FormData = require('form-data');
 const pdfParse = require('pdf-parse');
 const PaymentLink = require('../models/orders/PaymentLink');
 const SentPaymentLink = require('../models/orders/SentPaymentLink');
@@ -18,9 +17,8 @@ const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
-const baileysNotificationService = require('../services/baileysNotificationService');
+const greenApiService = require('../utilities/greenApiService');
 const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
-const { WHATSAPP_360DIALOG_API_URL, WHATSAPP_360DIALOG_API_KEY } = require('../config/whatsapp360dialog');
 const {
     findMatchedLinkInDescription,
     normalizePhoneNumber,
@@ -35,8 +33,6 @@ const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDet
 const router = express.Router();
 const { Op } = Sequelize;
 
-const GREEN_API_SEND_FILE_URL =
-    'https://7700.api.greenapi.com/waInstance7700541881/sendFileByUrl/2112835cf7a7459ba6de00c353163555b08baeb8d4b6413da2';
 const QR_MIRROR_CHAT_ID = '77775464450@c.us';
 const PDF_PROOF_DEBUG_PHONE = '77073670497';
 
@@ -61,42 +57,6 @@ const KAZPOST_COMMAND_TYPE_ID = 137;
 const KAZPOST_COMMAND_DEDUP_TTL_MS = 1000 * 60 * 60 * 6;
 const KAZPOST_REQUEST_TIMEOUT_MS = 1000 * 60 * 10;
 const KAZPOST_FALLBACK_ADMIN_PHONE = '7073670497';
-const INCOMING_MESSAGE_GREET_INTERVAL_MS = 1000 * 60 * 60 * 24 * 14;
-const INCOMING_MESSAGE_GREETING =
-    'Вас приветствует команда травника Greenman 🌿\n\n' +
-    '‼️Чтобы получить качественную консультацию и быстро оформить заказ,          внимательно заполните анкету.\n\n' +
-    '📋 Для консультации по подбору трав укажите:\n\n' +
-    '1️⃣ Возраст\n' +
-    '2️⃣ Вес\n' +
-    '3️⃣ Хронические заболевания\n' +
-    '4️⃣ Что вас беспокоит\n' +
-    '5️⃣ Поставленный диагноз\n' +
-    '6️⃣ Результаты обследований (УЗИ, анализы и др.)\n\n' +
-    '📎 Если есть обследования — прикрепляйте сразу.\n' +
-    '❗️Особенно важно чётко указать диагноз.\n\n' +
-    '⸻\n\n' +
-    '📦 Для отправки заказа по почте сразу оставьте:\n\n' +
-    '• Фамилия, имя, отчество\n' +
-    '• Город\n' +
-    '• Полный адрес\n' +
-    '• Индекс почтового отделения\n' +
-    '• Номер телефона\n\n' +
-    '⸻\n\n' +
-    '🛒 Если консультация не нужна и вы уже определились:\n\n' +
-    'Обязательно укажите:\n\n' +
-    '• Название продукции\n' +
-    '• Форму — на мёду / на водно-спиртовой основе / в пакетиках для заваривания\n' +
-    '• Количество\n' +
-    '• Данные для отправки\n\n' +
-    'Также вы можете оформить заказ напрямую на сайте:\n' +
-    '🌍 Сайт для Казахстана\n' +
-    'https://greenman.kz\n\n' +
-    '🌍 Сайт для России\n' +
-    'https://green-man.ru \n\n' +
-    '⸻\n\n' +
-    '⏳ Отвечаем в порядке очереди. В будние дни с 9-17часов\n\n' +
-    '➡️Запросов на консультацию много, поэтому, чтобы вас обслужили быстрее — заполните анкету максимально полно и понятно.\n\n' +
-    'В освободившееся окно мы свяжемся с вами, подберём индивидуальный курс и отправим посылку 🌿';
 const ORDER_DRAFT_AI_FALLBACK_PROMPT = `
 GPT принимает одно сообщение = один заказ и возвращает строго один JSON-объект.
 Верни только JSON:
@@ -179,179 +139,13 @@ const findFirstValueByKey = (source, targetKey) => {
     return null;
 };
 
-const sendFileByUrl = async (url, phoneNumber, fileName) => {
-    console.log(`Attempting to send file: URL - ${url}, Phone Number - ${phoneNumber}, File Name - ${fileName}`);
-
-    const normalizedPhone = normalizePhoneNumber(phoneNumber);
-    const to = normalizedPhone ? `7${normalizedPhone}` : String(phoneNumber || '').replace(/\D/g, '');
-    if (!to) {
-        throw new Error('Invalid phone number for 360dialog video send');
-    }
-
-    try {
-        const sourceUrl = String(url || '').trim();
-        const mediaResponse = await axios.get(sourceUrl, {
-            responseType: 'arraybuffer',
-            timeout: 60000
-        });
-        const mediaBuffer = Buffer.from(mediaResponse.data);
-        if (!mediaBuffer || mediaBuffer.length === 0) {
-            throw new Error('Downloaded media buffer is empty');
-        }
-        await sendVideoBufferTo360Dialog(mediaBuffer, to, fileName, sourceUrl);
-    } catch (error) {
-        console.error('[WhatsApp webhook] sendFileByUrl (video upload via 360dialog) failed:', {
-            status: error.response?.status || null,
-            data: error.response?.data || null,
-            message: error.message
-        });
-        throw error;
-    }
-};
-
-const isWhatsAppEncryptedMediaUrl = (value) => {
-    const raw = String(value || '').trim();
-    if (!raw) {
-        return false;
-    }
-
-    return /(?:^https:\/\/|\/\/)?(?:mmg\.whatsapp\.net|lookaside\.whatsapp\.com)\//i.test(raw) ||
-        /\.enc(?:$|\?)/i.test(raw);
-};
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const is360DialogInvalidParameterError = (error) => {
-    const responseData = error?.response?.data || {};
-    const errorBody = responseData?.error || {};
-    return Number(errorBody?.code) === 100 ||
-        String(errorBody?.message || '').includes('Invalid parameter') ||
-        String(errorBody?.error_data?.details || '').includes('Invalid parameter');
-};
-
-const send360DialogVideoMessageByMediaId = async ({ to, mediaId, captionText }) => {
-    const payload = {
-        messaging_product: 'whatsapp',
-        to,
-        type: 'video',
-        video: {
-            id: mediaId,
-            caption: captionText
-        }
-    };
-
-    return axios.post(
-        `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/messages`,
-        payload,
-        {
-            headers: {
-                'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000
-        }
-    );
-};
-
-const sendVideoBufferTo360Dialog = async (mediaBuffer, to, fileName, sourceUrl = '') => {
-    const safeFileName = String(fileName || 'video.mp4').trim() || 'video.mp4';
-    const captionText = 'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
-    const form = new FormData();
-    form.append('file', mediaBuffer, {
-        filename: safeFileName.endsWith('.mp4') ? safeFileName : `${safeFileName}.mp4`,
-        contentType: 'video/mp4'
-    });
-    form.append('messaging_product', 'whatsapp');
-
-    console.log('[WhatsApp outgoing] video_media_upload_request:', safeStringify({
-        to,
-        fileName: safeFileName,
-        sourceUrlPreview: String(sourceUrl || '').slice(0, 120),
-        size: mediaBuffer.length
-    }));
-
-    let uploadResponse;
-    try {
-        uploadResponse = await axios.post(
-            `${WHATSAPP_360DIALOG_API_URL.replace(/\/+$/, '')}/media`,
-            form,
-            {
-                headers: {
-                    'D360-API-KEY': WHATSAPP_360DIALOG_API_KEY,
-                    ...form.getHeaders()
-                },
-                maxBodyLength: Infinity,
-                timeout: 60000
-            }
-        );
-    } catch (error) {
-        console.error('[WhatsApp outgoing] video_media_upload_failed:', safeStringify({
-            to,
-            fileName: safeFileName,
-            size: mediaBuffer.length,
-            status: error.response?.status || null,
-            error: error.response?.data || error.message
-        }));
-        throw error;
-    }
-    const mediaId = String(uploadResponse?.data?.id || '').trim();
-    if (!mediaId) {
-        throw new Error('360dialog media upload did not return media id');
-    }
-    console.log('[WhatsApp outgoing] video_media_upload_success:', safeStringify({
-        to,
-        mediaId
-    }));
-
-    const retryDelaysMs = [0, 1200, 2500];
-    let lastError = null;
-
-    for (let index = 0; index < retryDelaysMs.length; index += 1) {
-        const attempt = index + 1;
-        const delayMs = retryDelaysMs[index];
-        if (delayMs > 0) {
-            await wait(delayMs);
-        }
-
-        try {
-            console.log('[WhatsApp outgoing] video_message_send_attempt:', safeStringify({
-                to,
-                mediaId,
-                attempt,
-                delayMs
-            }));
-            const response = await send360DialogVideoMessageByMediaId({
-                to,
-                mediaId,
-                captionText
-            });
-            console.log('Response from 360dialog (video by media id):', response.data);
-            return response.data;
-        } catch (error) {
-            lastError = error;
-            console.error('[WhatsApp outgoing] video_message_send_failed:', safeStringify({
-                to,
-                mediaId,
-                attempt,
-                status: error.response?.status || null,
-                error: error.response?.data || error.message
-            }));
-            if (!is360DialogInvalidParameterError(error) || attempt >= retryDelaysMs.length) {
-                throw error;
-            }
-        }
-    }
-
-    throw lastError || new Error('360dialog video send failed after retries');
-};
-
 const sendMessageByChatId = async (chatId, message) => {
     if (!chatId || !message) {
         return null;
     }
 
-    const response = await sendNotification.sendToChatId(chatId, message, { enforce24h: true });
-    console.log('Response from 360dialog (sendMessage):', response);
+    const response = await sendNotification.sendToChatId(chatId, message);
+    console.log('Response from Green API (sendMessage):', response);
     return response;
 };
 
@@ -360,17 +154,15 @@ const sendFileByUrlToChatId = async (chatId, urlFile, fileName, caption = '') =>
         return null;
     }
 
-    const payload = {
-        chatId,
-        urlFile,
-        fileName: fileName || `qr-${Date.now()}.png`,
-        caption: String(caption || '')
-    };
-
     try {
-        const response = await axios.post(GREEN_API_SEND_FILE_URL, payload);
-        console.log('Response from Green API (sendFileByUrl):', response.data);
-        return response.data;
+        const response = await greenApiService.sendFileByUrl({
+            chatId,
+            urlFile,
+            fileName: fileName || `qr-${Date.now()}.png`,
+            caption: String(caption || '')
+        });
+        console.log('Response from Green API (sendFileByUrl):', response);
+        return response;
     } catch (error) {
         console.error('[WhatsApp webhook] sendFileByUrlToChatId failed:', {
             status: error.response?.status || null,
@@ -2283,7 +2075,7 @@ const sanitizeLogToken = (value, maxLength = 80) => {
 const sendPdfProofDebugLog = async (message) => {
     const text = sanitizeLogToken(message, 900);
     try {
-        await sendNotification(PDF_PROOF_DEBUG_PHONE, text, { enforce24h: true });
+        await sendNotification(PDF_PROOF_DEBUG_PHONE, text);
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to send PDF debug log:', error.message);
     }
@@ -2317,11 +2109,9 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
     }
 
     const messageId = String(content?.idMessage || '').trim();
-    const messageTimestamp = Number(content?.messageTimestamp) || null;
     const webhookType = String(content?.typeWebhook || '').trim();
-    const isOutgoing = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
     const chatId = String(
-        isOutgoing
+        webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived'
             ? (content?.recipientData?.chatId || content?.senderData?.chatId || '')
             : (content?.senderData?.chatId || content?.recipientData?.chatId || '')
     ).trim();
@@ -2333,20 +2123,14 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
             skipped: true,
             reason: 'chatId_or_messageId_missing',
             chatId,
-            messageId,
-            messageTimestamp
+            messageId
         };
     }
 
     try {
-        const result = await baileysNotificationService.deleteMessageForCurrentSession({
+        const result = await greenApiService.deleteMessage({
             chatId,
-            messageId,
-            fromMe: isOutgoing,
-            timestamp: messageTimestamp,
-            participant: isOutgoing
-                ? (content?.senderData?.chatId || '')
-                : (content?.senderData?.chatId || '')
+            idMessage: messageId
         });
         console.log(`[WhatsApp webhook] Processed PDF message deleted for ${chatId}, messageId=${messageId}.`);
         return {
@@ -2365,9 +2149,7 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
             reason: 'delete_failed',
             error: error.message,
             chatId,
-            messageId,
-            messageTimestamp,
-            fromMe: isOutgoing
+            messageId
         };
     }
 };
@@ -2766,7 +2548,7 @@ const parseIncomingAdminExpenseCommand = (text) => {
     };
 };
 
-const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
+const trackIncomingMessage = async (content) => {
     const webhookType = String(content?.typeWebhook || '').trim();
     if (webhookType !== 'incomingMessageReceived') {
         return;
@@ -2783,8 +2565,6 @@ const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
     }
 
     const now = new Date();
-    let shouldSendGreeting = false;
-
     const user = await User.findOne({
         where: { phoneNumber: customerPhone }
     });
@@ -2794,36 +2574,10 @@ const trackIncomingMessageAndSendGreetingIfNeeded = async (content) => {
             phoneNumber: customerPhone,
             lastIncomingMessageAt: now
         });
-        shouldSendGreeting = true;
     } else {
-        const lastIncomingAt = user.lastIncomingMessageAt ? new Date(user.lastIncomingMessageAt) : null;
-        shouldSendGreeting =
-            !lastIncomingAt || now.getTime() - lastIncomingAt.getTime() > INCOMING_MESSAGE_GREET_INTERVAL_MS;
-
         await user.update({
             lastIncomingMessageAt: now
         });
-    }
-
-    const flushResult = await sendNotification.flushPendingMessagesByPhone(customerPhone);
-    if (flushResult.sentCount > 0) {
-        console.log(
-            `[WhatsApp webhook] Flushed pending messages for ${senderChatId}: sent=${flushResult.sentCount}, pending=${flushResult.pendingCount}.`
-        );
-        return;
-    }
-
-    if (!shouldSendGreeting) {
-        return;
-    }
-
-    try {
-        await sendMessageByChatId(senderChatId, INCOMING_MESSAGE_GREETING);
-        console.log(
-            `[WhatsApp webhook] Greeting sent to ${senderChatId} (phone=${customerPhone}, firstOrIdleOver14d=true).`
-        );
-    } catch (error) {
-        console.error('[WhatsApp webhook] Failed to send greeting message:', error.response?.data || error.message);
     }
 };
 
@@ -3082,9 +2836,8 @@ const processIncomingVideoMessageWebhook = async (content) => {
         return;
     }
 
-    const normalizedPhone = normalizePhoneNumber(rawPhoneNumber);
-    const to = normalizedPhone ? `7${normalizedPhone}` : String(rawPhoneNumber || '').replace(/\D/g, '');
-    if (!to) {
+    const chatId = greenApiService.normalizePhoneToChatId(rawPhoneNumber);
+    if (!chatId) {
         console.log('Did not find valid phone number for video forwarding.');
         return;
     }
@@ -3095,8 +2848,14 @@ const processIncomingVideoMessageWebhook = async (content) => {
             if (!mediaBuffer || mediaBuffer.length === 0) {
                 throw new Error('Video base64 buffer is empty');
             }
-            console.log('[WhatsApp webhook][video] forward source=baileys-buffer');
-            await sendVideoBufferTo360Dialog(mediaBuffer, to, fileName, downloadUrl);
+            console.log('[WhatsApp webhook][video] forward source=green-api-upload');
+            await greenApiService.sendFileByUpload({
+                chatId,
+                fileBuffer: mediaBuffer,
+                fileName,
+                mimeType: 'video/mp4',
+                caption: DEFAULT_CAPTION
+            });
             return;
         } catch (error) {
             console.error('Failed to send file by base64 buffer:', error.response?.data || error.message);
@@ -3105,14 +2864,13 @@ const processIncomingVideoMessageWebhook = async (content) => {
 
     if (downloadUrl) {
         try {
-            if (isWhatsAppEncryptedMediaUrl(downloadUrl)) {
-                console.error(
-                    '[WhatsApp webhook][video] skip url-fallback: encrypted WhatsApp CDN URL requires successful Baileys download first'
-                );
-                return;
-            }
-            console.log('[WhatsApp webhook][video] forward source=url-fallback');
-            await sendFileByUrl(downloadUrl, to, fileName);
+            console.log('[WhatsApp webhook][video] forward source=green-api-url');
+            await greenApiService.sendFileByUrl({
+                chatId,
+                urlFile: downloadUrl,
+                fileName,
+                caption: DEFAULT_CAPTION
+            });
         } catch (error) {
             console.error('Failed to send file by url:', error.response?.data || error.message);
         }
@@ -3130,7 +2888,7 @@ const processWebhookContent = async (content, meta = {}) => {
         }));
     }
     try {
-        await trackIncomingMessageAndSendGreetingIfNeeded(content);
+        await trackIncomingMessage(content);
         await processIncomingAdminExpenseWebhook(content);
         await processIncomingPdfProofWebhook(content);
         await processIncomingMessageWebhook(content);
