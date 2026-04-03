@@ -1648,8 +1648,14 @@ const handleOrderDraftAliasDecision = async (content) => {
         content?.messageData?.templateButtonReplyMessage ||
         content?.messageData?.templateButtonsReplyMessage ||
         null;
-    const selectedId = String(templateReply?.selectedId || '').trim();
-    const stanzaId = String(templateReply?.stanzaId || '').trim();
+    const interactiveReply = content?.messageData?.interactiveButtonsResponse || null;
+    const replyPayload = interactiveReply || templateReply;
+    const selectedId = String(replyPayload?.selectedId || '').trim();
+    const stanzaId = String(
+        replyPayload?.stanzaId ||
+        content?.messageData?.quotedMessage?.stanzaId ||
+        ''
+    ).trim();
     const decision = parseOrderDraftDecisionButtonId(selectedId);
 
     if (!decision || !Number.isInteger(decision.requestId) || decision.requestId <= 0) {
