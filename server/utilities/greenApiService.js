@@ -87,6 +87,43 @@ const sendMessage = async ({ chatId, message, quotedMessageId = null, linkPrevie
     return postJson('sendMessage', payload);
 };
 
+const sendInteractiveButtonsReply = async ({ chatId, header = '', body, footer = '', buttons = [] }) => {
+    const normalizedChatId = normalizePhoneToChatId(chatId);
+    const bodyText = String(body || '').trim();
+    const normalizedButtons = Array.isArray(buttons)
+        ? buttons
+            .map((button) => ({
+                buttonId: String(button?.buttonId || '').trim(),
+                buttonText: String(button?.buttonText || '').trim()
+            }))
+            .filter((button) => button.buttonId && button.buttonText)
+            .slice(0, 3)
+        : [];
+
+    if (!normalizedChatId || !bodyText || normalizedButtons.length === 0) {
+        return null;
+    }
+
+    const payload = {
+        chatId: normalizedChatId,
+        body: bodyText,
+        buttons: normalizedButtons
+    };
+
+    const headerText = String(header || '').trim();
+    const footerText = String(footer || '').trim();
+
+    if (headerText) {
+        payload.header = headerText;
+    }
+
+    if (footerText) {
+        payload.footer = footerText;
+    }
+
+    return postJson('sendInteractiveButtonsReply', payload);
+};
+
 const sendFileByUrl = async ({ chatId, urlFile, fileName, caption = '', quotedMessageId = null }) => {
     const normalizedChatId = normalizePhoneToChatId(chatId);
     const safeUrl = String(urlFile || '').trim();
@@ -162,6 +199,7 @@ module.exports = {
     GREEN_API_TOKEN_INSTANCE,
     normalizePhoneToChatId,
     sendMessage,
+    sendInteractiveButtonsReply,
     sendFileByUrl,
     sendFileByUpload,
     deleteMessage,

@@ -50,6 +50,8 @@ const PAYMENT_LINK_FOOTER =
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ORDER_DRAFT_AI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const ORDER_DRAFT_AI_MODEL = 'openai/gpt-5-mini';
+const ORDER_DRAFT_ALIAS_FIX_AI_MODEL = 'openai/gpt-5-mini';
+const ORDER_DRAFT_ALIAS_APPROVER_PHONES = ['77073670497', '77775464450', '77077632624'];
 const openRouterHttpsAgent = new https.Agent({
     keepAlive: true,
     family: 4
@@ -382,6 +384,103 @@ const stringifyJson = (value) => {
     }
 };
 
+const parseStoredJson = (value, fallback = null) => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+        return fallback;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch (_error) {
+        return fallback;
+    }
+};
+
+const buildOrderDraftAliasFixPrompt = ({ sourceText, unknownAliases, catalogLines }) => `
+Ты помогаешь исправлять псевдонимы товаров в сообщении заказа.
+Нужно исправить только строки с товарами. Заголовок "Ваш заказ", строку "Доставка ..." и данные клиента менять нельзя.
+
+Верни строго JSON без markdown:
+{
+  "correctedText": "полный исправленный текст сообщения",
+  "changes": [
+    {
+      "from": "ошибочный псевдоним",
+      "to": "правильный псевдоним",
+      "productName": "название товара",
+      "typeName": "тип"
+    }
+  ],
+  "comment": "короткий комментарий"
+}
+
+Правила:
+- Используй только псевдонимы из списка каталога ниже.
+- Если исправляешь псевдоним, подставляй именно alias типа, а не название товара.
+- Сохраняй количества ("2 шт" и т.д.).
+- Не добавляй новые товары, которых не было в исходном сообщении.
+- Если есть несколько вариантов, выбери самый вероятный по похожести.
+
+Ненайденные псевдонимы: ${unknownAliases.join(', ')}
+
+Каталог товаров и типов:
+${catalogLines.join('\n')}
+
+Исходное сообщение:
+${String(sourceText || '').trim()}
+`.trim();
+
+const buildOrderDraftAliasDecisionBody = ({ requestId, sourceText, suggestion }) => {
+    const unknownAliases = Array.isArray(suggestion?.unknownAliases) ? suggestion.unknownAliases : [];
+    const changes = Array.isArray(suggestion?.changes) ? suggestion.changes : [];
+    const comment = String(suggestion?.comment || '').trim();
+    const correctedText = String(suggestion?.correctedText || '').trim();
+
+    const changeLines = changes.length > 0
+        ? changes.map((item) => `- ${String(item?.from || '').trim()} -> ${String(item?.to || '').trim()}`).join('\n')
+        : 'Нет списка замен';
+
+    return [
+        `Ошибка псевдонима в "Ваш заказ" #${requestId}`,
+        unknownAliases.length > 0 ? `Не найдены: ${unknownAliases.join(', ')}` : null,
+        '',
+        'Исходная версия:',
+        String(sourceText || '').trim(),
+        '',
+        'Предложения ИИ:',
+        changeLines,
+        '',
+        'Новая версия:',
+        correctedText || 'ИИ не предложил новую версию',
+        comment ? '' : null,
+        comment ? `Комментарий ИИ: ${comment}` : null
+    ].filter((line) => line !== null).join('\n');
+};
+
+const buildOrderDraftAdminDecisionButtons = (requestId) => ([
+    {
+        buttonId: `odf:ok:${requestId}`,
+        buttonText: 'Подтвердить'
+    },
+    {
+        buttonId: `odf:no:${requestId}`,
+        buttonText: 'Отменить'
+    }
+]);
+
+const parseOrderDraftDecisionButtonId = (value) => {
+    const match = String(value || '').trim().match(/^odf:(ok|no):(\d+)$/);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        action: match[1] === 'ok' ? 'confirm' : 'cancel',
+        requestId: Number.parseInt(match[2], 10)
+    };
+};
+
 const createOrGetOrderDraftRequestRecord = async ({
     messageId,
     customerPhone,
@@ -447,7 +546,41 @@ const markOrderDraftUnknownAliases = async (record, parsedDraft, unknownAliases)
         parsedAliasesJson: stringifyJson(parsedDraft?.aliases || []),
         unknownAliasesJson: stringifyJson(unknownAliases || []),
         processingStatus: 'awaiting_alias_fix',
-        lastError: unknownAliases && unknownAliases.length > 0 ? `Не найдены псевдонимы: ${unknownAliases.join(', ')}` : null
+        lastError: unknownAliases && unknownAliases.length > 0 ? `Не найдены псевдонимы: ${unknownAliases.join(', ')}` : null,
+        aliasDecisionStatus: null,
+        aliasDecisionByChatId: null,
+        aliasDecisionAt: null
+    });
+
+    return record;
+};
+
+const saveOrderDraftAliasSuggestion = async (record, suggestion, adminMessages = []) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        aliasSuggestionJson: stringifyJson(suggestion || null),
+        aliasSuggestedText: String(suggestion?.correctedText || '').trim() || null,
+        aliasSuggestionMessagesJson: stringifyJson(adminMessages || []),
+        aliasDecisionStatus: 'pending',
+        aliasDecisionByChatId: null,
+        aliasDecisionAt: null
+    });
+
+    return record;
+};
+
+const markOrderDraftAliasDecision = async (record, { status, chatId }) => {
+    if (!record) {
+        return null;
+    }
+
+    await record.update({
+        aliasDecisionStatus: String(status || '').trim() || null,
+        aliasDecisionByChatId: String(chatId || '').trim() || null,
+        aliasDecisionAt: new Date()
     });
 
     return record;
@@ -471,7 +604,9 @@ const markOrderDraftPaymentRequested = async (record, {
         paymentConnectionId: paymentConnectionId || null,
         paymentRequestedAt: new Date(),
         processingStatus: 'awaiting_payment',
-        lastError: null
+        lastError: null,
+        aliasSuggestionMessagesJson: null,
+        aliasDecisionStatus: 'applied'
     });
 
     return record;
@@ -602,6 +737,166 @@ const parseJsonFromAiContent = (content) => {
     } catch (_error) {
         return null;
     }
+};
+
+const getAliasCatalogSnapshot = async () => {
+    const typeRows = await ProductType.findAll({
+        include: [{ model: Product, attributes: ['id', 'name', 'alias'] }],
+        order: [
+            [{ model: Product, as: 'product' }, 'name', 'ASC'],
+            ['type', 'ASC']
+        ]
+    });
+
+    return typeRows.map((typeRow) => {
+        const typeJson = typeRow.toJSON();
+        return {
+            productId: Number(typeJson.productId),
+            typeId: Number(typeJson.id),
+            productName: String(typeJson.product?.name || '').trim(),
+            productAlias: String(typeJson.product?.alias || '').trim(),
+            typeName: String(typeJson.type || '').trim(),
+            alias: String(typeJson.alias || '').trim(),
+            code: String(typeJson.code || '').trim()
+        };
+    });
+};
+
+const requestAiAliasCorrection = async ({ sourceText, unknownAliases }) => {
+    if (!ORDER_DRAFT_AI_API_KEY) {
+        throw new Error('OpenRouter API key не найден');
+    }
+
+    const catalog = await getAliasCatalogSnapshot();
+    const catalogLines = catalog.map((item) => [
+        `productId=${item.productId}`,
+        `typeId=${item.typeId}`,
+        `товар="${item.productName || '-'}"`,
+        `productAlias="${item.productAlias || '-'}"`,
+        `тип="${item.typeName || '-'}"`,
+        `alias="${item.alias || '-'}"`,
+        `code="${item.code || '-'}"`
+    ].join(' | '));
+
+    const aiRequestBody = {
+        model: ORDER_DRAFT_ALIAS_FIX_AI_MODEL,
+        temperature: 0,
+        messages: [
+            {
+                role: 'system',
+                content: 'Ты возвращаешь только JSON без пояснений и markdown.'
+            },
+            {
+                role: 'user',
+                content: buildOrderDraftAliasFixPrompt({
+                    sourceText,
+                    unknownAliases,
+                    catalogLines
+                })
+            }
+        ]
+    };
+
+    const response = await axios.post(
+        ORDER_DRAFT_AI_URL,
+        aiRequestBody,
+        {
+            headers: {
+                Authorization: `Bearer ${ORDER_DRAFT_AI_API_KEY}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://greenman.kz',
+                'X-Title': 'Order Draft Alias Fix'
+            },
+            family: 4,
+            httpsAgent: openRouterHttpsAgent,
+            timeout: 30000
+        }
+    );
+
+    const content = response?.data?.choices?.[0]?.message?.content;
+    const parsed = parseJsonFromAiContent(content);
+    if (!parsed || typeof parsed !== 'object') {
+        throw new Error('ИИ вернул невалидный JSON для исправления псевдонимов');
+    }
+
+    const correctedText = String(parsed.correctedText || '').trim();
+    if (!correctedText) {
+        throw new Error('ИИ не вернул correctedText');
+    }
+
+    return {
+        correctedText,
+        changes: Array.isArray(parsed.changes) ? parsed.changes : [],
+        comment: String(parsed.comment || '').trim(),
+        unknownAliases: Array.isArray(unknownAliases) ? unknownAliases : [],
+        aiRawText: String(content || '').trim()
+    };
+};
+
+const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }) => {
+    const body = buildOrderDraftAliasDecisionBody({
+        requestId,
+        sourceText,
+        suggestion
+    });
+
+    const results = await Promise.all(
+        ORDER_DRAFT_ALIAS_APPROVER_PHONES.map(async (phone) => {
+            try {
+                const response = await greenApiService.sendInteractiveButtonsReply({
+                    chatId: phone,
+                    header: 'Исправить псевдоним',
+                    body,
+                    footer: `Заявка #${requestId}`,
+                    buttons: buildOrderDraftAdminDecisionButtons(requestId)
+                });
+
+                return {
+                    phone,
+                    chatId: greenApiService.normalizePhoneToChatId(phone),
+                    idMessage: String(response?.idMessage || '').trim() || null
+                };
+            } catch (error) {
+                console.error('[WhatsApp webhook][OrderDraft] Failed to send alias suggestion to admin:', {
+                    phone,
+                    message: error.message,
+                    status: error.response?.status || null,
+                    data: error.response?.data || null
+                });
+                return {
+                    phone,
+                    chatId: greenApiService.normalizePhoneToChatId(phone),
+                    idMessage: null,
+                    error: error.message
+                };
+            }
+        })
+    );
+
+    return results.filter((item) => item.chatId);
+};
+
+const deleteOrderDraftAdminMessages = async (messages, ignoreChatId = '') => {
+    const normalizedIgnoreChatId = String(ignoreChatId || '').trim();
+    await Promise.all(
+        (Array.isArray(messages) ? messages : []).map(async (item) => {
+            const chatId = String(item?.chatId || '').trim();
+            const idMessage = String(item?.idMessage || '').trim();
+            if (!chatId || !idMessage || (normalizedIgnoreChatId && chatId === normalizedIgnoreChatId)) {
+                return;
+            }
+
+            try {
+                await greenApiService.deleteMessage({ chatId, idMessage });
+            } catch (error) {
+                console.error('[WhatsApp webhook][OrderDraft] Failed to delete admin alias suggestion message:', {
+                    chatId,
+                    idMessage,
+                    message: error.message
+                });
+            }
+        })
+    );
 };
 
 const splitAddressToOrderFields = (streetRaw) => {
@@ -1344,6 +1639,91 @@ const retryOrderDraftRequestProcessing = async ({
     return requestRecord.reload();
 };
 
+const handleOrderDraftAliasDecision = async (content) => {
+    if (String(content?.typeWebhook || '').trim() !== 'incomingMessageReceived') {
+        return false;
+    }
+
+    const templateReply =
+        content?.messageData?.templateButtonReplyMessage ||
+        content?.messageData?.templateButtonsReplyMessage ||
+        null;
+    const selectedId = String(templateReply?.selectedId || '').trim();
+    const stanzaId = String(templateReply?.stanzaId || '').trim();
+    const decision = parseOrderDraftDecisionButtonId(selectedId);
+
+    if (!decision || !Number.isInteger(decision.requestId) || decision.requestId <= 0) {
+        return false;
+    }
+
+    const senderChatId = String(content?.senderData?.chatId || '').trim();
+    const requestRecord = await OrderDraftRequest.findByPk(decision.requestId);
+    if (!requestRecord) {
+        return true;
+    }
+
+    const storedMessages = parseStoredJson(requestRecord.aliasSuggestionMessagesJson, []);
+    await deleteOrderDraftAdminMessages(storedMessages, senderChatId);
+
+    if (senderChatId && stanzaId) {
+        try {
+            await greenApiService.deleteMessage({
+                chatId: senderChatId,
+                idMessage: stanzaId
+            });
+        } catch (error) {
+            console.error('[WhatsApp webhook][OrderDraft] Failed to delete clicked admin message:', {
+                chatId: senderChatId,
+                idMessage: stanzaId,
+                message: error.message
+            });
+        }
+    }
+
+    const existingDecisionStatus = String(requestRecord.aliasDecisionStatus || '').trim().toLowerCase();
+    if (existingDecisionStatus === 'confirmed' || existingDecisionStatus === 'cancelled') {
+        return true;
+    }
+
+    if (decision.action === 'cancel') {
+        await markOrderDraftAliasDecision(requestRecord, {
+            status: 'cancelled',
+            chatId: senderChatId
+        });
+        return true;
+    }
+
+    const suggestedText = String(requestRecord.aliasSuggestedText || '').trim();
+    if (!suggestedText) {
+        await markOrderDraftAliasDecision(requestRecord, {
+            status: 'confirm_failed',
+            chatId: senderChatId
+        });
+        return true;
+    }
+
+    await markOrderDraftAliasDecision(requestRecord, {
+        status: 'confirmed',
+        chatId: senderChatId
+    });
+
+    try {
+        await retryOrderDraftRequestProcessing({
+            requestId: requestRecord.id,
+            sourceText: suggestedText
+        });
+    } catch (error) {
+        console.error('[WhatsApp webhook][OrderDraft] Failed to apply confirmed AI alias suggestion:', error.message);
+        await requestRecord.reload();
+        await requestRecord.update({
+            processingStatus: 'awaiting_alias_fix',
+            lastError: formatErrorMessage(error)
+        });
+    }
+
+    return true;
+};
+
 const buildBundleNoteText = (noteText, chatId) => {
     const normalizedNote = String(noteText || '').trim();
     const normalizedPhone = normalizePhoneNumber(chatId);
@@ -1806,6 +2186,22 @@ const processOrderDraftRequest = async ({
             `[WhatsApp webhook][OrderDraft] Unknown aliases found: ${resolved.unknownAliases.join(', ')}`
         );
         await markOrderDraftUnknownAliases(orderDraftRequest, parsedOrderDraft, resolved.unknownAliases);
+        if (orderDraftRequest) {
+            try {
+                const aliasSuggestion = await requestAiAliasCorrection({
+                    sourceText: textMessage,
+                    unknownAliases: resolved.unknownAliases
+                });
+                const adminMessages = await sendAliasSuggestionToAdmins({
+                    requestId: orderDraftRequest.id,
+                    sourceText: textMessage,
+                    suggestion: aliasSuggestion
+                });
+                await saveOrderDraftAliasSuggestion(orderDraftRequest, aliasSuggestion, adminMessages);
+            } catch (error) {
+                console.error('[WhatsApp webhook][OrderDraft] Failed to prepare AI alias suggestion:', error.message);
+            }
+        }
         await sendMessageByChatId(
             recipientChatId,
             `Не найдены псевдонимы: ${resolved.unknownAliases.join(', ')}`
@@ -2717,16 +3113,25 @@ const processIncomingMessageWebhook = async (content) => {
         })
         : null;
 
-    if (isOutgoingWebhook && startsWithKazpostCommand(textMessage)) {
+    if (startsWithKazpostCommand(textMessage)) {
         try {
-            await createOrderFromKazpostOutgoingCommand({
+            await processKazpostRequest({
                 textMessage,
                 recipientChatId,
                 recipientPhoneRaw:
-                    content?.recipientPhone ||
-                    content?.recipientData?.recipient ||
-                    content?.senderPhone ||
-                    null,
+                    isOutgoingWebhook
+                        ? (
+                            content?.recipientPhone ||
+                            content?.recipientData?.recipient ||
+                            content?.senderPhone ||
+                            null
+                        )
+                        : (
+                            content?.senderPhone ||
+                            content?.senderData?.sender ||
+                            content?.recipientPhone ||
+                            null
+                        ),
                 messageId
             });
         } catch (error) {
@@ -2925,6 +3330,10 @@ const processWebhookContent = async (content, meta = {}) => {
     try {
         pushWebhookEvent(content);
         await trackIncomingMessage(content);
+        const orderDraftAliasDecisionHandled = await handleOrderDraftAliasDecision(content);
+        if (orderDraftAliasDecisionHandled) {
+            return;
+        }
         await processIncomingAdminExpenseWebhook(content);
         await processIncomingPdfProofWebhook(content);
         await processIncomingMessageWebhook(content);

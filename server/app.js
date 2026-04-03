@@ -445,6 +445,48 @@ const ensureOrderDraftRequestsSchema = async () => {
             });
         }
 
+        if (!tableDefinition.aliasSuggestionJson) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasSuggestionJson', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aliasSuggestedText) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasSuggestedText', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aliasSuggestionMessagesJson) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasSuggestionMessagesJson', {
+                type: Sequelize.TEXT,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aliasDecisionStatus) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasDecisionStatus', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aliasDecisionByChatId) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasDecisionByChatId', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.aliasDecisionAt) {
+            await queryInterface.addColumn('order_draft_requests', 'aliasDecisionAt', {
+                type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
         if (!tableDefinition.orderId) {
             await queryInterface.addColumn('order_draft_requests', 'orderId', {
                 type: Sequelize.INTEGER,

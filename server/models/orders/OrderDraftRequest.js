@@ -58,6 +58,30 @@ const OrderDraftRequest = orderDB.define(
             type: Sequelize.TEXT,
             allowNull: true
         },
+        aliasSuggestionJson: {
+            type: Sequelize.TEXT,
+            allowNull: true
+        },
+        aliasSuggestedText: {
+            type: Sequelize.TEXT,
+            allowNull: true
+        },
+        aliasSuggestionMessagesJson: {
+            type: Sequelize.TEXT,
+            allowNull: true
+        },
+        aliasDecisionStatus: {
+            type: Sequelize.STRING,
+            allowNull: true
+        },
+        aliasDecisionByChatId: {
+            type: Sequelize.STRING,
+            allowNull: true
+        },
+        aliasDecisionAt: {
+            type: Sequelize.DATE,
+            allowNull: true
+        },
         orderId: {
             type: Sequelize.INTEGER,
             allowNull: true
