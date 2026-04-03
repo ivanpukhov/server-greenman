@@ -43,6 +43,8 @@ const ORDER_DRAFT_TTL_MS = 1000 * 60 * 60 * 6;
 const PAYMENT_LINK_DUPLICATE_WINDOW_MS = 1000 * 60 * 3;
 const pendingOrderDraftByChatId = new Map();
 const processedKazpostCommandByMessageId = new Map();
+const webhookEvents = [];
+let webhookEventSeq = 0;
 const PAYMENT_LINK_FOOTER =
     'После оплаты скиньте пожалуйста чек\n‼️Без чека отправки не будет';
 const ORDER_BUNDLE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -106,6 +108,39 @@ const safeStringify = (value) => {
         },
         2
     );
+};
+
+const pushWebhookEvent = (content) => {
+    const webhookType = String(content?.typeWebhook || '').trim();
+    const text =
+        content?.messageData?.extendedTextMessageData?.text ||
+        content?.messageData?.textMessageData?.textMessage ||
+        content?.messageData?.fileMessageData?.caption ||
+        content?.messageData?.videoMessage?.caption ||
+        '';
+    const chatId = String(
+        content?.senderData?.chatId ||
+        content?.recipientData?.chatId ||
+        ''
+    ).trim();
+
+    webhookEvents.push({
+        id: ++webhookEventSeq,
+        time: new Date().toISOString(),
+        type: webhookType || 'unknown',
+        chatId,
+        text: String(text || '').trim(),
+        messageId: String(content?.idMessage || '').trim() || null
+    });
+
+    if (webhookEvents.length > 200) {
+        webhookEvents.splice(0, webhookEvents.length - 200);
+    }
+};
+
+const getWebhookEvents = (limit = 15) => {
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 15));
+    return webhookEvents.slice(-safeLimit).reverse();
 };
 
 const findFirstValueByKey = (source, targetKey) => {
@@ -2888,6 +2923,7 @@ const processWebhookContent = async (content, meta = {}) => {
         }));
     }
     try {
+        pushWebhookEvent(content);
         await trackIncomingMessage(content);
         await processIncomingAdminExpenseWebhook(content);
         await processIncomingPdfProofWebhook(content);
@@ -2916,3 +2952,4 @@ module.exports = router;
 module.exports.processWebhookContent = processWebhookContent;
 module.exports.retryKazpostRequestProcessing = retryKazpostRequestProcessing;
 module.exports.retryOrderDraftRequestProcessing = retryOrderDraftRequestProcessing;
+module.exports.getWebhookEvents = getWebhookEvents;

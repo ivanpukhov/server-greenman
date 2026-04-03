@@ -268,7 +268,7 @@ const KazpostRequestsPage = () => {
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
-    const [period, setPeriod] = useState('all');
+    const [period, setPeriod] = useState('today');
     const [retryRow, setRetryRow] = useState(null);
     const [retryText, setRetryText] = useState('');
     const [retryingId, setRetryingId] = useState(null);
@@ -309,8 +309,16 @@ const KazpostRequestsPage = () => {
     );
 
     useEffect(() => {
-        loadData('', false, 'all');
+        loadData('', false, 'today');
     }, [loadData]);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            loadData(query, needsAttentionOnly, period);
+        }, 30000);
+
+        return () => window.clearInterval(timer);
+    }, [loadData, query, needsAttentionOnly, period]);
 
     const attentionCount = useMemo(() => rows.filter((row) => row.needsAttention).length, [rows]);
 

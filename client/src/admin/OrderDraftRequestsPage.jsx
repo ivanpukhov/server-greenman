@@ -283,7 +283,7 @@ const OrderDraftRequestsPage = () => {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
-    const [period, setPeriod] = useState('all');
+    const [period, setPeriod] = useState('today');
     const [retryRow, setRetryRow] = useState(null);
     const [sourceText, setSourceText] = useState('');
     const [corrections, setCorrections] = useState([]);
@@ -349,9 +349,17 @@ const OrderDraftRequestsPage = () => {
     );
 
     useEffect(() => {
-        loadData('', 'all');
+        loadData('', 'today');
         loadAliases();
     }, [loadAliases, loadData]);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            loadData(query, period);
+        }, 30000);
+
+        return () => window.clearInterval(timer);
+    }, [loadData, query, period]);
 
     const needsAttentionCount = useMemo(
         () =>

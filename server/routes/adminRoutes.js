@@ -30,6 +30,7 @@ router.post('/whatsapp/test-template', adminController.testWhatsAppTemplate);
 router.post('/whatsapp/test-message', adminController.testWhatsAppTemplate);
 router.get('/whatsapp/connection/status', adminWhatsAppController.getConnectionStatus);
 router.get('/whatsapp/connection/qr', adminWhatsAppController.getQr);
+router.get('/whatsapp/connection/events', adminWhatsAppController.getWebhookEvents);
 router.post('/whatsapp/connection/reboot', adminWhatsAppController.reboot);
 router.post('/whatsapp/connection/logout', adminWhatsAppController.logout);
 router.post('/whatsapp/connection/webhook', adminWhatsAppController.setWebhook);

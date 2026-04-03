@@ -1,4 +1,5 @@
 const greenApiService = require('../utilities/greenApiService');
+const whatsappWebhookRoutes = require('../routes/whatsappWebhookRoutes');
 
 module.exports = {
     async getConnectionStatus(_req, res) {
@@ -90,5 +91,14 @@ module.exports = {
                 error: error.message
             });
         }
+    },
+
+    async getWebhookEvents(req, res) {
+        const limit = Number(req.query?.limit || 15);
+        return res.json({
+            data: typeof whatsappWebhookRoutes.getWebhookEvents === 'function'
+                ? whatsappWebhookRoutes.getWebhookEvents(limit)
+                : []
+        });
     }
 };

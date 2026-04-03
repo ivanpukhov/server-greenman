@@ -32,6 +32,7 @@ const WhatsAppConnectionPage = () => {
     const [restarting, setRestarting] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [errorText, setErrorText] = useState('');
+    const [events, setEvents] = useState([]);
 
     const authorizedFetch = useCallback(async (url, options = {}) => {
         const token = adminAuthStorage.getToken();
@@ -53,6 +54,11 @@ const WhatsAppConnectionPage = () => {
     const loadStatus = useCallback(async () => {
         const body = await authorizedFetch(apiUrl('/admin/whatsapp/connection/status'));
         setStatus(body.data || null);
+    }, [authorizedFetch]);
+
+    const loadEvents = useCallback(async () => {
+        const body = await authorizedFetch(apiUrl('/admin/whatsapp/connection/events?limit=15'));
+        setEvents(Array.isArray(body.data) ? body.data : []);
     }, [authorizedFetch]);
 
     const handleRequestQr = async () => {
@@ -113,6 +119,7 @@ const WhatsAppConnectionPage = () => {
         const init = async () => {
             try {
                 await loadStatus();
+                await loadEvents();
             } catch (error) {
                 if (!cancelled) {
                     setErrorText(error.message);
@@ -124,12 +131,16 @@ const WhatsAppConnectionPage = () => {
         const statusTimer = setInterval(() => {
             loadStatus().catch(() => null);
         }, 5000);
+        const eventsTimer = setInterval(() => {
+            loadEvents().catch(() => null);
+        }, 5000);
 
         return () => {
             cancelled = true;
             clearInterval(statusTimer);
+            clearInterval(eventsTimer);
         };
-    }, [loadStatus]);
+    }, [loadEvents, loadStatus]);
 
     const statusLabel = useMemo(() => {
         const key = String(status?.connection || 'unknown');
@@ -203,7 +214,9 @@ const WhatsAppConnectionPage = () => {
                             </Typography>
                             <Box
                                 component="img"
-                                src={status.qr.message}
+                                src={String(status.qr.message || '').startsWith('data:')
+                                    ? status.qr.message
+                                    : `data:image/png;base64,${status.qr.message}`}
                                 alt="WhatsApp QR"
                                 sx={{
                                     width: 280,
@@ -227,6 +240,49 @@ const WhatsAppConnectionPage = () => {
                             webhookUrl: {status.settings.webhookUrl || 'не задан'}
                         </Alert>
                     ) : null}
+                </Stack>
+            </Paper>
+
+            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+                <Typography variant="h6" sx={{ mb: 1.2 }}>
+                    Последние 15 сообщений из webhook
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Лента обновляется автоматически и показывает последние события, пришедшие на backend webhook.
+                </Typography>
+                <Stack spacing={1}>
+                    {events.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                            Сообщений пока нет
+                        </Typography>
+                    ) : (
+                        events.map((event) => (
+                            <Box
+                                key={event.id}
+                                sx={{
+                                    p: 1.2,
+                                    borderRadius: 1.5,
+                                    border: '1px solid rgba(16,40,29,0.08)',
+                                    backgroundColor: '#fff'
+                                }}
+                            >
+                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ md: 'center' }}>
+                                    <Chip size="small" label={event.type || 'event'} />
+                                    <Typography variant="caption" color="text.secondary">
+                                        {formatDateTime(event.time)}
+                                    </Typography>
+                                    {event.chatId ? (
+                                        <Typography variant="caption" color="text.secondary">
+                                            чат: {event.chatId}
+                                        </Typography>
+                                    ) : null}
+                                </Stack>
+                                <Typography variant="body2" sx={{ mt: 0.8, whiteSpace: 'pre-wrap' }}>
+                                    {event.text || 'Без текста'}
+                                </Typography>
+                            </Box>
+                        ))
+                    )}
                 </Stack>
             </Paper>
         </Stack>
