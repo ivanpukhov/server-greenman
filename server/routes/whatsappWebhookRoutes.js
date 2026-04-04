@@ -33,7 +33,6 @@ const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDet
 const router = express.Router();
 const { Op } = Sequelize;
 
-const QR_MIRROR_CHAT_ID = '77775464450@c.us';
 const PDF_PROOF_DEBUG_PHONE = '77073670497';
 
 const DEFAULT_CAPTION =
@@ -211,20 +210,6 @@ const sendFileByUrlToChatId = async (chatId, urlFile, fileName, caption = '') =>
         });
         throw error;
     }
-};
-
-const buildCustomerPhoneCaptionByChatId = (chatId) => {
-    const normalizedPhone = normalizePhoneNumber(chatId);
-    if (normalizedPhone) {
-        return `+7${normalizedPhone}`;
-    }
-
-    const digits = String(chatId || '').replace(/\D/g, '');
-    if (digits.length >= 10) {
-        return `+7${digits.slice(-10)}`;
-    }
-
-    return String(chatId || '').trim();
 };
 
 const startsWithPaymentRequest = (text) => {
@@ -3456,44 +3441,47 @@ const processIncomingVideoMessageWebhook = async (content) => {
         return;
     }
 
-    const chatId = greenApiService.normalizePhoneToChatId(rawPhoneNumber);
-    if (!chatId) {
+    const recipientChatId = greenApiService.normalizePhoneToChatId(rawPhoneNumber);
+    if (!recipientChatId) {
         console.log('Did not find valid phone number for video forwarding.');
         return;
     }
 
-    if (fileBase64) {
-        try {
+    const sendVideoToChat = async ({ chatId, caption, logSuffix }) => {
+        if (fileBase64) {
             const mediaBuffer = Buffer.from(fileBase64, 'base64');
             if (!mediaBuffer || mediaBuffer.length === 0) {
                 throw new Error('Video base64 buffer is empty');
             }
-            console.log('[WhatsApp webhook][video] forward source=green-api-upload');
+
+            console.log(`[WhatsApp webhook][video] forward source=green-api-upload target=${logSuffix}`);
             await greenApiService.sendFileByUpload({
                 chatId,
                 fileBuffer: mediaBuffer,
                 fileName,
                 mimeType: 'video/mp4',
-                caption: DEFAULT_CAPTION
+                caption
             });
             return;
-        } catch (error) {
-            console.error('Failed to send file by base64 buffer:', error.response?.data || error.message);
         }
-    }
 
-    if (downloadUrl) {
-        try {
-            console.log('[WhatsApp webhook][video] forward source=green-api-url');
-            await greenApiService.sendFileByUrl({
-                chatId,
-                urlFile: downloadUrl,
-                fileName,
-                caption: DEFAULT_CAPTION
-            });
-        } catch (error) {
-            console.error('Failed to send file by url:', error.response?.data || error.message);
-        }
+        console.log(`[WhatsApp webhook][video] forward source=green-api-url target=${logSuffix}`);
+        await greenApiService.sendFileByUrl({
+            chatId,
+            urlFile: downloadUrl,
+            fileName,
+            caption
+        });
+    };
+
+    try {
+        await sendVideoToChat({
+            chatId: recipientChatId,
+            caption: DEFAULT_CAPTION,
+            logSuffix: 'recipient'
+        });
+    } catch (error) {
+        console.error('Failed to send video to recipient:', error.response?.data || error.message);
     }
 };
 
