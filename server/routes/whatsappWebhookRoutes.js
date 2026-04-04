@@ -2608,9 +2608,6 @@ const createOrderFromPaidBundle = async ({
     return createdOrder;
 };
 
-const buildQrCodeByData = (value) =>
-    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(value || ''))}`;
-
 const extractExpectedAmount = (text) => {
     const normalized = String(text || '').replace(/\u00A0/g, ' ');
     const match = normalized.match(/^\s*к\s+оплате\s+([0-9][0-9\s]*)/i);
@@ -3130,17 +3127,9 @@ const processIncomingPdfProofWebhook = async (content) => {
             return;
         }
 
-        const qrCodeUrl = buildQrCodeByData(bundleCode);
-        console.log(`[WhatsApp webhook][OrderDraft] Paid connection detected, sending deferred QR to ${senderChatId}`);
-        const qrFileName = `order-qr-${Date.now()}.png`;
-        const qrCaption = buildCustomerPhoneCaptionByChatId(senderChatId);
-
-        await sendFileByUrlToChatId(senderChatId, qrCodeUrl, qrFileName, qrCaption);
-
-        if (String(senderChatId) !== QR_MIRROR_CHAT_ID) {
-            await sendFileByUrlToChatId(QR_MIRROR_CHAT_ID, qrCodeUrl, qrFileName, qrCaption);
-        }
-        console.log('[WhatsApp webhook][OrderDraft] Deferred QR image sent after payment confirmation');
+        console.log(
+            `[WhatsApp webhook][OrderDraft] Paid connection detected for bundle ${bundleCode}, but automatic QR sending is disabled.`
+        );
     } finally {
         const deleteResult = await deleteProcessedPdfMessageIfNeeded(content, sellerIin);
         if (shouldDeleteProcessedPdf) {
