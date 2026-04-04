@@ -1045,13 +1045,12 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
     return results.filter((item) => item.chatId);
 };
 
-const deleteOrderDraftAdminMessages = async (messages, ignoreChatId = '') => {
-    const normalizedIgnoreChatId = String(ignoreChatId || '').trim();
+const deleteOrderDraftAdminMessages = async (messages) => {
     await Promise.all(
         (Array.isArray(messages) ? messages : []).map(async (item) => {
             const chatId = String(item?.chatId || '').trim();
             const idMessage = String(item?.idMessage || '').trim();
-            if (!chatId || !idMessage || (normalizedIgnoreChatId && chatId === normalizedIgnoreChatId)) {
+            if (!chatId || !idMessage) {
                 return;
             }
 
@@ -1838,9 +1837,14 @@ const handleOrderDraftAliasDecision = async (content) => {
     }
 
     const storedMessages = parseStoredJson(requestRecord.aliasSuggestionMessagesJson, []);
-    await deleteOrderDraftAdminMessages(storedMessages, senderChatId);
+    await deleteOrderDraftAdminMessages(storedMessages);
 
-    if (senderChatId && stanzaId) {
+    const hasStoredClickedMessage = storedMessages.some((item) => (
+        String(item?.chatId || '').trim() === senderChatId &&
+        String(item?.idMessage || '').trim() === stanzaId
+    ));
+
+    if (senderChatId && stanzaId && !hasStoredClickedMessage) {
         try {
             await greenApiService.deleteMessage({
                 chatId: senderChatId,
