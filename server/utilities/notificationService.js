@@ -9,6 +9,25 @@ const logOutgoing = (event, details = {}) => {
 
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
 const toText = (value) => String(value || '').trim();
+const FILTERED_ADMIN_PHONE = '7775464450';
+
+const startsWithNormalizedPrefix = (value, prefix) =>
+    String(value || '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+        .startsWith(String(prefix || '').trim().toLowerCase());
+
+const shouldSkipSpecialAdminMessage = (phoneOrChatId, messageText) => {
+    const tenDigitsPhone = normalizeToTenDigits(phoneOrChatId);
+    if (tenDigitsPhone !== FILTERED_ADMIN_PHONE) {
+        return false;
+    }
+
+    const text = toText(messageText);
+    return startsWithNormalizedPrefix(text, 'Ваш заказ') || startsWithNormalizedPrefix(text, 'Казпочта');
+};
 
 const isPhoneLikeWaJid = (value) => {
     const raw = toText(value).toLowerCase();
@@ -90,6 +109,15 @@ const sendNotification = async (phoneNumber, message) => {
         return null;
     }
 
+    if (shouldSkipSpecialAdminMessage(phoneNumber, message)) {
+        logOutgoing('skip_filtered_admin_message', {
+            phoneNumber: tenDigitsPhone,
+            chatId,
+            preview: toText(message).slice(0, 80)
+        });
+        return null;
+    }
+
     try {
         await ensureUserByPhone(tenDigitsPhone);
         return await sendTextDirect(chatId, message);
@@ -108,6 +136,15 @@ const sendToChatId = async (chatId, message) => {
     if (!tenDigitsPhone || !normalizedChatId) {
         logOutgoing('skip_invalid_chat_id', {
             chatId: String(chatId || '')
+        });
+        return null;
+    }
+
+    if (shouldSkipSpecialAdminMessage(chatId, message)) {
+        logOutgoing('skip_filtered_admin_message', {
+            phoneNumber: tenDigitsPhone,
+            chatId: normalizedChatId,
+            preview: toText(message).slice(0, 80)
         });
         return null;
     }
