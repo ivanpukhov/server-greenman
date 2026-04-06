@@ -1,72 +1,50 @@
-const greenApiService = require('../utilities/greenApiService');
+const dialog360Service = require('../utilities/dialog360Service');
 const whatsappWebhookRoutes = require('../routes/whatsappWebhookRoutes');
 
 module.exports = {
     async getConnectionStatus(_req, res) {
         try {
-            const [stateInstance, settings, qr] = await Promise.all([
-                greenApiService.getStateInstance(),
-                greenApiService.getSettings(),
-                greenApiService.getQr().catch(() => null)
-            ]);
+            const settings = await dialog360Service.getWebhook().catch((error) => ({
+                error: error.message
+            }));
+            const webhookUrl = String(settings?.url || '').trim() || null;
 
             return res.json({
                 data: {
-                    connection: String(stateInstance?.stateInstance || '').trim() || 'unknown',
-                    stateInstance,
+                    connection: webhookUrl ? 'configured' : 'missing_webhook',
+                    provider: '360dialog Cloud API',
+                    supportsQr: false,
+                    supportsReboot: false,
+                    supportsLogout: false,
                     settings,
-                    qr,
+                    qr: null,
                     updatedAt: new Date().toISOString()
                 }
             });
         } catch (error) {
             return res.status(500).json({
-                message: 'Не удалось получить состояние Green API',
+                message: 'Не удалось получить состояние 360dialog',
                 error: error.message
             });
         }
     },
 
     async getQr(_req, res) {
-        try {
-            const qr = await greenApiService.getQr();
-            return res.json({
-                data: qr
-            });
-        } catch (error) {
-            return res.status(500).json({
-                message: 'Не удалось получить QR Green API',
-                error: error.message
-            });
-        }
+        return res.status(400).json({
+            message: 'QR для 360dialog Cloud API не используется'
+        });
     },
 
     async reboot(_req, res) {
-        try {
-            const data = await greenApiService.reboot();
-            return res.json({
-                data
-            });
-        } catch (error) {
-            return res.status(500).json({
-                message: 'Не удалось перезапустить Green API instance',
-                error: error.message
-            });
-        }
+        return res.status(400).json({
+            message: 'Перезапуск instance не поддерживается в 360dialog Cloud API'
+        });
     },
 
     async logout(_req, res) {
-        try {
-            const data = await greenApiService.logout();
-            return res.json({
-                data
-            });
-        } catch (error) {
-            return res.status(500).json({
-                message: 'Не удалось разлогинить Green API instance',
-                error: error.message
-            });
-        }
+        return res.status(400).json({
+            message: 'Logout instance не поддерживается в 360dialog Cloud API'
+        });
     },
 
     async setWebhook(req, res) {
@@ -78,8 +56,13 @@ module.exports = {
                 });
             }
 
-            const data = await greenApiService.setSettings({
-                webhookUrl
+            const headers = req.body?.headers && typeof req.body.headers === 'object'
+                ? req.body.headers
+                : null;
+
+            const data = await dialog360Service.setWebhook({
+                url: webhookUrl,
+                headers
             });
 
             return res.json({
@@ -87,7 +70,7 @@ module.exports = {
             });
         } catch (error) {
             return res.status(500).json({
-                message: 'Не удалось сохранить webhook Green API',
+                message: 'Не удалось сохранить webhook 360dialog',
                 error: error.message
             });
         }

@@ -1,5 +1,5 @@
 const QR_MIRROR_PHONE_NUMBER = '77775464450';
-const greenApiService = require('./greenApiService');
+const dialog360Service = require('./dialog360Service');
 
 const normalizePhoneToChatId = (phoneNumber) => {
     const digits = String(phoneNumber || '').replace(/\D/g, '');
@@ -21,7 +21,7 @@ const normalizePhoneCaption = (phoneNumber) => {
     return `+7${localNumber}`;
 };
 
-const sendFileByChatId = async ({ chatId, fileBuffer, fileName, mimeType, caption }) => greenApiService.sendFileByUpload({
+const sendFileByChatId = async ({ chatId, fileBuffer, fileName, mimeType, caption }) => dialog360Service.sendFileByUpload({
     chatId,
     fileBuffer,
     fileName: fileName || 'order-photo.jpg',

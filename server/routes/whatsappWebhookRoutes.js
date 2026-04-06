@@ -17,7 +17,8 @@ const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
-const greenApiService = require('../utilities/greenApiService');
+const dialog360Service = require('../utilities/dialog360Service');
+const dialog360Webhook = require('../utilities/dialog360Webhook');
 const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
 const {
     findMatchedLinkInDescription,
@@ -112,16 +113,23 @@ const safeStringify = (value) => {
 };
 
 const pushWebhookEvent = (content) => {
-    const webhookType = String(content?.typeWebhook || '').trim();
+    const webhookType =
+        String(content?.typeWebhook || '').trim() ||
+        String(content?.type || '').trim() ||
+        String(content?.providerEventType || '').trim();
     const text =
         content?.messageData?.extendedTextMessageData?.text ||
         content?.messageData?.textMessageData?.textMessage ||
         content?.messageData?.fileMessageData?.caption ||
         content?.messageData?.videoMessage?.caption ||
+        content?.messageData?.interactiveButtonsResponse?.selectedDisplayText ||
+        content?.messageData?.templateButtonReplyMessage?.selectedDisplayText ||
+        content?.statusData?.status ||
         '';
     const chatId = String(
         content?.senderData?.chatId ||
         content?.recipientData?.chatId ||
+        content?.statusData?.recipient_id ||
         ''
     ).trim();
 
@@ -131,7 +139,7 @@ const pushWebhookEvent = (content) => {
         type: webhookType || 'unknown',
         chatId,
         text: String(text || '').trim(),
-        messageId: String(content?.idMessage || '').trim() || null
+        messageId: String(content?.idMessage || content?.statusData?.id || '').trim() || null
     });
 
     if (webhookEvents.length > 200) {
@@ -181,7 +189,7 @@ const sendMessageByChatId = async (chatId, message) => {
     }
 
     const response = await sendNotification.sendToChatId(chatId, message);
-    console.log('Response from Green API (sendMessage):', response);
+    console.log('Response from 360dialog (sendMessage):', response);
     return response;
 };
 
@@ -191,13 +199,13 @@ const sendFileByUrlToChatId = async (chatId, urlFile, fileName, caption = '') =>
     }
 
     try {
-        const response = await greenApiService.sendFileByUrl({
+        const response = await dialog360Service.sendFileByUrl({
             chatId,
             urlFile,
             fileName: fileName || `qr-${Date.now()}.png`,
             caption: String(caption || '')
         });
-        console.log('Response from Green API (sendFileByUrl):', response);
+        console.log('Response from 360dialog (sendFileByUrl):', response);
         return response;
     } catch (error) {
         console.error('[WhatsApp webhook] sendFileByUrlToChatId failed:', {
@@ -1012,7 +1020,7 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
     const results = await Promise.all(
         ORDER_DRAFT_ALIAS_APPROVER_PHONES.map(async (phone) => {
             try {
-                const response = await greenApiService.sendInteractiveButtonsReply({
+                const response = await dialog360Service.sendInteractiveButtonsReply({
                     chatId: phone,
                     header: 'Исправить псевдоним',
                     body,
@@ -1022,7 +1030,7 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
 
                 return {
                     phone,
-                    chatId: greenApiService.normalizePhoneToChatId(phone),
+                    chatId: dialog360Service.normalizePhoneToChatId(phone),
                     idMessage: String(response?.idMessage || '').trim() || null
                 };
             } catch (error) {
@@ -1034,7 +1042,7 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
                 });
                 return {
                     phone,
-                    chatId: greenApiService.normalizePhoneToChatId(phone),
+                    chatId: dialog360Service.normalizePhoneToChatId(phone),
                     idMessage: null,
                     error: error.message
                 };
@@ -1055,7 +1063,7 @@ const deleteOrderDraftAdminMessages = async (messages) => {
             }
 
             try {
-                await greenApiService.deleteMessage({ chatId, idMessage });
+                await dialog360Service.deleteMessage({ chatId, idMessage });
             } catch (error) {
                 console.error('[WhatsApp webhook][OrderDraft] Failed to delete admin alias suggestion message:', {
                     chatId,
@@ -1846,7 +1854,7 @@ const handleOrderDraftAliasDecision = async (content) => {
 
     if (senderChatId && stanzaId && !hasStoredClickedMessage) {
         try {
-            await greenApiService.deleteMessage({
+            await dialog360Service.deleteMessage({
                 chatId: senderChatId,
                 idMessage: stanzaId
             });
@@ -2736,7 +2744,7 @@ const deleteProcessedPdfMessageIfNeeded = async (content, sellerIin) => {
     }
 
     try {
-        const result = await greenApiService.deleteMessage({
+        const result = await dialog360Service.deleteMessage({
             chatId,
             idMessage: messageId
         });
@@ -3445,7 +3453,7 @@ const processIncomingVideoMessageWebhook = async (content) => {
         return;
     }
 
-    const recipientChatId = greenApiService.normalizePhoneToChatId(rawPhoneNumber);
+    const recipientChatId = dialog360Service.normalizePhoneToChatId(rawPhoneNumber);
     if (!recipientChatId) {
         console.log('Did not find valid phone number for video forwarding.');
         return;
@@ -3459,7 +3467,7 @@ const processIncomingVideoMessageWebhook = async (content) => {
             }
 
             console.log(`[WhatsApp webhook][video] forward source=green-api-upload target=${logSuffix}`);
-            await greenApiService.sendFileByUpload({
+            await dialog360Service.sendFileByUpload({
                 chatId,
                 fileBuffer: mediaBuffer,
                 fileName,
@@ -3470,7 +3478,7 @@ const processIncomingVideoMessageWebhook = async (content) => {
         }
 
         console.log(`[WhatsApp webhook][video] forward source=green-api-url target=${logSuffix}`);
-        await greenApiService.sendFileByUrl({
+        await dialog360Service.sendFileByUrl({
             chatId,
             urlFile: downloadUrl,
             fileName,
@@ -3499,21 +3507,30 @@ const processWebhookContent = async (content, meta = {}) => {
             body: content
         }));
     }
+
     try {
-        pushWebhookEvent(content);
-        await trackIncomingMessage(content);
-        const orderDraftAliasDecisionHandled = await handleOrderDraftAliasDecision(content);
-        if (orderDraftAliasDecisionHandled) {
-            return;
+        const normalizedContents = await dialog360Webhook.extractEventsFromPayload(content);
+
+        for (const normalizedContent of normalizedContents) {
+            pushWebhookEvent(normalizedContent);
+
+            if (!normalizedContent?.typeWebhook) {
+                continue;
+            }
+
+            await trackIncomingMessage(normalizedContent);
+            const orderDraftAliasDecisionHandled = await handleOrderDraftAliasDecision(normalizedContent);
+            if (orderDraftAliasDecisionHandled) {
+                continue;
+            }
+            await processIncomingAdminExpenseWebhook(normalizedContent);
+            await processIncomingPdfProofWebhook(normalizedContent);
+            await processIncomingMessageWebhook(normalizedContent);
+            await processIncomingVideoMessageWebhook(normalizedContent);
         }
-        await processIncomingAdminExpenseWebhook(content);
-        await processIncomingPdfProofWebhook(content);
-        await processIncomingMessageWebhook(content);
-        await processIncomingVideoMessageWebhook(content);
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to process incoming message webhook:', error.response?.data || error.message);
     }
-
 };
 
 router.post('/', async (req, res) => {

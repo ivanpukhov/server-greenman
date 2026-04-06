@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
-import AutorenewOutlinedIcon from '@mui/icons-material/AutorenewOutlined';
-import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
-import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
-import { useNotify } from 'react-admin';
+import { Alert, Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
 const STATUS_LABELS = {
-    idle: 'Не запущен',
-    authorized: 'Подключен',
-    starting: 'Запускается',
-    yellowCard: 'Желтая карточка',
-    blocked: 'Заблокирован',
-    sleepMode: 'Спящий режим',
+    configured: 'Настроен',
+    missing_webhook: 'Webhook не задан',
     notAuthorized: 'Не авторизован',
     unknown: 'Неизвестно'
 };
@@ -26,11 +18,7 @@ const formatDateTime = (value) => {
 };
 
 const WhatsAppConnectionPage = () => {
-    const notify = useNotify();
     const [status, setStatus] = useState(null);
-    const [loadingQr, setLoadingQr] = useState(false);
-    const [restarting, setRestarting] = useState(false);
-    const [loggingOut, setLoggingOut] = useState(false);
     const [errorText, setErrorText] = useState('');
     const [events, setEvents] = useState([]);
 
@@ -60,58 +48,6 @@ const WhatsAppConnectionPage = () => {
         const body = await authorizedFetch(apiUrl('/admin/whatsapp/connection/events?limit=15'));
         setEvents(Array.isArray(body.data) ? body.data : []);
     }, [authorizedFetch]);
-
-    const handleRequestQr = async () => {
-        if (loadingQr) return;
-        setLoadingQr(true);
-        setErrorText('');
-        try {
-            const qrBody = await authorizedFetch(apiUrl('/admin/whatsapp/connection/qr'));
-            setStatus((prev) => ({ ...(prev || {}), qr: qrBody.data || null }));
-            notify('QR обновлен', { type: 'success' });
-        } catch (error) {
-            setErrorText(error.message);
-            notify(error.message, { type: 'error' });
-        } finally {
-            setLoadingQr(false);
-        }
-    };
-
-    const handleRestart = async () => {
-        if (restarting) return;
-        setRestarting(true);
-        setErrorText('');
-        try {
-            await authorizedFetch(apiUrl('/admin/whatsapp/connection/reboot'), {
-                method: 'POST'
-            });
-            await loadStatus();
-            notify('Green API instance перезапущен', { type: 'success' });
-        } catch (error) {
-            setErrorText(error.message);
-            notify(error.message, { type: 'error' });
-        } finally {
-            setRestarting(false);
-        }
-    };
-
-    const handleLogout = async () => {
-        if (loggingOut) return;
-        setLoggingOut(true);
-        setErrorText('');
-        try {
-            await authorizedFetch(apiUrl('/admin/whatsapp/connection/logout'), {
-                method: 'POST'
-            });
-            await loadStatus();
-            notify('WhatsApp разлогинен', { type: 'success' });
-        } catch (error) {
-            setErrorText(error.message);
-            notify(error.message, { type: 'error' });
-        } finally {
-            setLoggingOut(false);
-        }
-    };
 
     useEffect(() => {
         let cancelled = false;
@@ -157,9 +93,9 @@ const WhatsAppConnectionPage = () => {
                     background: 'linear-gradient(135deg, rgba(19,111,99,0.16) 0%, rgba(31,154,96,0.12) 100%)'
                 }}
             >
-                <Typography variant="h5">Подключение WhatsApp (Green API)</Typography>
+                <Typography variant="h5">Подключение WhatsApp (360dialog)</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Входящие webhook и вся отправка теперь идут через Green API. Здесь можно проверить состояние instance и получить QR.
+                    Здесь показан статус Cloud API, текущий webhook для номера и последние события, которые пришли на backend.
                 </Typography>
             </Box>
 
@@ -170,7 +106,7 @@ const WhatsAppConnectionPage = () => {
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ sm: 'center' }}>
                         <Typography variant="body1">Статус:</Typography>
                         <Chip
-                            color={status?.connection === 'authorized' ? 'success' : status?.qr ? 'warning' : 'default'}
+                            color={status?.connection === 'configured' ? 'success' : 'warning'}
                             label={statusLabel}
                             size="small"
                         />
@@ -179,65 +115,16 @@ const WhatsAppConnectionPage = () => {
                         </Typography>
                     </Stack>
 
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
-                        <Button
-                            variant="contained"
-                            onClick={handleRequestQr}
-                            disabled={loadingQr}
-                            startIcon={<QrCode2OutlinedIcon />}
-                        >
-                            Получить QR
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            onClick={handleRestart}
-                            disabled={restarting}
-                            startIcon={<AutorenewOutlinedIcon />}
-                        >
-                            Перезапустить
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={handleLogout}
-                            disabled={loggingOut}
-                            startIcon={<LogoutOutlinedIcon />}
-                        >
-                            Разлогинить
-                        </Button>
-                    </Stack>
-
-                    {status?.qr?.message ? (
-                        <Box>
-                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                Сканируйте QR в WhatsApp
-                            </Typography>
-                            <Box
-                                component="img"
-                                src={String(status.qr.message || '').startsWith('data:')
-                                    ? status.qr.message
-                                    : `data:image/png;base64,${status.qr.message}`}
-                                alt="WhatsApp QR"
-                                sx={{
-                                    width: 280,
-                                    maxWidth: '100%',
-                                    borderRadius: 2,
-                                    border: '1px solid rgba(16,40,29,0.14)',
-                                    backgroundColor: '#fff',
-                                    p: 1
-                                }}
-                            />
-                        </Box>
-                    ) : null}
-
-                    {!status?.qr?.message && status?.connection !== 'authorized' ? (
+                    {status?.connection !== 'configured' ? (
                         <Alert severity="warning">
-                            Instance пока не авторизован. Если QR не появился автоматически, нажмите «Получить QR» или «Перезапустить».
+                            Для 360dialog нужен публичный URL backend webhook. После его установки у номера статус сменится на «Настроен».
                         </Alert>
                     ) : null}
                     {status?.settings ? (
                         <Alert severity="info">
-                            webhookUrl: {status.settings.webhookUrl || 'не задан'}
+                            provider: {status?.provider || '360dialog Cloud API'}
+                            <br />
+                            webhookUrl: {status.settings.url || 'не задан'}
                         </Alert>
                     ) : null}
                 </Stack>

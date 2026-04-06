@@ -1,7 +1,7 @@
 const User = require('../models/orders/User');
 const { normalizePhoneNumber } = require('./paymentLinkUtils');
 const { logError } = require('./errorLogger');
-const greenApiService = require('./greenApiService');
+const dialog360Service = require('./dialog360Service');
 
 const logOutgoing = (event, details = {}) => {
     console.log(`[WhatsApp outgoing] ${event}: ${JSON.stringify(details)}`);
@@ -77,17 +77,17 @@ const ensureUserByPhone = async (tenDigitsPhone) => {
 
 const sendTextDirect = async (chatId, messageText) => {
     const text = String(messageText || '').trim();
-    const normalizedChatId = greenApiService.normalizePhoneToChatId(chatId);
+    const normalizedChatId = dialog360Service.normalizePhoneToChatId(chatId);
     if (!normalizedChatId || !text) {
         return null;
     }
 
-    const response = await greenApiService.sendMessage({
+    const response = await dialog360Service.sendMessage({
         chatId: normalizedChatId,
         message: text
     });
 
-    logOutgoing('green_api_send_message', {
+    logOutgoing('dialog360_send_message', {
         chatId: normalizedChatId,
         textLength: text.length,
         response
@@ -98,7 +98,7 @@ const sendTextDirect = async (chatId, messageText) => {
 
 const sendNotification = async (phoneNumber, message) => {
     const tenDigitsPhone = normalizeToTenDigits(phoneNumber);
-    const chatId = greenApiService.normalizePhoneToChatId(phoneNumber);
+    const chatId = dialog360Service.normalizePhoneToChatId(phoneNumber);
 
     if (!tenDigitsPhone || !chatId) {
         logOutgoing('skip_invalid_phone', {
@@ -132,7 +132,7 @@ const sendNotification = async (phoneNumber, message) => {
 
 const sendToChatId = async (chatId, message) => {
     const tenDigitsPhone = normalizeToTenDigits(chatId);
-    const normalizedChatId = greenApiService.normalizePhoneToChatId(chatId);
+    const normalizedChatId = dialog360Service.normalizePhoneToChatId(chatId);
     if (!tenDigitsPhone || !normalizedChatId) {
         logOutgoing('skip_invalid_chat_id', {
             chatId: String(chatId || '')
@@ -195,6 +195,17 @@ const sendTemplateByName = async (phoneNumber, templateName, options = {}) => {
         : safeTemplateName;
 
     try {
+        const providerResponse = await dialog360Service.sendTemplate({
+            chatId: phoneNumber,
+            templateName: safeTemplateName,
+            languageCode: String(options.languageCode || options.language?.code || 'ru').trim() || 'ru',
+            components
+        });
+
+        if (providerResponse) {
+            return providerResponse;
+        }
+
         return await sendNotification(phoneNumber, fallbackText);
     } catch (error) {
         logError('notificationService.sendTemplateByName', error, {
