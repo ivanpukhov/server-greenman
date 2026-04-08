@@ -21,6 +21,25 @@ const PHONE_NUMBER_PATTERN = /(?:\+?7|8)?[\s()-]*\d(?:[\d\s()-]{8,16}\d)?/g;
 
 const safeArray = (value) => Array.isArray(value) ? value : [];
 
+const safeStringify = (value) => {
+    const seen = new WeakSet();
+
+    return JSON.stringify(
+        value,
+        (key, currentValue) => {
+            if (typeof currentValue === 'object' && currentValue !== null) {
+                if (seen.has(currentValue)) {
+                    return '[Circular]';
+                }
+                seen.add(currentValue);
+            }
+
+            return currentValue;
+        },
+        2
+    );
+};
+
 const secureCompare = (left, right) => {
     const leftBuffer = Buffer.from(String(left || ''), 'utf8');
     const rightBuffer = Buffer.from(String(right || ''), 'utf8');
@@ -214,6 +233,30 @@ const extractAttachments = (payload) => {
             };
         })
         .filter((attachment) => attachment.url);
+};
+
+const buildWebhookDebugMeta = (payload) => {
+    const attachments = extractAttachments(payload);
+    return {
+        event: String(payload?.event || '').trim() || null,
+        messageType: String(payload?.message_type || '').trim() || null,
+        messageId: String(payload?.id || '').trim() || null,
+        conversationId: Number.isFinite(Number(payload?.conversation?.id))
+            ? Number(payload.conversation.id)
+            : null,
+        contactIdentifier: String(
+            payload?.conversation?.contact_inbox?.source_id ||
+            payload?.contact_inbox?.source_id ||
+            ''
+        ).trim() || null,
+        isPrivate: payload?.private === true || payload?.is_private === true,
+        contentLength: buildTextContent(payload).length,
+        attachments: attachments.map((attachment) => ({
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            hasUrl: Boolean(attachment.url)
+        }))
+    };
 };
 
 const buildMessageProcessingContent = ({ customerPhone, textContent, providerMessageId }) => ({
@@ -430,6 +473,15 @@ router.post('/', async (req, res) => {
     }
 
     const payload = req.body || {};
+    console.log('[Chatwoot webhook] Incoming request:\n' + safeStringify({
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query,
+        meta: buildWebhookDebugMeta(payload),
+        body: payload
+    }));
+
     if (!isSupportedOutboundMessage(payload)) {
         return res.status(200).json({ ok: true, skipped: true });
     }
