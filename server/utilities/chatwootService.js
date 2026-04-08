@@ -7,10 +7,13 @@ const dialog360Service = require('./dialog360Service');
 const {
     CHATWOOT_BASE_URL,
     CHATWOOT_API_INBOX_IDENTIFIER,
-    CHATWOOT_ENABLED
+    CHATWOOT_ENABLED,
+    CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID
 } = require('../config/chatwoot');
 
 const REQUEST_TIMEOUT_MS = 15000;
+const MIRROR_CONTENT_PREFIX = '\u2063\u2064';
 
 const buildLogMeta = (content, extra = {}) => ({
     webhookType: String(content?.typeWebhook || '').trim() || null,
@@ -30,6 +33,10 @@ const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
 const buildApiUrl = (pathSuffix) => (
     `${trimTrailingSlash(CHATWOOT_BASE_URL)}/public/api/v1/inboxes/${encodeURIComponent(CHATWOOT_API_INBOX_IDENTIFIER)}${pathSuffix}`
+);
+
+const buildAccountApiUrl = (pathSuffix) => (
+    `${trimTrailingSlash(CHATWOOT_BASE_URL)}/api/v1/accounts/${CHATWOOT_ACCOUNT_ID}${pathSuffix}`
 );
 
 const buildPhoneNumberForChatwoot = (phoneNumber) => {
@@ -378,6 +385,41 @@ const createMessage = async ({ contactIdentifier, conversationId, content, echoI
     return response.data || {};
 };
 
+const createOutgoingConversationMessage = async ({ conversationId, content, contentAttributes = {} }) => {
+    const safeConversationId = toSafeInteger(conversationId);
+    const safeContent = String(content || '').trim();
+    if (!safeConversationId || !safeContent) {
+        return null;
+    }
+
+    const response = await axios.post(
+        buildAccountApiUrl(`/conversations/${safeConversationId}/messages`),
+        {
+            content: safeContent,
+            message_type: 'outgoing',
+            private: false,
+            content_type: 'text',
+            content_attributes: contentAttributes
+        },
+        {
+            headers: {
+                'Content-Type': 'application/json',
+                api_access_token: CHATWOOT_API_ACCESS_TOKEN
+            },
+            timeout: REQUEST_TIMEOUT_MS
+        }
+    );
+
+    return response.data || {};
+};
+
+const buildMirrorContent = (content) => `${MIRROR_CONTENT_PREFIX}${String(content || '').trim()}`;
+
+const isMirroredChatwootMessagePayload = (payload) => {
+    const content = String(payload?.content || '').trim();
+    return Boolean(payload?.content_attributes?.mirrored_from_360dialog) || content.startsWith(MIRROR_CONTENT_PREFIX);
+};
+
 const saveUserChatwootState = async (user, patch) => {
     const nextPatch = {};
 
@@ -481,6 +523,112 @@ const findOrCreateCustomerUser = async ({ customerPhone }) => {
     }
 
     return user;
+};
+
+const syncOutgoingSystemMessage = async ({ customerPhone, content, providerMessageId }) => {
+    if (!isConfigured()) {
+        return { skipped: true, reason: 'chatwoot_not_configured' };
+    }
+
+    const safePhone = normalizePhoneNumber(customerPhone);
+    const safeContent = String(content || '').trim();
+    const safeProviderMessageId = String(providerMessageId || '').trim();
+    if (!safePhone || !safeContent || !safeProviderMessageId) {
+        return { skipped: true, reason: 'invalid_payload' };
+    }
+
+    const existingSync = await ChatwootMessageSync.findOne({
+        where: {
+            provider: '360dialog_mirror',
+            providerMessageId: safeProviderMessageId
+        }
+    });
+    if (existingSync) {
+        return {
+            skipped: true,
+            reason: 'duplicate_message',
+            contactIdentifier: existingSync.chatwootContactIdentifier,
+            conversationId: existingSync.chatwootConversationId,
+            messageId: existingSync.chatwootMessageId
+        };
+    }
+
+    const user = await findOrCreateCustomerUser({ customerPhone: safePhone });
+    const chatwootState = await ensureChatwootConversation({
+        user,
+        customerPhone: safePhone,
+        senderName: 'Server',
+        senderChatId: dialog360Service.normalizePhoneToChatId(safePhone) || ''
+    });
+
+    let createdMessage;
+    if (CHATWOOT_API_ACCESS_TOKEN) {
+        createdMessage = await createOutgoingConversationMessage({
+            conversationId: chatwootState.conversationId,
+            content: safeContent,
+            contentAttributes: {
+                mirrored_from_360dialog: true,
+                provider: '360dialog',
+                provider_message_id: safeProviderMessageId
+            }
+        });
+    } else {
+        createdMessage = await createMessage({
+            contactIdentifier: chatwootState.contactIdentifier,
+            conversationId: chatwootState.conversationId,
+            content: buildMirrorContent(safeContent),
+            echoId: `mirror-${safeProviderMessageId}`
+        });
+    }
+
+    await ChatwootMessageSync.create({
+        provider: '360dialog_mirror',
+        providerMessageId: safeProviderMessageId,
+        customerPhone: safePhone,
+        customerChatId: dialog360Service.normalizePhoneToChatId(safePhone),
+        chatwootContactIdentifier: chatwootState.contactIdentifier,
+        chatwootConversationId: chatwootState.conversationId,
+        chatwootMessageId: String(createdMessage?.id || '').trim() || null
+    });
+
+    return {
+        skipped: false,
+        contactIdentifier: chatwootState.contactIdentifier,
+        conversationId: chatwootState.conversationId,
+        messageId: createdMessage?.id || null,
+        usedApplicationApi: Boolean(CHATWOOT_API_ACCESS_TOKEN)
+    };
+};
+
+const syncOutgoingSystemMessageSafe = async (params) => {
+    try {
+        const result = await syncOutgoingSystemMessage(params);
+        if (result?.skipped) {
+            console.log('[Chatwoot mirror] skipped:', {
+                reason: result.reason || 'unknown',
+                providerMessageId: String(params?.providerMessageId || '').trim() || null,
+                customerPhone: String(params?.customerPhone || '').trim() || null
+            });
+        } else {
+            console.log('[Chatwoot mirror] sent:', {
+                providerMessageId: String(params?.providerMessageId || '').trim() || null,
+                customerPhone: String(params?.customerPhone || '').trim() || null,
+                conversationId: result?.conversationId || null,
+                chatwootMessageId: result?.messageId || null,
+                usedApplicationApi: Boolean(result?.usedApplicationApi)
+            });
+        }
+        return result;
+    } catch (error) {
+        console.error('[Chatwoot mirror] failed:', {
+            providerMessageId: String(params?.providerMessageId || '').trim() || null,
+            customerPhone: String(params?.customerPhone || '').trim() || null,
+            message: error.message,
+            status: error.response?.status || null,
+            data: error.response?.data || null
+        });
+        return { skipped: true, reason: 'mirror_failed' };
+    }
 };
 
 const downloadAttachment = async (attachment) => {
@@ -670,5 +818,8 @@ const syncIncomingMessageSafe = async (content) => {
 module.exports = {
     isConfigured,
     syncIncomingMessage,
-    syncIncomingMessageSafe
+    syncIncomingMessageSafe,
+    syncOutgoingSystemMessage,
+    syncOutgoingSystemMessageSafe,
+    isMirroredChatwootMessagePayload
 };

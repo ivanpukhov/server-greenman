@@ -4,6 +4,7 @@ const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const { normalizePhoneNumber } = require('./paymentLinkUtils');
 const { logError } = require('./errorLogger');
 const dialog360Service = require('./dialog360Service');
+const chatwootService = require('./chatwootService');
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const WINDOW_REOPEN_TEMPLATE_NAME = 'order';
@@ -449,6 +450,40 @@ const sendTemplateDirect = async ({ phoneNumber, templateName, languageCode = DE
     });
 };
 
+const buildMirrorSummaryForAttachments = (attachments) => {
+    const safeAttachments = Array.isArray(attachments) ? attachments.filter(Boolean) : [];
+    if (safeAttachments.length === 0) {
+        return '';
+    }
+
+    return safeAttachments.map((attachment) => {
+        const fileName = String(attachment?.fileName || '').trim();
+        return fileName ? `[Файл] ${fileName}` : '[Файл]';
+    }).join('\n');
+};
+
+const mirrorOutboundToChatwootSafe = async ({ source, phoneNumber, text = '', attachments = [], providerMessageIds = [] }) => {
+    if (String(source || '').trim() === 'chatwoot') {
+        return;
+    }
+
+    const providerMessageId = Array.isArray(providerMessageIds) && providerMessageIds.length > 0
+        ? String(providerMessageIds[providerMessageIds.length - 1] || '').trim()
+        : '';
+    const normalizedPhone = normalizeToTenDigits(phoneNumber);
+    const mirrorText = String(text || '').trim() || buildMirrorSummaryForAttachments(attachments);
+
+    if (!providerMessageId || !normalizedPhone || !mirrorText) {
+        return;
+    }
+
+    await chatwootService.syncOutgoingSystemMessageSafe({
+        customerPhone: normalizedPhone,
+        content: mirrorText,
+        providerMessageId
+    });
+};
+
 const maybeSendWindowReopenTemplate = async (user, phoneNumber) => {
     if (!user || !phoneNumber) {
         return {
@@ -477,6 +512,13 @@ const maybeSendWindowReopenTemplate = async (user, phoneNumber) => {
         const response = await sendTemplateDirect({
             phoneNumber,
             templateName: WINDOW_REOPEN_TEMPLATE_NAME
+        });
+
+        await mirrorOutboundToChatwootSafe({
+            source: 'server',
+            phoneNumber,
+            text: `[Шаблон ${WINDOW_REOPEN_TEMPLATE_NAME}]`,
+            providerMessageIds: [String(response?.idMessage || '').trim()]
         });
 
         await user.update({
@@ -571,6 +613,14 @@ const sendContentWithWindowHandling = async ({
         });
         const providerMessageIds = extractProviderMessageIds(delivery.responses);
 
+        await mirrorOutboundToChatwootSafe({
+            source,
+            phoneNumber: tenDigitsPhone,
+            text: safeText,
+            attachments: safeAttachments,
+            providerMessageIds
+        });
+
         logOutgoing('content_sent', {
             phoneNumber: tenDigitsPhone,
             chatId,
@@ -656,6 +706,22 @@ const sendTemplateByName = async (phoneNumber, templateName, options = {}) => {
             languageCode: String(options.languageCode || options.language?.code || DEFAULT_LANGUAGE_CODE).trim() || DEFAULT_LANGUAGE_CODE,
             components: Array.isArray(options.components) ? options.components : []
         });
+        const textParts = (Array.isArray(options.components) ? options.components : [])
+            .flatMap((component) => Array.isArray(component?.parameters) ? component.parameters : [])
+            .map((parameter) => String(parameter?.text || '').trim())
+            .filter(Boolean);
+        const mirrorContent = String(options.mirrorContent || '').trim() || (
+            textParts.length > 0
+                ? `[Шаблон ${safeTemplateName}] ${textParts.join(' ')}`
+                : `[Шаблон ${safeTemplateName}]`
+        );
+
+        await mirrorOutboundToChatwootSafe({
+            source: options.source || 'server',
+            phoneNumber: tenDigitsPhone,
+            text: mirrorContent,
+            providerMessageIds: [String(providerResponse?.idMessage || '').trim()]
+        });
 
         logOutgoing('dialog360_send_template', {
             phoneNumber: tenDigitsPhone,
@@ -686,6 +752,7 @@ const sendErrorTemplate = async (phoneNumber, errorText, options = {}) => {
 
     return sendTemplateByName(phoneNumber, ERROR_TEMPLATE_NAME, {
         ...options,
+        mirrorContent: safeText,
         components: [
             buildTextBodyComponent(safeText)
         ]
@@ -720,6 +787,7 @@ const sendAuthTemplate = async (phoneNumber, code, options = {}) => {
     try {
         return await sendTemplateByName(phoneNumber, AUTH_TEMPLATE_NAME, {
             ...options,
+            mirrorContent: `Код подтверждения Greenman: ${safeCode}`,
             raiseErrors: true,
             components: authComponents
         });
@@ -746,6 +814,7 @@ const sendAuthTemplate = async (phoneNumber, code, options = {}) => {
         try {
             return await sendTemplateByName(phoneNumber, AUTH_TEMPLATE_NAME, {
                 ...options,
+                mirrorContent: `Код подтверждения Greenman: ${safeCode}`,
                 raiseErrors: true,
                 components: [
                     buildTextBodyComponent(safeCode)
@@ -823,6 +892,14 @@ const flushPendingMessagesForUser = async (user) => {
                 attachments: item?.attachments
             });
             const providerMessageIds = extractProviderMessageIds(delivery.responses);
+
+            await mirrorOutboundToChatwootSafe({
+                source: item?.source || 'server',
+                phoneNumber: user.phoneNumber,
+                text: item?.text,
+                attachments: item?.attachments,
+                providerMessageIds
+            });
 
             await updateChatwootSyncAfterDelivery({
                 item,

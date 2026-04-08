@@ -4,6 +4,7 @@ const User = require('../models/orders/User');
 const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const dialog360Service = require('../utilities/dialog360Service');
 const sendNotification = require('../utilities/notificationService');
+const chatwootService = require('../utilities/chatwootService');
 const {
     processIncomingMessageWebhook
 } = require('./whatsappWebhookRoutes');
@@ -487,6 +488,10 @@ router.post('/', async (req, res) => {
         meta: buildWebhookDebugMeta(payload),
         body: payload
     }));
+
+    if (chatwootService.isMirroredChatwootMessagePayload(payload)) {
+        return res.status(200).json({ ok: true, skipped: true, reason: 'mirrored_from_360dialog' });
+    }
 
     if (!isSupportedOutboundMessage(payload)) {
         return res.status(200).json({ ok: true, skipped: true });
