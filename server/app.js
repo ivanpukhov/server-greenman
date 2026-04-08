@@ -4,6 +4,10 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const path = require('path');
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env'), override: false });
+
 const sequelize = require('./utilities/database');
 const orderDB = require('./utilities/orderDatabase');
 
@@ -29,9 +33,6 @@ require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
 const { ensureDefaultAdmins, normalizeAdminIin, DEFAULT_ADMIN_IIN } = require('./utilities/adminUsers');
 const { logError } = require('./utilities/errorLogger');
-
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-dotenv.config({ path: path.resolve(__dirname, '../.env'), override: false });
 
 const app = express();
 
