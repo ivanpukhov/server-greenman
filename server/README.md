@@ -54,6 +54,25 @@ yarn install
 
 Для настройки необходимых переменных среды переименуйте файл `.env.example` в `.env` и заполните его своими данными.
 
+Для интеграции входящих WhatsApp-сообщений из `360dialog` в Chatwoot добавьте переменные:
+
+```bash
+CHATWOOT_BASE_URL=https://whaa.ru
+CHATWOOT_API_INBOX_IDENTIFIER=your_api_inbox_identifier
+CHATWOOT_ENABLED=true
+CHATWOOT_WEBHOOK_SECRET=your_chatwoot_webhook_secret
+```
+
+Нужен именно `API Inbox` в Chatwoot. После создания inbox возьмите его `inbox_identifier` и укажите в `CHATWOOT_API_INBOX_IDENTIFIER`.
+
+Для исходящих сообщений из Chatwoot в WhatsApp добавьте webhook в Chatwoot на URL:
+
+```bash
+https://your-domain/api/chatwoot-webhook
+```
+
+Подпишитесь на событие `message_created`. Endpoint отправляет только агентские исходящие сообщения, игнорирует входящие сообщения и приватные заметки.
+
 Запуск приложения:
 
 ```bash

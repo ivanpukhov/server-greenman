@@ -15,6 +15,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
+const chatwootWebhookRoutes = require('./routes/chatwootWebhookRoutes');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -22,6 +23,7 @@ require('./models/orders/SentPaymentLink');
 require('./models/orders/OrderBundle');
 require('./models/orders/KazpostRequest');
 require('./models/orders/OrderDraftRequest');
+require('./models/orders/ChatwootMessageSync');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -33,7 +35,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env'), override: false });
 
 const app = express();
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+    verify: (req, _res, buf) => {
+        req.rawBody = Buffer.from(buf || []).toString('utf8');
+    }
+}));
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -47,6 +53,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
+app.use('/api/chatwoot-webhook', chatwootWebhookRoutes);
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {
@@ -610,6 +617,20 @@ const ensureUsersSchema = async () => {
         if (!tableDefinition.lastAgreeTemplateSentAt) {
             await queryInterface.addColumn('users', 'lastAgreeTemplateSentAt', {
                 type: Sequelize.DATE,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.chatwootContactIdentifier) {
+            await queryInterface.addColumn('users', 'chatwootContactIdentifier', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.chatwootConversationId) {
+            await queryInterface.addColumn('users', 'chatwootConversationId', {
+                type: Sequelize.INTEGER,
                 allowNull: true
             });
         }

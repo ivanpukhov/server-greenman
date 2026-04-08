@@ -54,6 +54,14 @@ const User = orderDB.define('user', {
     lastAgreeTemplateSentAt: {
         type: Sequelize.DATE,
         allowNull: true
+    },
+    chatwootContactIdentifier: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    chatwootConversationId: {
+        type: Sequelize.INTEGER,
+        allowNull: true
     }
 });
 

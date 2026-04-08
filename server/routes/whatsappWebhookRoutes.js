@@ -19,6 +19,7 @@ const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
 const dialog360Service = require('../utilities/dialog360Service');
 const dialog360Webhook = require('../utilities/dialog360Webhook');
+const chatwootService = require('../utilities/chatwootService');
 const { ORDER_DRAFT_AI_API_KEY } = require('../config/orderDraftAiApiKey');
 const {
     findMatchedLinkInDescription,
@@ -3519,6 +3520,7 @@ const processWebhookContent = async (content, meta = {}) => {
             }
 
             await trackIncomingMessage(normalizedContent);
+            await chatwootService.syncIncomingMessageSafe(normalizedContent);
             const orderDraftAliasDecisionHandled = await handleOrderDraftAliasDecision(normalizedContent);
             if (orderDraftAliasDecisionHandled) {
                 continue;
