@@ -166,6 +166,11 @@ const extractMessageTextForProcessing = (content) => String(
     ''
 ).trim();
 
+const normalizeStructuredMessageText = (value) => String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\+\n/g, '\n')
+    .replace(/[ \t]+\\+\n/g, '\n');
+
 const isChatwootEchoedMessage = async (messageId) => {
     const safeMessageId = String(messageId || '').trim();
     if (!safeMessageId) {
@@ -261,7 +266,7 @@ const startsWithPaymentRequest = (text) => {
 };
 
 const startsWithKazpostCommand = (text) => {
-    const normalized = String(text || '')
+    const normalized = normalizeStructuredMessageText(text)
         .replace(/\u00A0/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
@@ -271,13 +276,13 @@ const startsWithKazpostCommand = (text) => {
 };
 
 const stripKazpostCommandPrefix = (text) => {
-    return String(text || '')
+    return normalizeStructuredMessageText(text)
         .replace(/^\s*казпочта[\s:,-]*/i, '')
         .trim();
 };
 
 const startsWithOrderDraftHeader = (text) => {
-    const firstLine = String(text || '')
+    const firstLine = normalizeStructuredMessageText(text)
         .split(/\r?\n/)
         .map((line) => String(line || '').trim())
         .find(Boolean);
@@ -2221,7 +2226,7 @@ const parseAliasLineWithQuantity = (line) => {
 };
 
 const analyzeOrderDraftMessage = (text) => {
-    const rawText = String(text || '');
+    const rawText = normalizeStructuredMessageText(text);
     console.log(`[WhatsApp webhook][OrderDraft] Raw text received (${rawText.length} chars)`);
     if (!rawText) {
         console.log('[WhatsApp webhook][OrderDraft] Skip: empty text');

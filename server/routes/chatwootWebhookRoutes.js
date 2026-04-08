@@ -95,7 +95,13 @@ const isSupportedOutboundMessage = (payload) => {
     return messageType === 'outgoing';
 };
 
-const buildTextContent = (payload) => String(payload?.content || '').trim();
+const normalizeStructuredText = (value) => String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\+\n/g, '\n')
+    .replace(/[ \t]+\\+\n/g, '\n')
+    .trim();
+
+const buildTextContent = (payload) => normalizeStructuredText(payload?.content || '');
 
 const extractPhoneCandidates = (value) => {
     const matches = String(value || '').match(PHONE_NUMBER_PATTERN) || [];
