@@ -3318,6 +3318,12 @@ const processIncomingMessageWebhook = async (content) => {
     }
 
     const isOutgoingWebhook = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const messageId = String(content?.idMessage || '').trim() || null;
+
+    if (isOutgoingWebhook && messageId && await isChatwootEchoedMessage(messageId)) {
+        console.log(`[WhatsApp webhook] Skip parser for Chatwoot echo message ${messageId}.`);
+        return;
+    }
 
     const textMessage = extractMessageTextForProcessing(content);
     const recipientChatId = String(

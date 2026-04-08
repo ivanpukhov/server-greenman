@@ -5,6 +5,9 @@ const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const dialog360Service = require('../utilities/dialog360Service');
 const sendNotification = require('../utilities/notificationService');
 const {
+    processIncomingMessageWebhook
+} = require('./whatsappWebhookRoutes');
+const {
     CHATWOOT_WEBHOOK_SECRET
 } = require('../config/chatwoot');
 const { normalizePhoneNumber } = require('../utilities/paymentLinkUtils');
@@ -112,12 +115,88 @@ const pickAttachmentFileName = (attachment, index) => {
     return extension ? `chatwoot-${index + 1}.${extension}` : `chatwoot-${index + 1}`;
 };
 
-const pickAttachmentMimeType = (attachment) => String(
+const inferMimeTypeFromName = (fileName, fallbackGroup = '') => {
+    const normalizedName = String(fileName || '').trim().toLowerCase();
+    const extension = normalizedName.includes('.')
+        ? normalizedName.split('.').pop()
+        : '';
+
+    if (extension === 'aac') {
+        return 'audio/aac';
+    }
+    if (extension === 'm4a' || extension === 'mp4') {
+        return fallbackGroup === 'audio' ? 'audio/mp4' : 'video/mp4';
+    }
+    if (extension === 'mp3') {
+        return 'audio/mpeg';
+    }
+    if (extension === 'amr') {
+        return 'audio/amr';
+    }
+    if (extension === 'ogg' || extension === 'oga') {
+        return 'audio/ogg';
+    }
+    if (extension === 'opus') {
+        return 'audio/opus';
+    }
+    if (extension === 'jpg' || extension === 'jpeg') {
+        return 'image/jpeg';
+    }
+    if (extension === 'png') {
+        return 'image/png';
+    }
+    if (extension === 'webp') {
+        return 'image/webp';
+    }
+    if (extension === '3gp' || extension === '3gpp') {
+        return 'video/3gpp';
+    }
+    if (extension === 'pdf') {
+        return 'application/pdf';
+    }
+    if (extension === 'txt') {
+        return 'text/plain';
+    }
+
+    if (fallbackGroup === 'audio') {
+        return 'audio/ogg';
+    }
+    if (fallbackGroup === 'image') {
+        return 'image/jpeg';
+    }
+    if (fallbackGroup === 'video') {
+        return 'video/mp4';
+    }
+
+    return '';
+};
+
+const normalizeAttachmentMimeType = (rawMimeType, fileName) => {
+    const normalizedMimeType = String(rawMimeType || '').trim().toLowerCase();
+    if (!normalizedMimeType) {
+        return inferMimeTypeFromName(fileName);
+    }
+
+    if (normalizedMimeType === 'audio') {
+        return inferMimeTypeFromName(fileName, 'audio');
+    }
+    if (normalizedMimeType === 'image') {
+        return inferMimeTypeFromName(fileName, 'image');
+    }
+    if (normalizedMimeType === 'video') {
+        return inferMimeTypeFromName(fileName, 'video');
+    }
+
+    return normalizedMimeType;
+};
+
+const pickAttachmentMimeType = (attachment, fileName) => normalizeAttachmentMimeType(
     attachment?.file_type ||
     attachment?.content_type ||
     attachment?.mime_type ||
-    ''
-).trim();
+    '',
+    fileName
+);
 
 const extractAttachments = (payload) => {
     const directAttachments = safeArray(payload?.attachments);
@@ -126,13 +205,38 @@ const extractAttachments = (payload) => {
         : [];
 
     return [...directAttachments, ...singleAttachment]
-        .map((attachment, index) => ({
-            url: pickAttachmentUrl(attachment),
-            fileName: pickAttachmentFileName(attachment, index),
-            mimeType: pickAttachmentMimeType(attachment)
-        }))
+        .map((attachment, index) => {
+            const fileName = pickAttachmentFileName(attachment, index);
+            return {
+                url: pickAttachmentUrl(attachment),
+                fileName,
+                mimeType: pickAttachmentMimeType(attachment, fileName)
+            };
+        })
         .filter((attachment) => attachment.url);
 };
+
+const buildMessageProcessingContent = ({ customerPhone, textContent, providerMessageId }) => ({
+    typeWebhook: 'outgoingAPIMessageReceived',
+    idMessage: String(providerMessageId || '').trim() || `chatwoot-local-${Date.now()}`,
+    senderPhone: null,
+    recipientPhone: customerPhone,
+    senderData: {
+        chatId: '',
+        sender: '',
+        senderName: 'Chatwoot'
+    },
+    recipientData: {
+        chatId: dialog360Service.normalizePhoneToChatId(customerPhone) || '',
+        recipient: customerPhone
+    },
+    messageData: {
+        typeMessage: 'textMessage',
+        textMessageData: {
+            textMessage: String(textContent || '').trim()
+        }
+    }
+});
 
 const resolveCustomerPhone = async (payload) => {
     const conversationId = Number.parseInt(String(payload?.conversation?.id || '').trim(), 10);
@@ -282,6 +386,16 @@ const forwardMessageCreatedEvent = async (payload) => {
     }
     if (Object.keys(syncPatch).length > 0) {
         await sync.update(syncPatch);
+    }
+
+    if (!wasQueued && textContent && !textSentSeparately && providerMessageId) {
+        await processIncomingMessageWebhook(
+            buildMessageProcessingContent({
+                customerPhone,
+                textContent,
+                providerMessageId
+            })
+        );
     }
 
     return {
