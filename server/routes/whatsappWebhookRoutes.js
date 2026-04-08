@@ -2994,10 +2994,11 @@ const processIncomingPdfProofWebhook = async (content) => {
     }
 
     if (!pdfBuffer && downloadUrl) {
-        let pdfResponse;
         try {
-            pdfResponse = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
-            pdfBuffer = Buffer.from(pdfResponse.data);
+            const pdfResponse = await dialog360Service.downloadMediaBuffer(downloadUrl, {
+                timeout: 120000
+            });
+            pdfBuffer = Buffer.from(pdfResponse?.buffer || []);
         } catch (error) {
             console.error('[WhatsApp webhook] Failed to download payment proof PDF:', error.response?.data || error.message);
             return;
@@ -3532,13 +3533,24 @@ const processIncomingVideoMessageWebhook = async (content) => {
     const fileName = String(videoData?.fileName || fileData?.fileName || '').trim() || `media-${Date.now()}`;
     const isVoice = Boolean(videoData?.voice || fileData?.voice);
     const mediaType = String(videoData?.mediaType || fileData?.mediaType || '').trim() || 'document';
-    const rawPhoneNumber =
+    const captionText =
         String(videoData?.caption || '').trim() ||
-        String(fileData?.caption || '').trim() ||
-        String(content?.recipientPhone || '').trim() ||
-        String(content?.senderPhone || '').trim();
+        String(fileData?.caption || '').trim();
+    const explicitPhoneNumber = normalizePhoneNumber(captionText);
+    const rawPhoneNumber = explicitPhoneNumber ||
+        (isOutgoingWebhook
+            ? (
+                String(content?.recipientPhone || '').trim() ||
+                String(content?.senderPhone || '').trim()
+            )
+            : '');
 
     if (!downloadUrl && !fileBase64) {
+        return;
+    }
+
+    if (!rawPhoneNumber) {
+        console.log(`[WhatsApp webhook][media] Skip: target phone not found in caption for ${mediaType}.`);
         return;
     }
 
