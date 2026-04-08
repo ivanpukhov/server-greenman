@@ -107,6 +107,24 @@ const buildTextBodyComponent = (...texts) => ({
     })).filter((item) => item.text)
 });
 
+const normalizeTemplateTextParameter = (value, maxLength = 900) => {
+    const normalized = String(value || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    if (!normalized) {
+        return '';
+    }
+
+    if (!Number.isFinite(maxLength) || maxLength < 20 || normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+};
+
 const parsePendingMessages = (value) => {
     const raw = String(value || '').trim();
     if (!raw) {
@@ -790,14 +808,16 @@ const sendTemplateByName = async (phoneNumber, templateName, options = {}) => {
     }
 
     try {
+        const languageCode = String(options.languageCode || options.language?.code || DEFAULT_LANGUAGE_CODE).trim() || DEFAULT_LANGUAGE_CODE;
+        const components = Array.isArray(options.components) ? options.components : [];
         const { tenDigitsPhone } = await resolveMessageTarget(phoneNumber);
         const providerResponse = await sendTemplateDirect({
             phoneNumber,
             templateName: safeTemplateName,
-            languageCode: String(options.languageCode || options.language?.code || DEFAULT_LANGUAGE_CODE).trim() || DEFAULT_LANGUAGE_CODE,
-            components: Array.isArray(options.components) ? options.components : []
+            languageCode,
+            components
         });
-        const textParts = (Array.isArray(options.components) ? options.components : [])
+        const textParts = components
             .flatMap((component) => Array.isArray(component?.parameters) ? component.parameters : [])
             .map((parameter) => String(parameter?.text || '').trim())
             .filter(Boolean);
@@ -824,7 +844,9 @@ const sendTemplateByName = async (phoneNumber, templateName, options = {}) => {
     } catch (error) {
         logError('notificationService.sendTemplateByName', error, {
             phoneNumber: normalizeToTenDigits(phoneNumber),
-            templateName: safeTemplateName
+            templateName: safeTemplateName,
+            status: error?.response?.status || null,
+            data: error?.response?.data || null
         });
 
         if (options.raiseErrors) {
@@ -841,11 +863,13 @@ const sendErrorTemplate = async (phoneNumber, errorText, options = {}) => {
         return null;
     }
 
+    const templatePreviewText = normalizeTemplateTextParameter(safeText, 950);
+
     return sendTemplateByName(phoneNumber, ERROR_TEMPLATE_NAME, {
         ...options,
         mirrorContent: safeText,
         components: [
-            buildTextBodyComponent(safeText)
+            buildTextBodyComponent(templatePreviewText)
         ]
     });
 };
@@ -869,7 +893,7 @@ const sendAuthTemplate = async (phoneNumber, code, options = {}) => {
             parameters: [
                 {
                     type: 'text',
-                    text: safeCode
+                    text: 'COPY_CODE'
                 }
             ]
         }
