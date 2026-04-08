@@ -355,28 +355,27 @@ res.status(err.statusCode || 500).json({error: err.message});
         try {
             const {trackingNumber} = req.body;
             const order = await Order.findByPk(req.params.id);
-            const updated = await Order.update({trackingNumber}, {where: {id: req.params.id, status: 'Оплачено'}});
-            const number = order.phoneNumber;
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            console.log(number)
-            // Отправка уведомления о трек-номере
+            if (!order) {
+                return res.status(404).json({error: 'Заказ не найден'});
+            }
 
-            await sendOrderTrackingTemplate(number, trackingNumber);
+            const safeTrackingNumber = String(trackingNumber || '').trim();
+            if (!safeTrackingNumber) {
+                return res.status(400).json({error: 'Трек-номер не указан'});
+            }
+
+            if (String(order.trackingNumber || '').trim() === safeTrackingNumber) {
+                return res.json({message: 'Этот трек-номер уже сохранен.'});
+            }
+
+            const updated = await Order.update({trackingNumber: safeTrackingNumber}, {where: {id: req.params.id, status: 'Оплачено'}});
+            const number = order.phoneNumber;
 
             if (updated[0] > 0) {
+                await sendOrderTrackingTemplate(number, safeTrackingNumber);
 
                 // Отправка запроса на track.greenman.kz
-                const response = await fetch(`https://track.greenman.kz/add/${trackingNumber}`, {method: 'GET'});
+                const response = await fetch(`https://track.greenman.kz/add/${safeTrackingNumber}`, {method: 'GET'});
                 const responseData = await response.json();
 
 

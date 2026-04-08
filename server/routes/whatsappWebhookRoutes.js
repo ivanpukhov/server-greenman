@@ -42,6 +42,7 @@ const DEFAULT_CAPTION =
     'Посылка собрана. Видео обязательно к просмотру. Пожалуйста, сверьте свой заказ с содержимым коробки.';
 const ORDER_DRAFT_SOURCE_PREFIX = '__ORDER_DRAFT__';
 const ORDER_DRAFT_TTL_MS = 1000 * 60 * 60 * 6;
+const ORDER_DRAFT_DUPLICATE_WINDOW_MS = 1000 * 60 * 60 * 6;
 const PAYMENT_LINK_DUPLICATE_WINDOW_MS = 1000 * 60 * 3;
 const pendingOrderDraftByChatId = new Map();
 const processedKazpostCommandByMessageId = new Map();
@@ -627,10 +628,12 @@ const createOrGetOrderDraftRequestRecord = async ({
     customerChatId,
     sourceText
 }) => {
+    const normalizedChatId = String(customerChatId || '').trim();
+    const normalizedSourceText = normalizeStructuredMessageText(sourceText).trim();
     const payload = {
         customerPhone: customerPhone || null,
-        customerChatId: customerChatId || null,
-        sourceText: String(sourceText || '').trim(),
+        customerChatId: normalizedChatId || null,
+        sourceText: normalizedSourceText,
         processingStatus: 'received',
         lastError: null
     };
@@ -661,7 +664,96 @@ const createOrGetOrderDraftRequestRecord = async ({
         return record;
     }
 
+    if (normalizedChatId && normalizedSourceText) {
+        const recentRows = await OrderDraftRequest.findAll({
+            where: {
+                customerChatId: normalizedChatId,
+                createdAt: {
+                    [Op.gte]: new Date(Date.now() - ORDER_DRAFT_DUPLICATE_WINDOW_MS)
+                }
+            },
+            order: [['createdAt', 'DESC']],
+            limit: 10
+        });
+
+        const duplicateRow = recentRows.find((row) => (
+            normalizeStructuredMessageText(row.sourceText).trim() === normalizedSourceText
+        ));
+
+        if (duplicateRow) {
+            const patch = {};
+            if (!duplicateRow.customerPhone && payload.customerPhone) {
+                patch.customerPhone = payload.customerPhone;
+            }
+            if (!duplicateRow.customerChatId && payload.customerChatId) {
+                patch.customerChatId = payload.customerChatId;
+            }
+            if (Object.keys(patch).length > 0) {
+                await duplicateRow.update(patch);
+            }
+            return duplicateRow;
+        }
+    }
+
     return OrderDraftRequest.create(payload);
+};
+
+const hasPendingAliasSuggestionForRequest = (requestRecord) => {
+    const decisionStatus = String(requestRecord?.aliasDecisionStatus || '').trim().toLowerCase();
+    const messages = parseStoredJson(requestRecord?.aliasSuggestionMessagesJson, []);
+    return decisionStatus === 'pending' && messages.length > 0;
+};
+
+const hasPaymentAlreadyBeenRequestedForOrderDraft = (requestRecord) => {
+    if (!requestRecord) {
+        return false;
+    }
+
+    const status = String(requestRecord.processingStatus || '').trim().toLowerCase();
+    return Boolean(
+        requestRecord.paymentRequestedAt &&
+        requestRecord.bundleCode &&
+        (
+            status === 'awaiting_payment' ||
+            status === 'paid' ||
+            status === 'completed'
+        )
+    );
+};
+
+const findExistingOrderDraftPaymentConnection = async ({
+    customerChatId,
+    bundleCode,
+    expectedAmount
+}) => {
+    const normalizedChatId = String(customerChatId || '').trim();
+    const normalizedBundleCode = String(bundleCode || '').trim();
+    if (!normalizedChatId || !normalizedBundleCode) {
+        return null;
+    }
+
+    const rows = await SentPaymentLink.findAll({
+        where: {
+            customerChatId: normalizedChatId
+        },
+        order: [['receivedAt', 'DESC']],
+        limit: 20
+    });
+
+    return rows.find((row) => {
+        const sourceMeta = parseOrderDraftSourceMeta(row.sourceDescription);
+        if (!sourceMeta || String(sourceMeta.bundleCode || '').trim() !== normalizedBundleCode) {
+            return false;
+        }
+
+        const sameAmount =
+            expectedAmount === null ||
+            expectedAmount === undefined ||
+            isSameRoundedAmount(sourceMeta.totalToPay, expectedAmount) ||
+            isSameRoundedAmount(row.expectedAmount, expectedAmount);
+
+        return sameAmount;
+    }) || null;
 };
 
 const markOrderDraftRequestFailed = async (record, error) => {
@@ -2121,6 +2213,21 @@ const sendPlannedPaymentLinkAndTrack = async ({
     sourceDescription,
     messageId
 }) => {
+    const sourceMeta = parseOrderDraftSourceMeta(sourceDescription);
+    if (sourceMeta?.bundleCode) {
+        const existingBundleConnection = await findExistingOrderDraftPaymentConnection({
+            customerChatId: recipientChatId,
+            bundleCode: sourceMeta.bundleCode,
+            expectedAmount
+        });
+        if (existingBundleConnection) {
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Existing payment connection reused for bundle ${sourceMeta.bundleCode}: #${existingBundleConnection.id}`
+            );
+            return existingBundleConnection;
+        }
+    }
+
     const plannedLink = await pickNextPaymentLinkByDispatchPlan();
     if (!plannedLink) {
         console.log('[WhatsApp webhook] Payment request detected, but there are no links from dispatch plan.');
@@ -2427,6 +2534,38 @@ const processOrderDraftRequest = async ({
     parsedOrderDraft,
     orderDraftRequest = null
 }) => {
+    if (orderDraftRequest) {
+        await orderDraftRequest.reload();
+
+        if (Number(orderDraftRequest.orderId) > 0) {
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Skip duplicate processing: request #${orderDraftRequest.id} already linked to order #${orderDraftRequest.orderId}.`
+            );
+            return {
+                bundleCode: String(orderDraftRequest.bundleCode || '').trim() || null,
+                totalToPay: Number.isFinite(Number(orderDraftRequest.expectedAmount))
+                    ? Number(orderDraftRequest.expectedAmount)
+                    : null,
+                sentPaymentConnectionId: Number(orderDraftRequest.paymentConnectionId) || null,
+                skippedAsDuplicate: true
+            };
+        }
+
+        if (hasPaymentAlreadyBeenRequestedForOrderDraft(orderDraftRequest)) {
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Skip duplicate processing: payment already requested for request #${orderDraftRequest.id}.`
+            );
+            return {
+                bundleCode: String(orderDraftRequest.bundleCode || '').trim() || null,
+                totalToPay: Number.isFinite(Number(orderDraftRequest.expectedAmount))
+                    ? Number(orderDraftRequest.expectedAmount)
+                    : null,
+                sentPaymentConnectionId: Number(orderDraftRequest.paymentConnectionId) || null,
+                skippedAsDuplicate: true
+            };
+        }
+    }
+
     console.log(
         `[WhatsApp webhook] Order draft detected. chatId=${recipientChatId}, aliases=${parsedOrderDraft.aliases.length}, delivery=${parsedOrderDraft.deliveryPrice}`
     );
@@ -2440,6 +2579,13 @@ const processOrderDraftRequest = async ({
         console.log(
             `[WhatsApp webhook][OrderDraft] Unknown aliases found: ${resolved.unknownAliases.join(', ')}`
         );
+        if (orderDraftRequest && hasPendingAliasSuggestionForRequest(orderDraftRequest)) {
+            console.log(
+                `[WhatsApp webhook][OrderDraft] Skip duplicate alias suggestion: request #${orderDraftRequest.id} is already waiting for admin decision.`
+            );
+            return null;
+        }
+
         await markOrderDraftUnknownAliases(orderDraftRequest, parsedOrderDraft, resolved.unknownAliases);
         if (orderDraftRequest) {
             try {
@@ -2595,6 +2741,20 @@ const createOrderFromPaidBundle = async ({
 }) => {
     if (!connection || !bundleCode) {
         return null;
+    }
+
+    const linkedRequest = await OrderDraftRequest.findOne({
+        where: {
+            bundleCode: String(bundleCode || '').trim()
+        },
+        order: [['createdAt', 'DESC']]
+    });
+
+    if (Number(linkedRequest?.orderId) > 0) {
+        const existingOrderFromRequest = await Order.findByPk(linkedRequest.orderId);
+        if (existingOrderFromRequest) {
+            return existingOrderFromRequest;
+        }
     }
 
     if (connection.linkedOrderId) {
