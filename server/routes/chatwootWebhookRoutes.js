@@ -5,9 +5,6 @@ const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const dialog360Service = require('../utilities/dialog360Service');
 const sendNotification = require('../utilities/notificationService');
 const {
-    processIncomingMessageWebhook
-} = require('./whatsappWebhookRoutes');
-const {
     CHATWOOT_WEBHOOK_SECRET
 } = require('../config/chatwoot');
 const { normalizePhoneNumber } = require('../utilities/paymentLinkUtils');
@@ -136,28 +133,6 @@ const extractAttachments = (payload) => {
         }))
         .filter((attachment) => attachment.url);
 };
-
-const buildMessageProcessingContent = ({ customerPhone, textContent, providerMessageId }) => ({
-    typeWebhook: 'outgoingAPIMessageReceived',
-    idMessage: String(providerMessageId || '').trim() || `chatwoot-local-${Date.now()}`,
-    senderPhone: null,
-    recipientPhone: customerPhone,
-    senderData: {
-        chatId: '',
-        sender: '',
-        senderName: 'Chatwoot'
-    },
-    recipientData: {
-        chatId: dialog360Service.normalizePhoneToChatId(customerPhone) || '',
-        recipient: customerPhone
-    },
-    messageData: {
-        typeMessage: 'textMessage',
-        textMessageData: {
-            textMessage: String(textContent || '').trim()
-        }
-    }
-});
 
 const resolveCustomerPhone = async (payload) => {
     const conversationId = Number.parseInt(String(payload?.conversation?.id || '').trim(), 10);
@@ -307,16 +282,6 @@ const forwardMessageCreatedEvent = async (payload) => {
     }
     if (Object.keys(syncPatch).length > 0) {
         await sync.update(syncPatch);
-    }
-
-    if (!wasQueued && textContent && !textSentSeparately && providerMessageId) {
-        await processIncomingMessageWebhook(
-            buildMessageProcessingContent({
-                customerPhone,
-                textContent,
-                providerMessageId
-            })
-        );
     }
 
     return {
