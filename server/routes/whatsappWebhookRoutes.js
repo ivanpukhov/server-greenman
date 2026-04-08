@@ -14,6 +14,7 @@ const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const User = require('../models/orders/User');
 const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
+const ProcessedWebhookMessage = require('../models/orders/ProcessedWebhookMessage');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
@@ -113,6 +114,66 @@ const safeStringify = (value) => {
         },
         2
     );
+};
+
+const buildWebhookDedupKey = (handler, messageId) => {
+    const safeHandler = String(handler || '').trim();
+    const safeMessageId = String(messageId || '').trim();
+    if (!safeHandler || !safeMessageId) {
+        return null;
+    }
+
+    return {
+        provider: '360dialog',
+        handler: safeHandler,
+        providerMessageId: safeMessageId
+    };
+};
+
+const markWebhookMessageProcessedOnce = async ({
+    handler,
+    messageId,
+    customerPhone = null,
+    customerChatId = null,
+    payloadPreview = ''
+}) => {
+    const dedupKey = buildWebhookDedupKey(handler, messageId);
+    if (!dedupKey) {
+        return true;
+    }
+
+    const [row, created] = await ProcessedWebhookMessage.findOrCreate({
+        where: dedupKey,
+        defaults: {
+            ...dedupKey,
+            customerPhone: String(customerPhone || '').trim() || null,
+            customerChatId: String(customerChatId || '').trim() || null,
+            payloadPreview: String(payloadPreview || '').trim() || null
+        }
+    });
+
+    if (!created) {
+        console.log(
+            `[WhatsApp webhook][Dedup] Skip duplicate handler=${dedupKey.handler} messageId=${dedupKey.providerMessageId}`
+        );
+        return false;
+    }
+
+    const patch = {};
+    if (!row.customerPhone && customerPhone) {
+        patch.customerPhone = String(customerPhone || '').trim();
+    }
+    if (!row.customerChatId && customerChatId) {
+        patch.customerChatId = String(customerChatId || '').trim();
+    }
+    if (!row.payloadPreview && payloadPreview) {
+        patch.payloadPreview = String(payloadPreview || '').trim();
+    }
+    if (Object.keys(patch).length > 0) {
+        await row.update(patch);
+    }
+
+    return true;
 };
 
 const pushWebhookEvent = (content) => {
@@ -3125,6 +3186,7 @@ const processIncomingPdfProofWebhook = async (content) => {
     }
 
     const fileData = content?.messageData?.fileMessageData;
+    const messageId = String(content?.idMessage || '').trim();
     const downloadUrl = String(fileData?.downloadUrl || '').trim();
     const fileBase64 = String(fileData?.fileBase64 || '').trim();
     const mimeType = String(fileData?.mimeType || '').trim().toLowerCase();
@@ -3141,6 +3203,17 @@ const processIncomingPdfProofWebhook = async (content) => {
         fileName.endsWith('.pdf');
 
     if ((!downloadUrl && !fileBase64) || !senderChatId || !looksLikePdf) {
+        return;
+    }
+
+    const shouldProcessPdf = await markWebhookMessageProcessedOnce({
+        handler: 'pdf_proof',
+        messageId,
+        customerPhone: normalizePhoneNumber(senderChatId),
+        customerChatId: senderChatId,
+        payloadPreview: fileName || downloadUrl || '[pdf]'
+    });
+    if (!shouldProcessPdf) {
         return;
     }
 
@@ -3529,6 +3602,17 @@ const processIncomingMessageWebhook = async (content) => {
         : null;
 
     if (startsWithKazpostCommand(textMessage)) {
+        const shouldProcessKazpostMessage = await markWebhookMessageProcessedOnce({
+            handler: 'kazpost_command',
+            messageId,
+            customerPhone: recipientPhoneForDraft || normalizePhoneNumber(recipientChatId),
+            customerChatId: recipientChatId,
+            payloadPreview: textMessage.slice(0, 500)
+        });
+        if (!shouldProcessKazpostMessage) {
+            return;
+        }
+
         try {
             await processKazpostRequest({
                 textMessage,
@@ -3568,6 +3652,17 @@ const processIncomingMessageWebhook = async (content) => {
         );
     }
     if (parsedOrderDraft) {
+        const shouldProcessOrderDraftMessage = await markWebhookMessageProcessedOnce({
+            handler: 'order_draft_message',
+            messageId,
+            customerPhone: recipientPhoneForDraft || normalizePhoneNumber(recipientChatId),
+            customerChatId: recipientChatId,
+            payloadPreview: textMessage.slice(0, 500)
+        });
+        if (!shouldProcessOrderDraftMessage) {
+            return;
+        }
+
         await processOrderDraftRequest({
             textMessage,
             recipientChatId,
@@ -3586,6 +3681,17 @@ const processIncomingMessageWebhook = async (content) => {
     const isIncomingWebhook = webhookType === 'incomingMessageReceived';
 
     if (isIncomingWebhook && startsWithPaymentRequest(textMessage)) {
+        const shouldProcessPaymentRequest = await markWebhookMessageProcessedOnce({
+            handler: 'payment_request_message',
+            messageId,
+            customerPhone: normalizePhoneNumber(recipientChatId),
+            customerChatId: recipientChatId,
+            payloadPreview: textMessage.slice(0, 500)
+        });
+        if (!shouldProcessPaymentRequest) {
+            return null;
+        }
+
         console.log(`[WhatsApp webhook] Payment command detected. chatId=${recipientChatId}, text="${textMessage}"`);
         const expectedAmount = extractExpectedAmount(textMessage);
         console.log(`[WhatsApp webhook] Expected amount parsed: ${expectedAmount === null ? 'none' : expectedAmount}`);
@@ -3622,6 +3728,17 @@ const processIncomingMessageWebhook = async (content) => {
 
     if (!matchedLink) {
         return;
+    }
+
+    const shouldProcessMatchedLink = await markWebhookMessageProcessedOnce({
+        handler: 'matched_payment_link_message',
+        messageId,
+        customerPhone: normalizePhoneNumber(recipientChatId),
+        customerChatId: recipientChatId,
+        payloadPreview: textMessage.slice(0, 500)
+    });
+    if (!shouldProcessMatchedLink) {
+        return null;
     }
 
     const customerPhone = normalizePhoneNumber(recipientChatId);
@@ -3709,12 +3826,30 @@ const processIncomingVideoMessageWebhook = async (content) => {
         return;
     }
 
+    const recipientChatId = rawPhoneNumber
+        ? dialog360Service.normalizePhoneToChatId(rawPhoneNumber)
+        : null;
+
+    const shouldProcessMediaForward = await markWebhookMessageProcessedOnce({
+        handler: 'media_forward',
+        messageId,
+        customerPhone: normalizePhoneNumber(rawPhoneNumber),
+        customerChatId: recipientChatId,
+        payloadPreview: [
+            mediaType,
+            fileName,
+            captionText
+        ].filter(Boolean).join(' | ').slice(0, 500)
+    });
+    if (!shouldProcessMediaForward) {
+        return;
+    }
+
     if (!rawPhoneNumber) {
         console.log(`[WhatsApp webhook][media] Skip: target phone not found in caption for ${mediaType}.`);
         return;
     }
 
-    const recipientChatId = dialog360Service.normalizePhoneToChatId(rawPhoneNumber);
     if (!recipientChatId) {
         console.log('Did not find valid phone number for video forwarding.');
         return;
