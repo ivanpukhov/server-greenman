@@ -239,6 +239,24 @@ const buildMessageProcessingContent = ({ customerPhone, textContent, providerMes
     }
 });
 
+const parseChatwootOutgoingMessage = async ({ customerPhone, textContent, chatwootMessageId }) => {
+    const safePhone = String(customerPhone || '').trim();
+    const safeText = String(textContent || '').trim();
+    const safeMessageId = String(chatwootMessageId || '').trim();
+
+    if (!safePhone || !safeText || !safeMessageId) {
+        return;
+    }
+
+    await processIncomingMessageWebhook(
+        buildMessageProcessingContent({
+            customerPhone: safePhone,
+            textContent: safeText,
+            providerMessageId: `chatwoot:${safeMessageId}`
+        })
+    );
+};
+
 const resolveCustomerPhone = async (payload) => {
     const conversationId = Number.parseInt(String(payload?.conversation?.id || '').trim(), 10);
     const contactIdentifier = String(
@@ -328,6 +346,14 @@ const forwardMessageCreatedEvent = async (payload) => {
         return { skipped: true, reason: 'empty_payload' };
     }
 
+    if (textContent) {
+        await parseChatwootOutgoingMessage({
+            customerPhone,
+            textContent,
+            chatwootMessageId: messageId
+        });
+    }
+
     const chatwootContactIdentifier = String(
         payload?.conversation?.contact_inbox?.source_id ||
         payload?.contact_inbox?.source_id ||
@@ -387,16 +413,6 @@ const forwardMessageCreatedEvent = async (payload) => {
     }
     if (Object.keys(syncPatch).length > 0) {
         await sync.update(syncPatch);
-    }
-
-    if (!wasQueued && textContent && !textSentSeparately && providerMessageId) {
-        await processIncomingMessageWebhook(
-            buildMessageProcessingContent({
-                customerPhone,
-                textContent,
-                providerMessageId
-            })
-        );
     }
 
     return {
