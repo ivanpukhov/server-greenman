@@ -219,6 +219,7 @@ const extractAttachments = (payload) => {
 const buildMessageProcessingContent = ({ customerPhone, textContent, providerMessageId }) => ({
     typeWebhook: 'outgoingAPIMessageReceived',
     idMessage: String(providerMessageId || '').trim() || `chatwoot-local-${Date.now()}`,
+    localProcessing: true,
     senderPhone: null,
     recipientPhone: customerPhone,
     senderData: {
