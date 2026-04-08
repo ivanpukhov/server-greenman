@@ -1045,6 +1045,18 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
 
     const results = await Promise.all(
         ORDER_DRAFT_ALIAS_APPROVER_PHONES.map(async (phone) => {
+            let templateResponse = null;
+            try {
+                templateResponse = await sendNotification.sendErrorTemplate(phone, body);
+            } catch (error) {
+                console.error('[WhatsApp webhook][OrderDraft] Failed to send error template to admin:', {
+                    phone,
+                    message: error.message,
+                    status: error.response?.status || null,
+                    data: error.response?.data || null
+                });
+            }
+
             try {
                 const response = await dialog360Service.sendInteractiveButtonsReply({
                     chatId: phone,
@@ -1057,7 +1069,9 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
                 return {
                     phone,
                     chatId: dialog360Service.normalizePhoneToChatId(phone),
-                    idMessage: String(response?.idMessage || '').trim() || null
+                    idMessage: String(response?.idMessage || templateResponse?.idMessage || '').trim() || null,
+                    templateMessageId: String(templateResponse?.idMessage || '').trim() || null,
+                    interactiveMessageId: String(response?.idMessage || '').trim() || null
                 };
             } catch (error) {
                 console.error('[WhatsApp webhook][OrderDraft] Failed to send alias suggestion to admin:', {
@@ -1069,7 +1083,9 @@ const sendAliasSuggestionToAdmins = async ({ requestId, sourceText, suggestion }
                 return {
                     phone,
                     chatId: dialog360Service.normalizePhoneToChatId(phone),
-                    idMessage: null,
+                    idMessage: String(templateResponse?.idMessage || '').trim() || null,
+                    templateMessageId: String(templateResponse?.idMessage || '').trim() || null,
+                    interactiveMessageId: null,
                     error: error.message
                 };
             }
@@ -1083,19 +1099,26 @@ const deleteOrderDraftAdminMessages = async (messages) => {
     await Promise.all(
         (Array.isArray(messages) ? messages : []).map(async (item) => {
             const chatId = String(item?.chatId || '').trim();
-            const idMessage = String(item?.idMessage || '').trim();
-            if (!chatId || !idMessage) {
+            const idsToDelete = [
+                String(item?.interactiveMessageId || '').trim(),
+                String(item?.templateMessageId || '').trim(),
+                String(item?.idMessage || '').trim()
+            ].filter(Boolean);
+
+            if (!chatId || idsToDelete.length === 0) {
                 return;
             }
 
-            try {
-                await dialog360Service.deleteMessage({ chatId, idMessage });
-            } catch (error) {
-                console.error('[WhatsApp webhook][OrderDraft] Failed to delete admin alias suggestion message:', {
-                    chatId,
-                    idMessage,
-                    message: error.message
-                });
+            for (const idMessage of idsToDelete) {
+                try {
+                    await dialog360Service.deleteMessage({ chatId, idMessage });
+                } catch (error) {
+                    console.error('[WhatsApp webhook][OrderDraft] Failed to delete admin alias suggestion message:', {
+                        chatId,
+                        idMessage,
+                        message: error.message
+                    });
+                }
             }
         })
     );
@@ -1875,7 +1898,11 @@ const handleOrderDraftAliasDecision = async (content) => {
 
     const hasStoredClickedMessage = storedMessages.some((item) => (
         String(item?.chatId || '').trim() === senderChatId &&
-        String(item?.idMessage || '').trim() === stanzaId
+        [
+            String(item?.interactiveMessageId || '').trim(),
+            String(item?.templateMessageId || '').trim(),
+            String(item?.idMessage || '').trim()
+        ].includes(stanzaId)
     ));
 
     if (senderChatId && stanzaId && !hasStoredClickedMessage) {
@@ -3206,11 +3233,22 @@ const trackIncomingMessage = async (content) => {
     if (!user) {
         await User.create({
             phoneNumber: customerPhone,
-            lastIncomingMessageAt: now
+            lastIncomingMessageAt: now,
+            isWaitingForWhatsappWindowOpen: false
         });
     } else {
         await user.update({
-            lastIncomingMessageAt: now
+            lastIncomingMessageAt: now,
+            isWaitingForWhatsappWindowOpen: false
+        });
+    }
+
+    const flushResult = await sendNotification.flushPendingMessagesByPhone(customerPhone);
+    if (Number(flushResult?.sentCount || 0) > 0 || Number(flushResult?.pendingCount || 0) > 0) {
+        console.log('[WhatsApp webhook] Pending outbound messages processed after inbound reply:', {
+            phoneNumber: customerPhone,
+            sentCount: flushResult.sentCount || 0,
+            pendingCount: flushResult.pendingCount || 0
         });
     }
 };
@@ -3477,9 +3515,13 @@ const processIncomingVideoMessageWebhook = async (content) => {
 
     const videoData = content?.messageData?.videoMessage || null;
     const fileData = content?.messageData?.fileMessageData || null;
+    const mediaData = videoData || fileData;
     const downloadUrl = String(videoData?.downloadUrl || fileData?.downloadUrl || '').trim();
     const fileBase64 = String(videoData?.fileBase64 || fileData?.fileBase64 || '').trim();
-    const fileName = String(videoData?.fileName || fileData?.fileName || '').trim() || `video-${Date.now()}.mp4`;
+    const mimeType = String(videoData?.mimeType || fileData?.mimeType || '').trim() || 'application/octet-stream';
+    const fileName = String(videoData?.fileName || fileData?.fileName || '').trim() || `media-${Date.now()}`;
+    const isVoice = Boolean(videoData?.voice || fileData?.voice);
+    const mediaType = String(videoData?.mediaType || fileData?.mediaType || '').trim() || 'document';
     const rawPhoneNumber =
         String(videoData?.caption || '').trim() ||
         String(fileData?.caption || '').trim() ||
@@ -3496,41 +3538,41 @@ const processIncomingVideoMessageWebhook = async (content) => {
         return;
     }
 
-    const sendVideoToChat = async ({ chatId, caption, logSuffix }) => {
-        if (fileBase64) {
-            const mediaBuffer = Buffer.from(fileBase64, 'base64');
-            if (!mediaBuffer || mediaBuffer.length === 0) {
-                throw new Error('Video base64 buffer is empty');
-            }
+    const sendMediaToChat = async ({ chatId, caption, logSuffix }) => {
+        let mediaBuffer = null;
 
-            console.log(`[WhatsApp webhook][video] forward source=green-api-upload target=${logSuffix}`);
-            await dialog360Service.sendFileByUpload({
-                chatId,
-                fileBuffer: mediaBuffer,
-                fileName,
-                mimeType: 'video/mp4',
-                caption
+        if (fileBase64) {
+            mediaBuffer = Buffer.from(fileBase64, 'base64');
+        } else {
+            const downloadResponse = await dialog360Service.downloadMediaBuffer(downloadUrl, {
+                timeout: 120000
             });
-            return;
+            mediaBuffer = Buffer.from(downloadResponse?.buffer || []);
         }
 
-        console.log(`[WhatsApp webhook][video] forward source=green-api-url target=${logSuffix}`);
-        await dialog360Service.sendFileByUrl({
+        if (!mediaBuffer || mediaBuffer.length === 0) {
+            throw new Error('Media buffer is empty');
+        }
+
+        console.log(`[WhatsApp webhook][media] forward source=${fileBase64 ? 'base64' : '360dialog-download'} target=${logSuffix}`);
+        await dialog360Service.sendFileByUpload({
             chatId,
-            urlFile: downloadUrl,
+            fileBuffer: mediaBuffer,
             fileName,
-            caption
+            mimeType,
+            caption: mediaType === 'audio' ? '' : caption,
+            voice: isVoice
         });
     };
 
     try {
-        await sendVideoToChat({
+        await sendMediaToChat({
             chatId: recipientChatId,
-            caption: DEFAULT_CAPTION,
+            caption: mediaData === videoData ? DEFAULT_CAPTION : String(mediaData?.caption || '').trim(),
             logSuffix: 'recipient'
         });
     } catch (error) {
-        console.error('Failed to send video to recipient:', error.response?.data || error.message);
+        console.error('Failed to send media to recipient:', error.response?.data || error.message);
     }
 };
 

@@ -379,6 +379,27 @@ const getMediaDownloadUrl = async (mediaId) => {
     return normalizeDownloadUrl(mediaInfo?.url || '');
 };
 
+const downloadMediaBuffer = async (mediaUrl, options = {}) => {
+    const normalizedUrl = normalizeDownloadUrl(mediaUrl);
+    if (!normalizedUrl) {
+        return null;
+    }
+
+    const response = await axios.get(normalizedUrl, {
+        responseType: 'arraybuffer',
+        timeout: options.timeout || 120000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        headers: getHeaders(options.headers || {})
+    });
+
+    const buffer = Buffer.from(response.data || []);
+    return {
+        buffer,
+        mimeType: String(response.headers?.['content-type'] || '').trim()
+    };
+};
+
 const getWebhook = async () => getJson('v1/configs/webhook');
 
 const setWebhook = async ({ url, headers = null }) => {
@@ -410,6 +431,7 @@ module.exports = {
     deleteMessage,
     getMediaInfo,
     getMediaDownloadUrl,
+    downloadMediaBuffer,
     getWebhook,
     setWebhook
 };

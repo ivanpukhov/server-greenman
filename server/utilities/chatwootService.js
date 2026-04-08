@@ -3,6 +3,7 @@ const FormData = require('form-data');
 const User = require('../models/orders/User');
 const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const { normalizePhoneNumber } = require('./paymentLinkUtils');
+const dialog360Service = require('./dialog360Service');
 const {
     CHATWOOT_BASE_URL,
     CHATWOOT_API_INBOX_IDENTIFIER,
@@ -488,19 +489,15 @@ const downloadAttachment = async (attachment) => {
         return null;
     }
 
-    const response = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 120000,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+    const response = await dialog360Service.downloadMediaBuffer(url, {
+        timeout: 120000
     });
-
-    const buffer = Buffer.from(response.data || []);
+    const buffer = Buffer.from(response?.buffer || []);
     if (buffer.length === 0) {
         return null;
     }
 
-    const responseMimeType = String(response.headers?.['content-type'] || '').trim();
+    const responseMimeType = String(response?.mimeType || '').trim();
     const mimeType = String(attachment?.mimeType || responseMimeType || 'application/octet-stream').trim();
     const fileName = buildAttachmentFileName({
         fileName: attachment?.fileName,

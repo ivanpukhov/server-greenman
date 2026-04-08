@@ -1,9 +1,9 @@
-const axios = require('axios');
 const crypto = require('crypto');
 const express = require('express');
 const User = require('../models/orders/User');
 const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const dialog360Service = require('../utilities/dialog360Service');
+const sendNotification = require('../utilities/notificationService');
 const {
     processIncomingMessageWebhook
 } = require('./whatsappWebhookRoutes');
@@ -137,32 +137,6 @@ const extractAttachments = (payload) => {
         .filter((attachment) => attachment.url);
 };
 
-const isAttachmentVoice = (attachment) => dialog360Service.isVoiceMedia({
-    mimeType: attachment?.mimeType,
-    fileName: attachment?.fileName,
-    urlFile: attachment?.url
-});
-
-const shouldSendTextSeparately = ({ attachments, textContent }) => {
-    const safeText = String(textContent || '').trim();
-    if (!safeText || attachments.length === 0) {
-        return false;
-    }
-
-    if (attachments.length > 1) {
-        return true;
-    }
-
-    const firstAttachment = attachments[0];
-    const mediaType = dialog360Service.normalizeMediaType({
-        mimeType: firstAttachment?.mimeType,
-        fileName: firstAttachment?.fileName,
-        urlFile: firstAttachment?.url
-    });
-
-    return !dialog360Service.supportsCaptionForMediaType(mediaType);
-};
-
 const buildMessageProcessingContent = ({ customerPhone, textContent, providerMessageId }) => ({
     typeWebhook: 'outgoingAPIMessageReceived',
     idMessage: String(providerMessageId || '').trim() || `chatwoot-local-${Date.now()}`,
@@ -247,76 +221,6 @@ const resolveCustomerPhone = async (payload) => {
     return null;
 };
 
-const sendTextToWhatsapp = async ({ phoneNumber, text }) => {
-    const normalizedChatId = dialog360Service.normalizePhoneToChatId(phoneNumber);
-    const safeText = String(text || '').trim();
-    if (!normalizedChatId || !safeText) {
-        return null;
-    }
-
-    return dialog360Service.sendMessage({
-        chatId: normalizedChatId,
-        message: safeText
-    });
-};
-
-const downloadAttachmentBuffer = async (attachment) => {
-    const response = await axios.get(String(attachment?.url || '').trim(), {
-        responseType: 'arraybuffer',
-        timeout: 120000,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-    });
-
-    return Buffer.from(response.data || []);
-};
-
-const sendAttachmentsToWhatsapp = async ({ phoneNumber, attachments, textContent }) => {
-    const normalizedChatId = dialog360Service.normalizePhoneToChatId(phoneNumber);
-    if (!normalizedChatId || attachments.length === 0) {
-        return [];
-    }
-
-    const responses = [];
-    const sendTextFirst = shouldSendTextSeparately({ attachments, textContent });
-
-    if (sendTextFirst) {
-        const textResponse = await sendTextToWhatsapp({
-            phoneNumber,
-            text: textContent
-        });
-        if (textResponse) {
-            responses.push(textResponse);
-        }
-    }
-
-    for (const [index, attachment] of attachments.entries()) {
-        const fileBuffer = await downloadAttachmentBuffer(attachment);
-        if (!fileBuffer || fileBuffer.length === 0) {
-            continue;
-        }
-
-        const mediaType = dialog360Service.normalizeMediaType({
-            mimeType: attachment.mimeType,
-            fileName: attachment.fileName,
-            urlFile: attachment.url
-        });
-        const useCaption = !sendTextFirst && index === 0 && dialog360Service.supportsCaptionForMediaType(mediaType);
-
-        const response = await dialog360Service.sendFileByUpload({
-            chatId: normalizedChatId,
-            fileBuffer,
-            fileName: attachment.fileName,
-            mimeType: attachment.mimeType,
-            caption: useCaption ? String(textContent || '').trim() : '',
-            voice: isAttachmentVoice(attachment)
-        });
-        responses.push(response);
-    }
-
-    return responses;
-};
-
 const forwardMessageCreatedEvent = async (payload) => {
     const messageId = String(payload?.id || '').trim();
     if (!messageId) {
@@ -344,37 +248,68 @@ const forwardMessageCreatedEvent = async (payload) => {
         return { skipped: true, reason: 'empty_payload' };
     }
 
-    const textSentSeparately = shouldSendTextSeparately({ attachments, textContent });
-    const providerMessageIds = [];
-    if (attachments.length > 0) {
-        const attachmentResponses = await sendAttachmentsToWhatsapp({
-            phoneNumber: customerPhone,
-            attachments,
-            textContent
-        });
-        for (const response of attachmentResponses) {
-            const responseMessageId = String(response?.idMessage || '').trim();
-            if (responseMessageId) {
-                providerMessageIds.push(responseMessageId);
-            }
-        }
-    } else {
-        const response = await sendTextToWhatsapp({
-            phoneNumber: customerPhone,
-            text: textContent
-        });
-        const responseMessageId = String(response?.idMessage || '').trim();
-        if (responseMessageId) {
-            providerMessageIds.push(responseMessageId);
-        }
-    }
+    const chatwootContactIdentifier = String(
+        payload?.conversation?.contact_inbox?.source_id ||
+        payload?.contact_inbox?.source_id ||
+        ''
+    ).trim() || null;
+    const chatwootConversationId = Number.isFinite(Number(payload?.conversation?.id))
+        ? Number(payload.conversation.id)
+        : null;
 
+    const deliveryResult = await sendNotification.sendChatwootOutbound({
+        phoneNumber: customerPhone,
+        textContent,
+        attachments,
+        chatwootMessageId: messageId,
+        chatwootContactIdentifier,
+        chatwootConversationId
+    });
+
+    const providerMessageIds = Array.isArray(deliveryResult?.providerMessageIds)
+        ? deliveryResult.providerMessageIds
+        : [];
     const providerMessageId = providerMessageIds[providerMessageIds.length - 1] || null;
-    if (providerMessageIds.length === 0) {
-        throw new Error('360dialog did not return provider message ids');
+    const wasQueued = Boolean(deliveryResult?.queued);
+    const textSentSeparately = Boolean(deliveryResult?.textSentSeparately);
+
+    const [sync] = await ChatwootMessageSync.findOrCreate({
+        where: {
+            provider: 'chatwoot',
+            providerMessageId: messageId
+        },
+        defaults: {
+            provider: 'chatwoot',
+            providerMessageId: messageId,
+            customerPhone,
+            customerChatId: dialog360Service.normalizePhoneToChatId(customerPhone),
+            chatwootContactIdentifier,
+            chatwootConversationId,
+            chatwootMessageId: providerMessageId
+        }
+    });
+
+    const syncPatch = {};
+    if (!sync.customerPhone && customerPhone) {
+        syncPatch.customerPhone = customerPhone;
+    }
+    if (!sync.customerChatId && customerPhone) {
+        syncPatch.customerChatId = dialog360Service.normalizePhoneToChatId(customerPhone);
+    }
+    if (!sync.chatwootContactIdentifier && chatwootContactIdentifier) {
+        syncPatch.chatwootContactIdentifier = chatwootContactIdentifier;
+    }
+    if (!sync.chatwootConversationId && chatwootConversationId) {
+        syncPatch.chatwootConversationId = chatwootConversationId;
+    }
+    if (providerMessageId && sync.chatwootMessageId !== providerMessageId) {
+        syncPatch.chatwootMessageId = providerMessageId;
+    }
+    if (Object.keys(syncPatch).length > 0) {
+        await sync.update(syncPatch);
     }
 
-    if (textContent && !textSentSeparately) {
+    if (!wasQueued && textContent && !textSentSeparately && providerMessageId) {
         await processIncomingMessageWebhook(
             buildMessageProcessingContent({
                 customerPhone,
@@ -384,24 +319,9 @@ const forwardMessageCreatedEvent = async (payload) => {
         );
     }
 
-    await ChatwootMessageSync.create({
-        provider: 'chatwoot',
-        providerMessageId: messageId,
-        customerPhone,
-        customerChatId: dialog360Service.normalizePhoneToChatId(customerPhone),
-        chatwootContactIdentifier: String(
-            payload?.conversation?.contact_inbox?.source_id ||
-            payload?.contact_inbox?.source_id ||
-            ''
-        ).trim() || null,
-        chatwootConversationId: Number.isFinite(Number(payload?.conversation?.id))
-            ? Number(payload.conversation.id)
-            : null,
-        chatwootMessageId: providerMessageId
-    });
-
     return {
         skipped: false,
+        queued: wasQueued,
         providerMessageId,
         providerMessageIds,
         customerPhone
