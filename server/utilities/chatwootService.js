@@ -10,6 +10,14 @@ const {
 
 const REQUEST_TIMEOUT_MS = 15000;
 
+const buildLogMeta = (content, extra = {}) => ({
+    webhookType: String(content?.typeWebhook || '').trim() || null,
+    providerMessageId: String(content?.idMessage || '').trim() || null,
+    senderChatId: String(content?.senderData?.chatId || '').trim() || null,
+    senderPhone: String(content?.senderPhone || content?.senderData?.sender || '').trim() || null,
+    ...extra
+});
+
 const isConfigured = () => Boolean(
     CHATWOOT_ENABLED &&
     CHATWOOT_BASE_URL &&
@@ -453,14 +461,27 @@ const syncIncomingMessage = async (content) => {
 
 const syncIncomingMessageSafe = async (content) => {
     try {
-        return await syncIncomingMessage(content);
+        const result = await syncIncomingMessage(content);
+
+        if (result?.skipped) {
+            console.log('[Chatwoot sync] skipped:', buildLogMeta(content, {
+                reason: result.reason || 'unknown'
+            }));
+        } else {
+            console.log('[Chatwoot sync] sent:', buildLogMeta(content, {
+                contactIdentifier: result?.contactIdentifier || null,
+                conversationId: result?.conversationId || null,
+                chatwootMessageId: result?.messageId || null
+            }));
+        }
+
+        return result;
     } catch (error) {
-        console.error('[Chatwoot sync] Failed to sync incoming WhatsApp message:', {
+        console.error('[Chatwoot sync] failed:', buildLogMeta(content, {
             message: error.message,
             status: error.response?.status || null,
-            data: error.response?.data || null,
-            providerMessageId: String(content?.idMessage || '').trim() || null
-        });
+            data: error.response?.data || null
+        }));
         return { skipped: true, reason: 'sync_failed' };
     }
 };
