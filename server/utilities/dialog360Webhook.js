@@ -12,13 +12,23 @@ const buildFileName = (messageType, mediaNode) => {
     }
 
     const mimeType = String(mediaNode?.mime_type || '').trim().toLowerCase();
-    const knownExt = mimeType === 'application/pdf'
-        ? '.pdf'
-        : mimeType.startsWith('video/')
-            ? '.mp4'
-            : mimeType.startsWith('image/')
-                ? '.jpg'
-                : '';
+    let knownExt = '';
+
+    if (mimeType === 'application/pdf') {
+        knownExt = '.pdf';
+    } else if (mimeType.startsWith('video/')) {
+        knownExt = '.mp4';
+    } else if (mimeType === 'image/webp') {
+        knownExt = '.webp';
+    } else if (mimeType === 'image/png') {
+        knownExt = '.png';
+    } else if (mimeType === 'image/gif') {
+        knownExt = '.gif';
+    } else if (mimeType.startsWith('image/')) {
+        knownExt = '.jpg';
+    } else if (mimeType.startsWith('audio/')) {
+        knownExt = '.ogg';
+    }
 
     return `${messageType || 'file'}-${Date.now()}${knownExt}`;
 };
@@ -161,7 +171,9 @@ const mapMediaMessage = async (message, content) => {
         mimeType: String(mediaNode?.mime_type || '').trim(),
         caption: String(mediaNode?.caption || '').trim(),
         fileBase64: '',
-        mediaId: String(mediaNode?.id || '').trim() || null
+        mediaId: String(mediaNode?.id || '').trim() || null,
+        mediaType: String(message?.type || '').trim() || 'document',
+        voice: Boolean(mediaNode?.voice)
     };
 
     if (message.type === 'video') {
@@ -175,6 +187,24 @@ const mapMediaMessage = async (message, content) => {
     content.messageData = {
         typeMessage: 'fileMessage',
         fileMessageData: mediaPayload
+    };
+    return content;
+};
+
+const mapContactsMessage = (message, content) => {
+    content.messageData = {
+        typeMessage: 'contactMessage',
+        contactMessage: {
+            contacts: safeArray(message?.contacts)
+        }
+    };
+    return content;
+};
+
+const mapOrderMessage = (message, content) => {
+    content.messageData = {
+        typeMessage: 'orderMessage',
+        orderMessage: message?.order || {}
     };
     return content;
 };
@@ -220,6 +250,14 @@ const map360MessageToInternal = async ({ field, metadata, message, contacts = []
 
     if (['image', 'document', 'audio', 'sticker', 'video'].includes(messageType)) {
         return mapMediaMessage(message, content);
+    }
+
+    if (messageType === 'contacts') {
+        return mapContactsMessage(message, content);
+    }
+
+    if (messageType === 'order') {
+        return mapOrderMessage(message, content);
     }
 
     if (messageType === 'reaction') {

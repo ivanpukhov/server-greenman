@@ -13,6 +13,7 @@ const OrderDraftRequest = require('../models/orders/OrderDraftRequest');
 const Expense = require('../models/orders/Expense');
 const Order = require('../models/orders/Order');
 const User = require('../models/orders/User');
+const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
@@ -151,6 +152,30 @@ const pushWebhookEvent = (content) => {
 const getWebhookEvents = (limit = 15) => {
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 15));
     return webhookEvents.slice(-safeLimit).reverse();
+};
+
+const extractMessageTextForProcessing = (content) => String(
+    content?.messageData?.extendedTextMessageData?.text ||
+    content?.messageData?.textMessageData?.textMessage ||
+    content?.messageData?.fileMessageData?.caption ||
+    content?.messageData?.videoMessage?.caption ||
+    ''
+).trim();
+
+const isChatwootEchoedMessage = async (messageId) => {
+    const safeMessageId = String(messageId || '').trim();
+    if (!safeMessageId) {
+        return false;
+    }
+
+    const sync = await ChatwootMessageSync.findOne({
+        where: {
+            provider: 'chatwoot',
+            chatwootMessageId: safeMessageId
+        }
+    });
+
+    return Boolean(sync);
 };
 
 const findFirstValueByKey = (source, targetKey) => {
@@ -3251,16 +3276,19 @@ const processIncomingMessageWebhook = async (content) => {
     }
 
     const isOutgoingWebhook = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const messageId = String(content?.idMessage || '').trim() || null;
 
-    const textMessage =
-        content?.messageData?.extendedTextMessageData?.text ||
-        content?.messageData?.textMessageData?.textMessage;
+    if (isOutgoingWebhook && messageId && await isChatwootEchoedMessage(messageId)) {
+        console.log(`[WhatsApp webhook] Skip parser for Chatwoot echo message ${messageId}.`);
+        return;
+    }
+
+    const textMessage = extractMessageTextForProcessing(content);
     const recipientChatId = String(
         isOutgoingWebhook
             ? (content?.recipientData?.chatId || content?.senderData?.chatId || '')
             : (content?.senderData?.chatId || content?.recipientData?.chatId || '')
     ).trim();
-    const messageId = String(content?.idMessage || '').trim() || null;
 
     if (!textMessage || !recipientChatId) {
         return;
@@ -3439,6 +3467,14 @@ const processIncomingMessageWebhook = async (content) => {
 };
 
 const processIncomingVideoMessageWebhook = async (content) => {
+    const webhookType = String(content.typeWebhook || '').trim();
+    const isOutgoingWebhook = webhookType === 'outgoingMessageReceived' || webhookType === 'outgoingAPIMessageReceived';
+    const messageId = String(content?.idMessage || '').trim() || null;
+    if (isOutgoingWebhook && messageId && await isChatwootEchoedMessage(messageId)) {
+        console.log(`[WhatsApp webhook][video] Skip Chatwoot echo message ${messageId}.`);
+        return;
+    }
+
     const videoData = content?.messageData?.videoMessage || null;
     const fileData = content?.messageData?.fileMessageData || null;
     const downloadUrl = String(videoData?.downloadUrl || fileData?.downloadUrl || '').trim();
@@ -3550,6 +3586,8 @@ router.post('/', async (req, res) => {
 
 module.exports = router;
 module.exports.processWebhookContent = processWebhookContent;
+module.exports.processIncomingMessageWebhook = processIncomingMessageWebhook;
+module.exports.processIncomingVideoMessageWebhook = processIncomingVideoMessageWebhook;
 module.exports.retryKazpostRequestProcessing = retryKazpostRequestProcessing;
 module.exports.retryOrderDraftRequestProcessing = retryOrderDraftRequestProcessing;
 module.exports.getWebhookEvents = getWebhookEvents;

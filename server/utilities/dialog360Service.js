@@ -62,15 +62,27 @@ const normalizeMediaType = ({ mimeType, fileName, urlFile }) => {
         return 'video';
     }
 
-    if (safeMimeType.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+    if (safeMimeType.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
         return 'image';
     }
 
-    if (safeMimeType.startsWith('audio/') || ['.aac', '.amr', '.mp3', '.m4a', '.ogg'].includes(ext)) {
+    if (safeMimeType.startsWith('audio/') || ['.aac', '.amr', '.mp3', '.m4a', '.ogg', '.oga', '.opus', '.wav'].includes(ext)) {
         return 'audio';
     }
 
     return 'document';
+};
+
+const supportsCaptionForMediaType = (type) => ['image', 'video', 'document'].includes(String(type || '').trim());
+
+const isVoiceMedia = ({ mimeType, fileName, urlFile, voice = false }) => {
+    if (voice === true) {
+        return true;
+    }
+
+    const safeMimeType = String(mimeType || '').trim().toLowerCase();
+    const ext = path.extname(String(fileName || urlFile || '').trim()).toLowerCase();
+    return safeMimeType === 'audio/ogg' || safeMimeType === 'audio/opus' || ['.ogg', '.oga', '.opus'].includes(ext);
 };
 
 const buildProviderResponse = (data) => ({
@@ -243,7 +255,7 @@ const sendMediaByObject = async ({ chatId, type, mediaObject, context = null }) 
     return postJson('messages', payload, { timeout: 120000 });
 };
 
-const sendFileByUrl = async ({ chatId, urlFile, fileName, mimeType, caption = '', quotedMessageId = null }) => {
+const sendFileByUrl = async ({ chatId, urlFile, fileName, mimeType, caption = '', quotedMessageId = null, voice = false }) => {
     const safeUrl = String(urlFile || '').trim();
     if (!safeUrl) {
         return null;
@@ -265,6 +277,8 @@ const sendFileByUrl = async ({ chatId, urlFile, fileName, mimeType, caption = ''
         if (safeCaption) {
             mediaObject.caption = safeCaption;
         }
+    } else if (type === 'audio' && isVoiceMedia({ mimeType, fileName: safeFileName, urlFile: safeUrl, voice })) {
+        mediaObject.voice = true;
     }
 
     return sendMediaByObject({
@@ -300,7 +314,7 @@ const uploadMedia = async ({ fileBuffer, fileName, mimeType }) => {
     return response.data || null;
 };
 
-const sendFileByUpload = async ({ chatId, fileBuffer, fileName, mimeType, caption = '' }) => {
+const sendFileByUpload = async ({ chatId, fileBuffer, fileName, mimeType, caption = '', quotedMessageId = null, voice = false }) => {
     const uploadResponse = await uploadMedia({
         fileBuffer,
         fileName,
@@ -328,12 +342,19 @@ const sendFileByUpload = async ({ chatId, fileBuffer, fileName, mimeType, captio
         if (safeCaption) {
             mediaObject.caption = safeCaption;
         }
+    } else if (type === 'audio' && isVoiceMedia({ mimeType, fileName: safeFileName, voice })) {
+        mediaObject.voice = true;
     }
 
     return sendMediaByObject({
         chatId,
         type,
-        mediaObject
+        mediaObject,
+        context: quotedMessageId
+            ? {
+                message_id: String(quotedMessageId).trim()
+            }
+            : null
     });
 };
 
@@ -377,6 +398,9 @@ module.exports = {
     D360_API_KEY,
     normalizePhoneToWaId,
     normalizePhoneToChatId,
+    normalizeMediaType,
+    supportsCaptionForMediaType,
+    isVoiceMedia,
     normalizeDownloadUrl,
     sendMessage,
     sendTemplate,

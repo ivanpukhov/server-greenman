@@ -1,4 +1,5 @@
 const axios = require('axios');
+const FormData = require('form-data');
 const User = require('../models/orders/User');
 const ChatwootMessageSync = require('../models/orders/ChatwootMessageSync');
 const { normalizePhoneNumber } = require('./paymentLinkUtils');
@@ -40,11 +41,130 @@ const toSafeInteger = (value) => {
     return Number.isFinite(parsed) ? parsed : null;
 };
 
+const getFileExtensionFromMime = (mimeType) => {
+    const safeMimeType = String(mimeType || '').trim().toLowerCase();
+
+    if (safeMimeType === 'application/pdf') {
+        return '.pdf';
+    }
+
+    if (safeMimeType.startsWith('image/')) {
+        return safeMimeType.endsWith('png')
+            ? '.png'
+            : safeMimeType.endsWith('webp')
+                ? '.webp'
+                : safeMimeType.endsWith('gif')
+                    ? '.gif'
+                    : '.jpg';
+    }
+
+    if (safeMimeType.startsWith('video/')) {
+        return '.mp4';
+    }
+
+    if (safeMimeType.startsWith('audio/')) {
+        return safeMimeType.includes('mpeg')
+            ? '.mp3'
+            : safeMimeType.includes('wav')
+                ? '.wav'
+                : '.ogg';
+    }
+
+    return '';
+};
+
+const buildAttachmentFileName = ({ fileName, mimeType, mediaType }) => {
+    const normalizedFileName = String(fileName || '').trim();
+    if (normalizedFileName) {
+        return normalizedFileName;
+    }
+
+    const extension = getFileExtensionFromMime(mimeType);
+    return `${String(mediaType || 'file').trim() || 'file'}-${Date.now()}${extension}`;
+};
+
 const getTextFromContent = (content) => (
     content?.messageData?.extendedTextMessageData?.text ||
     content?.messageData?.textMessageData?.textMessage ||
     ''
 );
+
+const buildContactsSummaryText = (contacts) => {
+    const safeContacts = Array.isArray(contacts) ? contacts : [];
+    if (safeContacts.length === 0) {
+        return '[Контакт]';
+    }
+
+    const lines = ['[Контакты]'];
+    for (const contact of safeContacts.slice(0, 5)) {
+        const formattedName = String(contact?.name?.formatted_name || '').trim();
+        const phone = String(contact?.phones?.[0]?.phone || contact?.phones?.[0]?.wa_id || '').trim();
+        const row = [formattedName, phone].filter(Boolean).join(' - ');
+        if (row) {
+            lines.push(row);
+        }
+    }
+
+    return lines.join('\n');
+};
+
+const buildOrderSummaryText = (orderMessage) => {
+    const order = orderMessage && typeof orderMessage === 'object' ? orderMessage : {};
+    const catalogId = String(order.catalog_id || '').trim();
+    const text = String(order.text || '').trim();
+    const productCount = Array.isArray(order.product_items) ? order.product_items.length : 0;
+    const lines = ['[Заказ из каталога]'];
+
+    if (catalogId) {
+        lines.push(`Каталог: ${catalogId}`);
+    }
+    if (productCount > 0) {
+        lines.push(`Товаров: ${productCount}`);
+    }
+    if (text) {
+        lines.push(`Комментарий: ${text}`);
+    }
+
+    return lines.join('\n');
+};
+
+const extractInboundMediaAttachments = (content) => {
+    const candidates = [
+        content?.messageData?.videoMessage
+            ? {
+                ...content.messageData.videoMessage,
+                mediaType: String(content?.messageData?.videoMessage?.mediaType || 'video').trim() || 'video'
+            }
+            : null,
+        content?.messageData?.fileMessageData || null
+    ].filter(Boolean);
+
+    return candidates
+        .map((item) => {
+            const downloadUrl = String(item?.downloadUrl || '').trim();
+            const mimeType = String(item?.mimeType || '').trim();
+            const mediaType = String(item?.mediaType || '').trim() || 'document';
+            const fileName = buildAttachmentFileName({
+                fileName: item?.fileName,
+                mimeType,
+                mediaType
+            });
+
+            if (!downloadUrl) {
+                return null;
+            }
+
+            return {
+                url: downloadUrl,
+                mimeType,
+                fileName,
+                caption: String(item?.caption || '').trim(),
+                mediaType,
+                voice: Boolean(item?.voice)
+            };
+        })
+        .filter(Boolean);
+};
 
 const buildInboundMessageText = (content) => {
     const textMessage = String(getTextFromContent(content) || '').trim();
@@ -68,42 +188,15 @@ const buildInboundMessageText = (content) => {
 
     const fileMessage = content?.messageData?.fileMessageData || null;
     if (fileMessage) {
-        const lines = ['[Файл]'];
-        const fileName = String(fileMessage.fileName || '').trim();
+        const mediaType = String(fileMessage.mediaType || '').trim();
         const caption = String(fileMessage.caption || '').trim();
-        const downloadUrl = String(fileMessage.downloadUrl || '').trim();
-
-        if (fileName) {
-            lines.push(`Имя файла: ${fileName}`);
-        }
-        if (caption) {
-            lines.push(`Подпись: ${caption}`);
-        }
-        if (downloadUrl) {
-            lines.push(`Ссылка: ${downloadUrl}`);
-        }
-
-        return lines.join('\n');
+        return caption || `[${mediaType || 'Файл'}]`;
     }
 
     const videoMessage = content?.messageData?.videoMessage || null;
     if (videoMessage) {
-        const lines = ['[Видео]'];
-        const fileName = String(videoMessage.fileName || '').trim();
         const caption = String(videoMessage.caption || '').trim();
-        const downloadUrl = String(videoMessage.downloadUrl || '').trim();
-
-        if (fileName) {
-            lines.push(`Имя файла: ${fileName}`);
-        }
-        if (caption) {
-            lines.push(`Подпись: ${caption}`);
-        }
-        if (downloadUrl) {
-            lines.push(`Ссылка: ${downloadUrl}`);
-        }
-
-        return lines.join('\n');
+        return caption || '[Видео]';
     }
 
     const locationMessage = content?.messageData?.locationMessage || null;
@@ -131,6 +224,16 @@ const buildInboundMessageText = (content) => {
     if (reactionMessage) {
         const emoji = String(reactionMessage.emoji || '').trim();
         return emoji ? `[Реакция] ${emoji}` : '[Реакция]';
+    }
+
+    const contactMessage = content?.messageData?.contactMessage || null;
+    if (contactMessage) {
+        return buildContactsSummaryText(contactMessage.contacts);
+    }
+
+    const orderMessage = content?.messageData?.orderMessage || null;
+    if (orderMessage) {
+        return buildOrderSummaryText(orderMessage);
     }
 
     const unsupportedType = String(content?.messageData?.unsupportedMessage?.type || '').trim();
@@ -219,18 +322,55 @@ const createConversation = async (contactIdentifier, customAttributes = {}) => {
     return response.data || {};
 };
 
-const createMessage = async ({ contactIdentifier, conversationId, content, echoId }) => {
-    const response = await axios.post(
-        buildApiUrl(`/contacts/${encodeURIComponent(contactIdentifier)}/conversations/${conversationId}/messages`),
-        {
-            content,
-            echo_id: echoId
-        },
-        {
-            headers: {
-                'Content-Type': 'application/json'
+const buildConversationMessagesUrl = ({ contactIdentifier, conversationId }) => (
+    buildApiUrl(`/contacts/${encodeURIComponent(contactIdentifier)}/conversations/${conversationId}/messages`)
+);
+
+const createMessage = async ({ contactIdentifier, conversationId, content, echoId, attachments = [] }) => {
+    const safeAttachments = Array.isArray(attachments) ? attachments.filter(Boolean) : [];
+    const url = buildConversationMessagesUrl({ contactIdentifier, conversationId });
+
+    if (safeAttachments.length === 0) {
+        const response = await axios.post(
+            url,
+            {
+                content,
+                echo_id: echoId
             },
-            timeout: REQUEST_TIMEOUT_MS
+            {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: REQUEST_TIMEOUT_MS
+            }
+        );
+
+        return response.data || {};
+    }
+
+    const form = new FormData();
+    const safeContent = String(content || '').trim();
+    if (safeContent) {
+        form.append('content', safeContent);
+    }
+    if (echoId) {
+        form.append('echo_id', String(echoId).trim());
+    }
+
+    for (const attachment of safeAttachments) {
+        form.append('attachments[]', attachment.buffer, {
+            filename: String(attachment.fileName || `attachment-${Date.now()}`).trim(),
+            contentType: String(attachment.mimeType || 'application/octet-stream').trim()
+        });
+    }
+
+    const response = await axios.post(
+        url,
+        form,
+        {
+            headers: form.getHeaders(),
+            timeout: Math.max(REQUEST_TIMEOUT_MS, 120000),
+            maxBodyLength: Infinity
         }
     );
 
@@ -342,6 +482,39 @@ const findOrCreateCustomerUser = async ({ customerPhone }) => {
     return user;
 };
 
+const downloadAttachment = async (attachment) => {
+    const url = String(attachment?.url || '').trim();
+    if (!url) {
+        return null;
+    }
+
+    const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 120000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+    });
+
+    const buffer = Buffer.from(response.data || []);
+    if (buffer.length === 0) {
+        return null;
+    }
+
+    const responseMimeType = String(response.headers?.['content-type'] || '').trim();
+    const mimeType = String(attachment?.mimeType || responseMimeType || 'application/octet-stream').trim();
+    const fileName = buildAttachmentFileName({
+        fileName: attachment?.fileName,
+        mimeType,
+        mediaType: attachment?.mediaType
+    });
+
+    return {
+        buffer,
+        mimeType,
+        fileName
+    };
+};
+
 const syncIncomingMessage = async (content) => {
     if (!isConfigured()) {
         return { skipped: true, reason: 'chatwoot_not_configured' };
@@ -381,7 +554,8 @@ const syncIncomingMessage = async (content) => {
     }
 
     const messageText = buildInboundMessageText(content);
-    if (!messageText) {
+    const attachmentDescriptors = extractInboundMediaAttachments(content);
+    if (!messageText && attachmentDescriptors.length === 0) {
         return { skipped: true, reason: 'empty_message' };
     }
 
@@ -396,11 +570,16 @@ const syncIncomingMessage = async (content) => {
 
     let createdMessage;
     try {
+        const attachments = await Promise.all(
+            attachmentDescriptors.map((attachment) => downloadAttachment(attachment))
+        );
+
         createdMessage = await createMessage({
             contactIdentifier: chatwootState.contactIdentifier,
             conversationId: chatwootState.conversationId,
             content: messageText,
-            echoId: providerMessageId || `d360-${Date.now()}`
+            echoId: providerMessageId || `d360-${Date.now()}`,
+            attachments
         });
     } catch (error) {
         if (error.response?.status !== 404) {
@@ -429,11 +608,16 @@ const syncIncomingMessage = async (content) => {
             chatwootConversationId: nextConversationId
         });
 
+        const attachments = await Promise.all(
+            attachmentDescriptors.map((attachment) => downloadAttachment(attachment))
+        );
+
         createdMessage = await createMessage({
             contactIdentifier: nextContactIdentifier,
             conversationId: nextConversationId,
             content: messageText,
-            echoId: providerMessageId || `d360-${Date.now()}`
+            echoId: providerMessageId || `d360-${Date.now()}`,
+            attachments
         });
         chatwootState.contactIdentifier = nextContactIdentifier;
         chatwootState.conversationId = nextConversationId;
