@@ -39,7 +39,7 @@ const { Op } = Sequelize;
 const PDF_PROOF_DEBUG_PHONE = '77073670497';
 
 const DEFAULT_CAPTION =
-    'Посылочка идет на отправку. ‼️ Видео обязательно к просмотру ‼️ Обязательно сверьте свой заказ с содержимым коробки';
+    'Посылка собрана. Видео обязательно к просмотру. Пожалуйста, сверьте свой заказ с содержимым коробки.';
 const ORDER_DRAFT_SOURCE_PREFIX = '__ORDER_DRAFT__';
 const ORDER_DRAFT_TTL_MS = 1000 * 60 * 60 * 6;
 const PAYMENT_LINK_DUPLICATE_WINDOW_MS = 1000 * 60 * 3;

@@ -125,6 +125,19 @@ const pickAttachmentUrl = (attachment) => {
         .find(Boolean) || '';
 };
 
+const pickAttachmentUrlPathName = (attachment) => {
+    const url = pickAttachmentUrl(attachment);
+    if (!url) {
+        return '';
+    }
+
+    try {
+        return new URL(url).pathname || '';
+    } catch (_error) {
+        return '';
+    }
+};
+
 const pickAttachmentFileName = (attachment, index) => {
     const candidate = String(
         attachment?.file_name ||
@@ -138,14 +151,30 @@ const pickAttachmentFileName = (attachment, index) => {
     }
 
     const extension = String(attachment?.extension || '').trim().replace(/^\./, '');
-    return extension ? `chatwoot-${index + 1}.${extension}` : `chatwoot-${index + 1}`;
+    if (extension) {
+        return `chatwoot-${index + 1}.${extension}`;
+    }
+
+    const urlPathName = pickAttachmentUrlPathName(attachment);
+    const urlTail = String(urlPathName || '').split('/').pop() || '';
+    if (urlTail && urlTail.includes('.')) {
+        return urlTail;
+    }
+
+    return `chatwoot-${index + 1}`;
 };
 
-const inferMimeTypeFromName = (fileName, fallbackGroup = '') => {
-    const normalizedName = String(fileName || '').trim().toLowerCase();
-    const extension = normalizedName.includes('.')
-        ? normalizedName.split('.').pop()
-        : '';
+const inferMimeTypeFromCandidates = (candidates, fallbackGroup = '') => {
+    const extension = (Array.isArray(candidates) ? candidates : [])
+        .map((value) => String(value || '').trim().toLowerCase())
+        .filter(Boolean)
+        .map((value) => {
+            if (!value.includes('.')) {
+                return '';
+            }
+            return value.split('.').pop() || '';
+        })
+        .find(Boolean);
 
     if (extension === 'aac') {
         return 'audio/aac';
@@ -197,31 +226,42 @@ const inferMimeTypeFromName = (fileName, fallbackGroup = '') => {
     return '';
 };
 
-const normalizeAttachmentMimeType = (rawMimeType, fileName) => {
+const normalizeAttachmentMimeType = (rawMimeType, fileName, attachmentUrl = '') => {
     const normalizedMimeType = String(rawMimeType || '').trim().toLowerCase();
+    const inferredMimeType = inferMimeTypeFromCandidates([fileName, attachmentUrl]);
+
     if (!normalizedMimeType) {
-        return inferMimeTypeFromName(fileName);
+        return inferredMimeType;
     }
 
     if (normalizedMimeType === 'audio') {
-        return inferMimeTypeFromName(fileName, 'audio');
+        return inferMimeTypeFromCandidates([fileName, attachmentUrl], 'audio');
     }
     if (normalizedMimeType === 'image') {
-        return inferMimeTypeFromName(fileName, 'image');
+        return inferMimeTypeFromCandidates([fileName, attachmentUrl], 'image');
     }
     if (normalizedMimeType === 'video') {
-        return inferMimeTypeFromName(fileName, 'video');
+        return inferMimeTypeFromCandidates([fileName, attachmentUrl], 'video');
+    }
+
+    if (inferredMimeType && inferredMimeType !== normalizedMimeType) {
+        const normalizedGroup = normalizedMimeType.split('/')[0];
+        const inferredGroup = inferredMimeType.split('/')[0];
+        if (normalizedGroup && normalizedGroup === inferredGroup) {
+            return inferredMimeType;
+        }
     }
 
     return normalizedMimeType;
 };
 
-const pickAttachmentMimeType = (attachment, fileName) => normalizeAttachmentMimeType(
+const pickAttachmentMimeType = (attachment, fileName, attachmentUrl) => normalizeAttachmentMimeType(
     attachment?.file_type ||
     attachment?.content_type ||
     attachment?.mime_type ||
     '',
-    fileName
+    fileName,
+    attachmentUrl
 );
 
 const extractAttachments = (payload) => {
@@ -232,11 +272,12 @@ const extractAttachments = (payload) => {
 
     return [...directAttachments, ...singleAttachment]
         .map((attachment, index) => {
+            const attachmentUrl = pickAttachmentUrl(attachment);
             const fileName = pickAttachmentFileName(attachment, index);
             return {
-                url: pickAttachmentUrl(attachment),
+                url: attachmentUrl,
                 fileName,
-                mimeType: pickAttachmentMimeType(attachment, fileName)
+                mimeType: pickAttachmentMimeType(attachment, fileName, attachmentUrl)
             };
         })
         .filter((attachment) => attachment.url);

@@ -273,6 +273,84 @@ const isAttachmentVoice = (attachment) => dialog360Service.isVoiceMedia({
     urlFile: attachment?.url
 });
 
+const inferMimeTypeFromPathValue = (value) => {
+    const safeValue = String(value || '').trim().toLowerCase();
+    if (!safeValue.includes('.')) {
+        return '';
+    }
+
+    const extension = safeValue.split('.').pop() || '';
+    if (extension === 'aac') {
+        return 'audio/aac';
+    }
+    if (extension === 'amr') {
+        return 'audio/amr';
+    }
+    if (extension === 'mp3') {
+        return 'audio/mpeg';
+    }
+    if (extension === 'm4a') {
+        return 'audio/mp4';
+    }
+    if (extension === 'ogg' || extension === 'oga') {
+        return 'audio/ogg';
+    }
+    if (extension === 'opus') {
+        return 'audio/opus';
+    }
+    if (extension === 'jpg' || extension === 'jpeg') {
+        return 'image/jpeg';
+    }
+    if (extension === 'png') {
+        return 'image/png';
+    }
+    if (extension === 'webp') {
+        return 'image/webp';
+    }
+    if (extension === 'mp4') {
+        return 'video/mp4';
+    }
+    if (extension === '3gp' || extension === '3gpp') {
+        return 'video/3gpp';
+    }
+    if (extension === 'pdf') {
+        return 'application/pdf';
+    }
+    if (extension === 'txt') {
+        return 'text/plain';
+    }
+
+    return '';
+};
+
+const resolveAttachmentMimeType = (attachment, responseMimeType = '') => {
+    const rawMimeType = String(attachment?.mimeType || '').trim().toLowerCase();
+    const normalizedResponseMimeType = String(responseMimeType || '').trim().toLowerCase();
+    const inferredMimeType =
+        inferMimeTypeFromPathValue(attachment?.fileName) ||
+        inferMimeTypeFromPathValue(attachment?.url);
+
+    if (inferredMimeType) {
+        const inferredGroup = inferredMimeType.split('/')[0];
+        const rawGroup = rawMimeType.split('/')[0];
+        const responseGroup = normalizedResponseMimeType.split('/')[0];
+
+        if (!rawMimeType || rawMimeType === 'audio' || rawMimeType === 'image' || rawMimeType === 'video') {
+            return inferredMimeType;
+        }
+
+        if (rawGroup && rawGroup === inferredGroup && rawMimeType !== inferredMimeType) {
+            return inferredMimeType;
+        }
+
+        if (normalizedResponseMimeType && responseGroup === inferredGroup && normalizedResponseMimeType !== inferredMimeType) {
+            return inferredMimeType;
+        }
+    }
+
+    return normalizedResponseMimeType || rawMimeType || 'application/octet-stream';
+};
+
 const shouldSendTextSeparately = ({ attachments, textContent }) => {
     const safeText = String(textContent || '').trim();
     const safeAttachments = Array.isArray(attachments) ? attachments.filter(Boolean) : [];
@@ -309,7 +387,14 @@ const downloadAttachmentBuffer = async (attachment) => {
     });
 
     const buffer = Buffer.from(response.data || []);
-    return buffer.length > 0 ? buffer : null;
+    if (buffer.length === 0) {
+        return null;
+    }
+
+    return {
+        buffer,
+        mimeType: String(response.headers?.['content-type'] || '').trim()
+    };
 };
 
 const sendAttachmentsDirect = async ({ chatId, attachments, textContent }) => {
@@ -335,13 +420,14 @@ const sendAttachmentsDirect = async ({ chatId, attachments, textContent }) => {
     }
 
     for (const [index, attachment] of safeAttachments.entries()) {
-        const fileBuffer = await downloadAttachmentBuffer(attachment);
-        if (!fileBuffer) {
+        const downloadedAttachment = await downloadAttachmentBuffer(attachment);
+        if (!downloadedAttachment?.buffer) {
             continue;
         }
+        const effectiveMimeType = resolveAttachmentMimeType(attachment, downloadedAttachment.mimeType);
 
         const mediaType = dialog360Service.normalizeMediaType({
-            mimeType: attachment?.mimeType,
+            mimeType: effectiveMimeType,
             fileName: attachment?.fileName,
             urlFile: attachment?.url
         });
@@ -349,11 +435,16 @@ const sendAttachmentsDirect = async ({ chatId, attachments, textContent }) => {
 
         const response = await dialog360Service.sendFileByUpload({
             chatId: normalizedChatId,
-            fileBuffer,
+            fileBuffer: downloadedAttachment.buffer,
             fileName: attachment?.fileName,
-            mimeType: attachment?.mimeType,
+            mimeType: effectiveMimeType,
             caption: useCaption ? String(textContent || '').trim() : '',
-            voice: isAttachmentVoice(attachment)
+            voice: dialog360Service.isVoiceMedia({
+                mimeType: effectiveMimeType,
+                fileName: attachment?.fileName,
+                urlFile: attachment?.url,
+                voice: isAttachmentVoice(attachment)
+            })
         });
 
         if (response) {
