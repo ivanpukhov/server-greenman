@@ -16,6 +16,7 @@ import {
     useRefresh,
     TextField,
     TextInput,
+    TopToolbar,
     required,
     useNotify
 } from 'react-admin';
@@ -186,6 +187,25 @@ const calculateDeliveryCostFromProducts = (products, deliveryMethod) => {
 };
 
 const formatMoney = (value) => `${Math.round(Number(value) || 0)} ₸`;
+const fetchAdminJson = async (path, options = {}) => {
+    const token = adminAuthStorage.getToken();
+    const response = await fetch(apiUrl(path), {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            ...(options.headers || {})
+        }
+    });
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(body?.message || 'Не удалось выполнить запрос');
+    }
+
+    return body;
+};
+
 const formatDateTime = (value) => {
     if (!value) {
         return '—';
@@ -202,6 +222,38 @@ const getStatusLabel = (value) =>
     orderStatusChoices.find((item) => String(item.id) === String(value))?.name || String(value || '—');
 const getDeliveryMethodLabel = (value) =>
     deliveryMethodChoices.find((item) => String(item.id) === String(value))?.name || String(value || '—');
+
+const getTrackingQueueSeverity = (status) => {
+    if (status === 'failed') {
+        return 'error';
+    }
+
+    if (status === 'completed') {
+        return 'success';
+    }
+
+    if (status === 'running') {
+        return 'info';
+    }
+
+    return 'warning';
+};
+
+const getTrackingQueueLabel = (status) => {
+    if (status === 'running') {
+        return 'Очередь выполняется';
+    }
+
+    if (status === 'completed') {
+        return 'Очередь завершена';
+    }
+
+    if (status === 'failed') {
+        return 'Очередь завершилась с ошибкой';
+    }
+
+    return 'Очередь не запущена';
+};
 
 const CODE39_PATTERNS = {
     '0': 'nnnwwnwnn',
@@ -1126,29 +1178,162 @@ const parseOrderCreatePrefill = (search) => {
 export const OrderList = () => {
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
+    const OrderTrackingQueuePanel = () => {
+        const notify = useNotify();
+        const refresh = useRefresh();
+        const [status, setStatus] = useState(null);
+        const [loadingStatus, setLoadingStatus] = useState(true);
+        const [startingQueue, setStartingQueue] = useState(false);
+
+        const loadStatus = async (options = {}) => {
+            if (!options.silent) {
+                setLoadingStatus(true);
+            }
+
+            try {
+                const body = await fetchAdminJson('/admin/orders/tracking-queue/today');
+                setStatus(body?.data || null);
+            } catch (error) {
+                if (!options.silent) {
+                    notify(error.message || 'Не удалось получить статус очереди', { type: 'error' });
+                }
+            } finally {
+                if (!options.silent) {
+                    setLoadingStatus(false);
+                }
+            }
+        };
+
+        useEffect(() => {
+            loadStatus();
+        }, []);
+
+        useEffect(() => {
+            const pollMs = status?.status === 'running' ? 5000 : 20000;
+            const timerId = window.setInterval(() => {
+                loadStatus({ silent: true });
+            }, pollMs);
+
+            return () => window.clearInterval(timerId);
+        }, [status?.status]);
+
+        const handleStartQueue = async () => {
+            if (startingQueue || status?.status === 'running') {
+                return;
+            }
+
+            setStartingQueue(true);
+            try {
+                const body = await fetchAdminJson('/admin/orders/tracking-queue/today/start', {
+                    method: 'POST'
+                });
+                setStatus(body?.data || null);
+                notify(body?.message || 'Очередь запущена', { type: 'success' });
+                refresh();
+            } catch (error) {
+                notify(error.message || 'Не удалось запустить очередь', { type: 'error' });
+            } finally {
+                setStartingQueue(false);
+            }
+        };
+
+        const recentEvents = Array.isArray(status?.events) ? status.events.slice(-5).reverse() : [];
+        const isRunning = status?.status === 'running';
+
+        return (
+            <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)', mb: 1.5 }}>
+                <Stack spacing={1.2}>
+                    <Stack
+                        direction={{ xs: 'column', md: 'row' }}
+                        alignItems={{ md: 'center' }}
+                        justifyContent="space-between"
+                        spacing={1.2}
+                    >
+                        <Box>
+                            <Typography variant="subtitle1">Очередь треков за сегодня</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Очищает треки у оплаченных заказов Казпочты за сегодня и отправляет их в Telegram по одному.
+                            </Typography>
+                        </Box>
+                        <TopToolbar sx={{ p: 0, minHeight: 'auto', gap: 1, justifyContent: 'flex-start' }}>
+                            <Button
+                                variant="contained"
+                                onClick={handleStartQueue}
+                                disabled={startingQueue || isRunning}
+                            >
+                                Запустить очередь
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                onClick={() => loadStatus()}
+                                disabled={loadingStatus || startingQueue}
+                            >
+                                Обновить статус
+                            </Button>
+                        </TopToolbar>
+                    </Stack>
+
+                    <Alert severity={getTrackingQueueSeverity(status?.status)}>
+                        {getTrackingQueueLabel(status?.status)}
+                        {status?.error ? `: ${status.error}` : ''}
+                    </Alert>
+
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.4} flexWrap="wrap" useFlexGap>
+                        <Typography variant="body2">
+                            Всего заказов: {Number(status?.totalOrders || 0)}
+                        </Typography>
+                        <Typography variant="body2">
+                            Обработано: {Number(status?.processedOrders || 0)}
+                        </Typography>
+                        <Typography variant="body2">
+                            Текущий заказ: {status?.currentOrderId || '—'}
+                        </Typography>
+                        <Typography variant="body2">
+                            Попытка: {status?.currentAttempt || '—'}
+                        </Typography>
+                    </Stack>
+
+                    {recentEvents.length > 0 ? (
+                        <Stack spacing={0.5}>
+                            {recentEvents.map((event) => (
+                                <Typography key={`${event.at}-${event.message}`} variant="caption" color="text.secondary">
+                                    {formatDateTime(event.at)} • {event.message}
+                                </Typography>
+                            ))}
+                        </Stack>
+                    ) : null}
+                </Stack>
+            </Paper>
+        );
+    };
+
     const OrderListContent = () => {
         const listContext = useListContext();
         const rows = Array.isArray(listContext.data) ? listContext.data : [];
 
         if (!isSmall) {
             return (
-                <Datagrid rowClick="show" bulkActionButtons={false}>
-                    <TextField source="id" label="ID" />
-                    <TextField source="customerName" label="Клиент" />
-                    <TextField source="phoneNumber" label="Телефон" />
-                    <TextField source="city" label="Город" />
-                    <TextField source="paymentMethod" label="Оплата" />
-                    <TextField source="deliveryMethod" label="Доставка" />
-                    <TextField source="status" label="Статус" />
-                    <DateField source="createdAt" label="Дата" showTime locales="ru-RU" />
-                    <ShowButton label="Детали" />
-                    <DeleteButton label="Удалить" mutationMode="pessimistic" redirect={false} />
-                </Datagrid>
+                <Box>
+                    <OrderTrackingQueuePanel />
+                    <Datagrid rowClick="show" bulkActionButtons={false}>
+                        <TextField source="id" label="ID" />
+                        <TextField source="customerName" label="Клиент" />
+                        <TextField source="phoneNumber" label="Телефон" />
+                        <TextField source="city" label="Город" />
+                        <TextField source="paymentMethod" label="Оплата" />
+                        <TextField source="deliveryMethod" label="Доставка" />
+                        <TextField source="status" label="Статус" />
+                        <DateField source="createdAt" label="Дата" showTime locales="ru-RU" />
+                        <ShowButton label="Детали" />
+                        <DeleteButton label="Удалить" mutationMode="pessimistic" redirect={false} />
+                    </Datagrid>
+                </Box>
             );
         }
 
         return (
             <Stack spacing={1.2} sx={{ p: 1.2 }}>
+                <OrderTrackingQueuePanel />
                 {rows.map((record) => (
                     <Card key={record.id} variant="outlined" sx={{ borderRadius: 2 }}>
                         <CardActionArea href={`#/orders/${record.id}/show`}>

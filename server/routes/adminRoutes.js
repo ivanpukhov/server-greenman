@@ -21,6 +21,8 @@ router.put('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
 router.get('/orders', adminController.getOrders);
+router.get('/orders/tracking-queue/today', adminController.getTodayOrderTrackingQueueStatus);
+router.post('/orders/tracking-queue/today/start', adminController.startTodayOrderTrackingQueue);
 router.get('/orders/:id', adminController.getOrder);
 router.post('/orders', adminController.createOrder);
 router.put('/orders/:id', adminController.updateOrder);

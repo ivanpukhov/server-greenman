@@ -13,6 +13,7 @@ const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
 const sendNotification = require('../utilities/notificationService');
+const orderTrackingQueueService = require('../utilities/orderTrackingQueueService');
 const { sendOrderTrackingTemplate, sendAuthTemplate } = sendNotification;
 const { logError } = require('../utilities/errorLogger');
 const { getActiveAdmins, getAdminByPhone, normalizeAdminPhone, normalizeAdminIin } = require('../utilities/adminUsers');
@@ -538,6 +539,27 @@ const getOrderPeriodRange = (periodRaw) => {
     }
 
     return null;
+};
+
+const getTodayPaidKazpostOrders = async () => {
+    const periodRange = getOrderPeriodRange('today');
+    if (!periodRange) {
+        return [];
+    }
+
+    return Order.findAll({
+        where: {
+            createdAt: {
+                [Op.gte]: periodRange.start,
+                [Op.lte]: periodRange.end
+            },
+            status: {
+                [Op.in]: PAID_ORDER_STATUSES
+            },
+            deliveryMethod: 'kazpost'
+        },
+        order: [['createdAt', 'ASC']]
+    });
 };
 
 const safeAmount = (value) => {
@@ -1755,6 +1777,38 @@ const adminController = {
             return res.json({ data: mergedRowsWithAccounts, total: mergedRows.length });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось получить список заказов', error: error.message });
+        }
+    },
+
+    async getTodayOrderTrackingQueueStatus(_req, res) {
+        try {
+            return res.json({
+                data: orderTrackingQueueService.getQueueStatus()
+            });
+        } catch (error) {
+            return res.status(500).json({
+                message: 'Не удалось получить статус очереди треков',
+                error: error.message
+            });
+        }
+    },
+
+    async startTodayOrderTrackingQueue(_req, res) {
+        try {
+            const orders = await getTodayPaidKazpostOrders();
+            const status = await orderTrackingQueueService.startTodayQueue(orders);
+
+            return res.json({
+                data: status,
+                message: orders.length > 0
+                    ? `Очередь треков за сегодня запущена. Заказов: ${orders.length}`
+                    : 'За сегодня нет оплаченных заказов Казпочты'
+            });
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({
+                message: error.message || 'Не удалось запустить очередь треков',
+                error: error.message
+            });
         }
     },
 
