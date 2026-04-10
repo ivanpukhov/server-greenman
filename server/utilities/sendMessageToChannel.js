@@ -29,6 +29,7 @@ async function sendViaFallback(message) {
     );
 }
 
+
 async function sendMessageToChannel(order) {
     const message = buildTelegramOrderMessage(order);
 
