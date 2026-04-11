@@ -4,6 +4,7 @@ const sendMessageToChannel = require('./sendMessageToChannel');
 
 const { Op } = Sequelize;
 const POLL_INTERVAL_MS = 10000;
+const TRACKING_WAIT_TIMEOUT_MS = 15 * 60 * 1000;
 
 const state = {
     status: 'idle',
@@ -82,6 +83,8 @@ const findDuplicateOrderByTracking = async (trackingNumber, excludeOrderId) => {
 };
 
 const waitForUniqueTrackingNumber = async (orderId) => {
+    const startedAt = Date.now();
+
     while (true) {
         await sleep(POLL_INTERVAL_MS);
         const order = await Order.findByPk(orderId);
@@ -91,6 +94,16 @@ const waitForUniqueTrackingNumber = async (orderId) => {
 
         const trackingNumber = normalizeTrackingNumber(order.trackingNumber);
         if (!trackingNumber) {
+            if (Date.now() - startedAt >= TRACKING_WAIT_TIMEOUT_MS) {
+                pushEvent(`Заказ #${orderId}: трек не появился за 15 минут, отправляем повторно`);
+                return {
+                    ok: false,
+                    trackingNumber: '',
+                    duplicateOrderId: null,
+                    reason: 'timeout'
+                };
+            }
+
             continue;
         }
 
@@ -103,7 +116,8 @@ const waitForUniqueTrackingNumber = async (orderId) => {
             return {
                 ok: false,
                 trackingNumber,
-                duplicateOrderId: duplicateOrder.id
+                duplicateOrderId: duplicateOrder.id,
+                reason: 'duplicate'
             };
         }
 
@@ -143,7 +157,7 @@ const sendOrderForTracking = async (orderId) => {
         const trackingResult = await waitForUniqueTrackingNumber(orderId);
         if (!trackingResult.ok) {
             markItemStatus(orderId, {
-                status: 'duplicate_retry',
+                status: trackingResult.reason === 'timeout' ? 'timeout_retry' : 'duplicate_retry',
                 trackingNumber: '',
                 duplicateOrderId: trackingResult.duplicateOrderId
             });
