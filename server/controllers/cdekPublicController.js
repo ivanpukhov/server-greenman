@@ -51,8 +51,13 @@ const suggestCities = async (req, res) => {
         setCache(cacheKey, mapped);
         res.json(mapped);
     } catch (error) {
-        logError('cdekPublic.suggestCities', error, { query });
-        res.status(502).json({ error: 'Не удалось получить список городов СДЭК' });
+        const cdekDetail = error.response?.data?.message || error.response?.data?.error_description || error.response?.data?.error || null;
+        logError('cdekPublic.suggestCities', error, { query, cdekStatus: error.response?.status, cdekDetail });
+        res.status(502).json({
+            error: 'Не удалось получить список городов СДЭК',
+            detail: cdekDetail || error.message,
+            cdekStatus: error.response?.status
+        });
     }
 };
 

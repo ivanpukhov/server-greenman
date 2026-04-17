@@ -76,6 +76,7 @@ router.post('/orders-rf/:id/cdek/intake', cdekAdminController.createIntake);
 
 router.get('/settings/cdek', cdekSettingsController.getSettings);
 router.put('/settings/cdek', cdekSettingsController.updateSettings);
+router.post('/settings/cdek/test', cdekSettingsController.testConnection);
 
 router.get('/order-draft-requests', adminController.getOrderDraftRequests);
 router.post('/order-draft-requests/:id/retry', adminController.retryOrderDraftRequest);

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert, Box, Button, CircularProgress, Divider, FormControl,
-    FormHelperText, InputAdornment, InputLabel, MenuItem, OutlinedInput,
-    Paper, Select, Stack, TextField, Typography
+    Alert, Box, Button, Chip, CircularProgress, Collapse, Divider, FormControl,
+    FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography
 } from '@mui/material';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { apiUrl } from '../config/api';
 import { adminAuthStorage } from './authProvider';
 
@@ -36,6 +36,8 @@ const CdekSettingsPage = () => {
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [testResult, setTestResult] = useState(null);
+    const [testing, setTesting] = useState(false);
 
     const authFetch = useCallback(async (url, options = {}) => {
         const token = adminAuthStorage.getToken();
@@ -68,6 +70,23 @@ const CdekSettingsPage = () => {
         if (form.CDEK_CLIENT_SECRET === PLACEHOLDER) {
             setForm((prev) => ({ ...prev, CDEK_CLIENT_SECRET: '' }));
             setSecretEditing(true);
+        }
+    };
+
+    const handleTest = async () => {
+        setTesting(true);
+        setTestResult(null);
+        try {
+            const res = await fetch(apiUrl('/admin/settings/cdek/test'), {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${adminAuthStorage.getToken()}`, 'Content-Type': 'application/json' }
+            });
+            const body = await res.json().catch(() => ({}));
+            setTestResult({ ok: !!body.ok, error: body.error, steps: body.steps || [] });
+        } catch (e) {
+            setTestResult({ ok: false, error: e.message, steps: [] });
+        } finally {
+            setTesting(false);
         }
     };
 
@@ -208,16 +227,48 @@ const CdekSettingsPage = () => {
                 </Stack>
             </Paper>
 
-            <Button
-                variant="contained"
-                size="large"
-                startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveOutlinedIcon />}
-                onClick={handleSave}
-                disabled={saving}
-                sx={{ backgroundColor: '#00AB6D', '&:hover': { backgroundColor: '#009960' } }}
-            >
-                {saving ? 'Сохранение...' : 'Сохранить настройки'}
-            </Button>
+            <Stack direction="row" gap={2} alignItems="center" flexWrap="wrap">
+                <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveOutlinedIcon />}
+                    onClick={handleSave}
+                    disabled={saving || testing}
+                    sx={{ backgroundColor: '#00AB6D', '&:hover': { backgroundColor: '#009960' } }}
+                >
+                    {saving ? 'Сохранение...' : 'Сохранить настройки'}
+                </Button>
+                <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={testing ? <CircularProgress size={18} /> : <PlayCircleOutlineIcon />}
+                    onClick={handleTest}
+                    disabled={saving || testing}
+                >
+                    {testing ? 'Проверка...' : 'Тест подключения'}
+                </Button>
+            </Stack>
+
+            {testResult && (
+                <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} mb={1}>
+                        Результат теста: {testResult.ok
+                            ? <Chip label="OK" color="success" size="small" sx={{ ml: 1 }} />
+                            : <Chip label="Ошибка" color="error" size="small" sx={{ ml: 1 }} />}
+                    </Typography>
+                    {testResult.error && (
+                        <Alert severity="error" sx={{ mb: 1 }}>{testResult.error}</Alert>
+                    )}
+                    {(testResult.steps || []).map((s, i) => (
+                        <Box key={i} sx={{ mb: 1, pl: 1, borderLeft: '3px solid', borderColor: s.ok === false ? 'error.main' : s.ok === true ? 'success.main' : 'grey.400' }}>
+                            <Typography variant="caption" fontWeight={600}>{s.step}</Typography>
+                            <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                {JSON.stringify(s, null, 2)}
+                            </pre>
+                        </Box>
+                    ))}
+                </Paper>
+            )}
         </Box>
     );
 };
