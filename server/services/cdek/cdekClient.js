@@ -17,9 +17,10 @@ const createClient = (baseURL) => {
     instance.interceptors.response.use(
         (response) => response,
         async (error) => {
+            // Only retry on a real 401 HTTP response — never on timeouts or network errors
             const status = error.response?.status;
             const originalConfig = error.config || {};
-            if (status === 401 && !originalConfig._retriedAuth) {
+            if (status === 401 && error.response && !originalConfig._retriedAuth) {
                 invalidateToken();
                 originalConfig._retriedAuth = true;
                 originalConfig._forceRefresh = true;
