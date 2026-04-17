@@ -171,12 +171,22 @@ const pollOrderUntilRegistered = async (uuid, { timeoutMs = 20000, intervalMs = 
     return lastData;
 };
 
-const requestPrint = async (orderUuid, kind) => {
+const requestPrint = async ({ orderUuid, cdekNumber, orderNumber }, kind) => {
     const client = await getClient();
     const endpoint = kind === 'barcode' ? '/print/barcodes' : '/print/orders';
+    const orderRef = {};
+    if (cdekNumber) {
+        orderRef.cdek_number = String(cdekNumber);
+    } else if (orderNumber) {
+        orderRef.number = String(orderNumber);
+    } else if (orderUuid) {
+        orderRef.order_uuid = String(orderUuid);
+    } else {
+        throw new Error('orderUuid or cdekNumber is required');
+    }
     try {
         const response = await client.post(endpoint, {
-            orders: [{ order_uuid: orderUuid }],
+            orders: [orderRef],
             copies: 1,
             format: kind === 'barcode' ? 'A6' : undefined
         });
@@ -184,6 +194,8 @@ const requestPrint = async (orderUuid, kind) => {
     } catch (error) {
         logError('cdek.requestPrint', error, {
             orderUuid,
+            cdekNumber,
+            orderNumber,
             kind,
             status: error.response?.status,
             data: error.response?.data
@@ -213,10 +225,23 @@ const pollPrintReady = async (formUuid, kind, { timeoutMs = 60000, intervalMs = 
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
         const data = await getPrintForm(formUuid, kind);
-        const status = data?.entity?.statuses?.[0]?.code || data?.entity?.status;
+        const statuses = Array.isArray(data?.entity?.statuses)
+            ? data.entity.statuses.map((item) => item?.code).filter(Boolean)
+            : [];
+        const status = statuses[statuses.length - 1] || data?.entity?.status;
         const url = data?.entity?.url;
+        const requests = Array.isArray(data?.requests) ? data.requests : [];
+        const invalidRequest = requests.find((request) =>
+            request?.state === 'INVALID' || (Array.isArray(request?.errors) && request.errors.length > 0)
+        );
         if ((status === 'READY' || status === 'DONE') && url) {
             return { url, data };
+        }
+        if (invalidRequest) {
+            const reason = Array.isArray(invalidRequest.errors) && invalidRequest.errors.length > 0
+                ? invalidRequest.errors.map((item) => item?.message || item?.code).filter(Boolean).join('; ')
+                : invalidRequest.state;
+            throw new Error(`CDEK print form is invalid${reason ? `: ${reason}` : ''}`);
         }
         if (status === 'INVALID' || status === 'REMOVED') {
             throw new Error(`CDEK print form is ${status}`);
@@ -226,16 +251,20 @@ const pollPrintReady = async (formUuid, kind, { timeoutMs = 60000, intervalMs = 
     throw new Error('CDEK print form polling timed out');
 };
 
-const downloadPrintPdfStream = async (pdfUrl) => {
+const downloadPrintPdf = async (pdfUrl) => {
     const client = await getClient();
     try {
         const response = await client.get(pdfUrl, {
-            responseType: 'stream',
+            responseType: 'arraybuffer',
             baseURL: ''
         });
-        return response;
+        return {
+            data: Buffer.from(response.data),
+            headers: response.headers || {},
+            status: response.status
+        };
     } catch (error) {
-        logError('cdek.downloadPrintPdfStream', error, {
+        logError('cdek.downloadPrintPdf', error, {
             pdfUrl,
             status: error.response?.status
         });
@@ -281,7 +310,7 @@ module.exports = {
     requestPrint,
     getPrintForm,
     pollPrintReady,
-    downloadPrintPdfStream,
+    downloadPrintPdf,
     createIntake,
     subscribeWebhook
 };
