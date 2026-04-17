@@ -1,4 +1,4 @@
-const { KZT_TO_RUB_RATE, RF_MARKUP } = require('./pricing');
+const { kztToRub } = require('./pricing');
 
 const SPIRIT_REGEX = /\bспирт\w*/giu;
 
@@ -6,8 +6,6 @@ const stripSpirit = (name) => {
     if (!name) return '';
     return String(name).replace(SPIRIT_REGEX, '').replace(/\s+/g, ' ').trim();
 };
-
-const kztToRub = (kztPrice) => Math.round(Number(kztPrice || 0) * RF_MARKUP / KZT_TO_RUB_RATE);
 
 const truncate = (str, max) => (str.length > max ? str.slice(0, max) : str);
 

@@ -1,22 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Box, Paper, Stack, Text, Title } from '@mantine/core';
+import { Accordion, Box, Paper, Stack, Text, Title } from '@mantine/core';
 import { hasValidSiteSession } from '../../AuthContext.jsx';
 import PhoneAuth from './PhoneAuth.jsx';
 import CodeConfirm from './CodeConfirm.jsx';
-import { IconLeaf } from '../../icons';
+import { IconLeaf, IconShieldCheck } from '../../icons';
+
+const safeRedirect = (raw) => {
+    if (!raw) return '/profile';
+    if (!raw.startsWith('/') || raw.startsWith('//')) return '/profile';
+    return raw;
+};
 
 const Auth = () => {
     const { t } = useTranslation();
     const [step, setStep] = useState(1);
     const [phoneNumber, setPhoneNumber] = useState('');
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const redirectTo = safeRedirect(searchParams.get('redirect'));
 
     useEffect(() => {
-        if (hasValidSiteSession()) navigate('/profile');
-    }, [navigate]);
+        if (hasValidSiteSession()) navigate(redirectTo, { replace: true });
+    }, [navigate, redirectTo]);
 
     const handleCodeSent = (phone) => {
         setPhoneNumber(phone);
@@ -63,8 +71,35 @@ const Auth = () => {
                     {step === 1 ? (
                         <PhoneAuth onCodeSent={handleCodeSent} phoneNumber={phoneNumber} />
                     ) : (
-                        <CodeConfirm phoneNumber={phoneNumber} onPhoneNumberChange={() => setStep(1)} />
+                        <CodeConfirm
+                            phoneNumber={phoneNumber}
+                            onPhoneNumberChange={() => setStep(1)}
+                            redirectTo={redirectTo}
+                        />
                     )}
+
+                    <Accordion variant="separated" radius="md">
+                        <Accordion.Item value="why">
+                            <Accordion.Control
+                                icon={
+                                    <IconShieldCheck
+                                        size={16}
+                                        stroke={1.7}
+                                        color="var(--mantine-color-greenman-7)"
+                                    />
+                                }
+                            >
+                                <Text size="sm" fw={600}>
+                                    {t('auth.why.title')}
+                                </Text>
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                                <Text size="sm" c="dimmed">
+                                    {t('auth.why.body')}
+                                </Text>
+                            </Accordion.Panel>
+                        </Accordion.Item>
+                    </Accordion>
                 </Stack>
             </Paper>
         </Box>

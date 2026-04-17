@@ -3,6 +3,7 @@ const { buildCdekItems } = require('./itemsMapper');
 const { buildPackages } = require('./buildPackages');
 
 const DEFAULT_TARIFF_CODE = 482;
+const DEFAULT_PVZ_TARIFF_CODE = 483;
 const CONTRACT_TYPE = 1;
 
 const normalizePhoneE164 = (phone) => {
@@ -15,7 +16,11 @@ const normalizePhoneE164 = (phone) => {
 };
 
 const buildOrderPayload = async (order) => {
-    const tariffCode = Number(await getSetting('CDEK_TARIFF_CODE') || DEFAULT_TARIFF_CODE);
+    const isPvzDelivery = String(order.cdekDeliveryMode || 'door').trim().toLowerCase() === 'pvz';
+    const tariffCode = Number(
+        await getSetting(isPvzDelivery ? 'CDEK_TARIFF_CODE_PVZ' : 'CDEK_TARIFF_CODE')
+        || (isPvzDelivery ? DEFAULT_PVZ_TARIFF_CODE : DEFAULT_TARIFF_CODE)
+    );
     const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
     const senderAddress = await getSetting('CDEK_SENDER_ADDRESS');
     const senderName = await getSetting('CDEK_SENDER_NAME') || 'Green Man';
@@ -30,11 +35,11 @@ const buildOrderPayload = async (order) => {
     const orderNumber = `GM-${order.id}`;
     const packages = buildPackages({ orderNumber, items });
 
-    return {
+    const payload = {
         type: CONTRACT_TYPE,
         tariff_code: tariffCode,
         number: orderNumber,
-        comment: `Интернет-магазин Greenman, заказ #${order.id}`,
+        comment: `Интернет-магазин Greenman, заказ #${order.id}${isPvzDelivery ? ', выдача в ПВЗ' : ', доставка до двери'}`,
         sender: {
             name: senderName,
             company: senderCompany,
@@ -49,16 +54,27 @@ const buildOrderPayload = async (order) => {
             email: order.email || undefined,
             phones: [{ number: normalizePhoneE164(order.phoneNumber) }]
         },
-        to_location: {
-            code: Number(order.cdekCityCode),
-            address: order.cdekAddress
-        },
         packages
     };
+
+    if (isPvzDelivery) {
+        if (!order.cdekPvzCode) {
+            throw new Error('Для доставки в ПВЗ требуется cdekPvzCode');
+        }
+        payload.delivery_point = String(order.cdekPvzCode).trim();
+    } else {
+        payload.to_location = {
+            code: Number(order.cdekCityCode),
+            address: order.cdekAddress
+        };
+    }
+
+    return payload;
 };
 
 module.exports = {
     buildOrderPayload,
     normalizePhoneE164,
-    DEFAULT_TARIFF_CODE
+    DEFAULT_TARIFF_CODE,
+    DEFAULT_PVZ_TARIFF_CODE
 };

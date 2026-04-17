@@ -111,12 +111,160 @@ const productController = {
 
     getAllProducts: async (req, res) => {
         try {
-            const products = await Product.findAll({
-                include: [{model: ProductType, as: 'types'}]
+            const hasAnyQueryParam = Object.keys(req.query || {}).length > 0;
+
+            if (!hasAnyQueryParam) {
+                const products = await Product.findAll({
+                    include: [{ model: ProductType, as: 'types' }],
+                    order: [['id', 'ASC']],
+                });
+                return res.json(products);
+            }
+
+            const {
+                search,
+                diseases,
+                priceMin,
+                priceMax,
+                inStock,
+                sort = 'popular',
+                page = 1,
+                limit = 24,
+            } = req.query;
+
+            const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+            const parsedLimit = Math.min(
+                60,
+                Math.max(1, parseInt(limit, 10) || 24),
+            );
+
+            const where = {};
+            if (search && search.trim()) {
+                where.name = { [Op.like]: `%${search.trim()}%` };
+            }
+
+            const diseaseList = diseases
+                ? (Array.isArray(diseases)
+                      ? diseases
+                      : String(diseases).split(','))
+                      .map((d) => String(d).trim().toLowerCase())
+                      .filter(Boolean)
+                : [];
+
+            const pMin =
+                priceMin !== undefined && priceMin !== '' ? Number(priceMin) : null;
+            const pMax =
+                priceMax !== undefined && priceMax !== '' ? Number(priceMax) : null;
+            const requireInStock = String(inStock) === 'true';
+
+            const allMatching = await Product.findAll({
+                where,
+                include: [{ model: ProductType, as: 'types' }],
             });
-            res.json(products);
+
+            const plain = allMatching
+                .map((p) => p.toJSON())
+                .filter((p) => p.types && p.types.length > 0)
+                .filter((p) => {
+                    if (!diseaseList.length) return true;
+                    const pd = (p.diseases || []).map((d) =>
+                        String(d).toLowerCase(),
+                    );
+                    return diseaseList.some((d) => pd.includes(d));
+                })
+                .filter((p) => {
+                    const prices = p.types.map((t) => t.price);
+                    const min = Math.min(...prices);
+                    const max = Math.max(...prices);
+                    if (pMin !== null && max < pMin) return false;
+                    if (pMax !== null && min > pMax) return false;
+                    return true;
+                })
+                .filter((p) => {
+                    if (!requireInStock) return true;
+                    return p.types.some(
+                        (t) => t.stockQuantity === null || t.stockQuantity > 0,
+                    );
+                });
+
+            const sorted = [...plain].sort((a, b) => {
+                const aMin = Math.min(...a.types.map((t) => t.price));
+                const bMin = Math.min(...b.types.map((t) => t.price));
+                switch (sort) {
+                    case 'price_asc':
+                        return aMin - bMin;
+                    case 'price_desc':
+                        return bMin - aMin;
+                    case 'name':
+                        return a.name.localeCompare(b.name, 'ru');
+                    case 'new':
+                        return b.id - a.id;
+                    default:
+                        return a.id - b.id;
+                }
+            });
+
+            const total = sorted.length;
+            const offset = (parsedPage - 1) * parsedLimit;
+            const items = sorted.slice(offset, offset + parsedLimit);
+
+            res.json({
+                items,
+                total,
+                page: parsedPage,
+                limit: parsedLimit,
+                hasMore: offset + items.length < total,
+            });
         } catch (err) {
-            res.status(500).json({error: err.message});
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    getProductFacets: async (req, res) => {
+        try {
+            const products = await Product.findAll({
+                attributes: ['diseases'],
+                include: [
+                    {
+                        model: ProductType,
+                        as: 'types',
+                        attributes: ['price'],
+                    },
+                ],
+            });
+
+            const diseaseCounts = new Map();
+            let minPrice = Infinity;
+            let maxPrice = 0;
+
+            products.forEach((p) => {
+                const list = Array.isArray(p.diseases) ? p.diseases : [];
+                list.forEach((d) => {
+                    const key = String(d).trim();
+                    if (!key) return;
+                    diseaseCounts.set(key, (diseaseCounts.get(key) || 0) + 1);
+                });
+                (p.types || []).forEach((t) => {
+                    if (typeof t.price === 'number') {
+                        if (t.price < minPrice) minPrice = t.price;
+                        if (t.price > maxPrice) maxPrice = t.price;
+                    }
+                });
+            });
+
+            if (!isFinite(minPrice)) minPrice = 0;
+
+            const diseases = [...diseaseCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([name, count]) => ({ name, count }));
+
+            res.json({
+                diseases,
+                priceRange: { min: minPrice, max: maxPrice },
+                totalProducts: products.length,
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
         }
     },
 

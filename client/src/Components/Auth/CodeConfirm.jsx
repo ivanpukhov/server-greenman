@@ -13,7 +13,7 @@ const prettifyPhone = (p) => {
     return m ? `+7 (${m[1]}) ${m[2]}-${m[3]}-${m[4]}` : `+7${p || ''}`;
 };
 
-const CodeConfirm = ({ phoneNumber, onPhoneNumberChange }) => {
+const CodeConfirm = ({ phoneNumber, onPhoneNumberChange, redirectTo = '/profile' }) => {
     const { t } = useTranslation();
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ const CodeConfirm = ({ phoneNumber, onPhoneNumberChange }) => {
             });
             login(res.data.token);
             localStorage.setItem('userId', String(res.data.userId));
-            navigate('/profile');
+            navigate(redirectTo, { replace: true });
         } catch {
             setError(t('auth.code.wrong'));
         } finally {

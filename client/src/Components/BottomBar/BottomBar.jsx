@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Indicator, Transition } from '@mantine/core';
+import { Transition } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import {
     IconHome,
@@ -53,7 +53,10 @@ const BottomBar = () => {
     const location = useLocation();
 
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = cart.reduce((sum, item) => sum + item.type.price * item.quantity, 0);
+    const totalPrice = cart.reduce(
+        (sum, item) => sum + item.type.price * item.quantity,
+        0,
+    );
 
     const isCartPage = location.pathname === '/cart';
     const isAuthPage = location.pathname === '/auth';
@@ -69,9 +72,12 @@ const BottomBar = () => {
                 {(style) => (
                     <Link to="/cart" className={s.cartCta} style={style}>
                         <div className={s.cartCtaText}>
-                            <span className={s.cartCtaLabel}>{t('cart.actions.to_checkout')}</span>
+                            <span className={s.cartCtaLabel}>
+                                {t('cart.actions.to_checkout')}
+                            </span>
                             <span className={s.cartCtaMeta}>
-                                {totalItems} {t('common.pieces')} · {formatPrice(totalPrice)}
+                                {totalItems} {t('common.pieces')} ·{' '}
+                                {formatPrice(totalPrice)}
                             </span>
                         </div>
                         <IconArrowNarrowRight size={20} stroke={1.8} />
@@ -85,31 +91,35 @@ const BottomBar = () => {
                         key={tab.to}
                         to={tab.to}
                         end={tab.end}
-                        className={({ isActive }) => `${s.tab} ${isActive ? s.tabActive : ''}`}
+                        className={({ isActive }) =>
+                            `${s.tab} ${isActive ? s.tabActive : ''}`
+                        }
                     >
                         {({ isActive }) => {
                             const Icon = isActive ? tab.iconActive : tab.icon;
-                            const node = (
-                                <span className={s.iconBox}>
-                                    <Icon size={22} stroke={isActive ? 2 : 1.7} />
-                                </span>
-                            );
+                            const showBadge = tab.withBadge && totalItems > 0;
                             return (
                                 <>
-                                    {tab.withBadge ? (
-                                        <Indicator
-                                            label={totalItems || ''}
-                                            size={14}
-                                            disabled={totalItems === 0}
-                                            color="greenman"
-                                            offset={3}
+                                    <span className={s.iconBox}>
+                                        <Icon
+                                            size={22}
+                                            stroke={isActive ? 2 : 1.7}
+                                        />
+                                    </span>
+                                    <span className={s.tabLabel}>
+                                        {t(tab.labelKey)}
+                                    </span>
+                                    {showBadge && (
+                                        <span
+                                            key={totalItems}
+                                            className={s.badge}
+                                            aria-hidden="true"
                                         >
-                                            {node}
-                                        </Indicator>
-                                    ) : (
-                                        node
+                                            {totalItems > 99
+                                                ? '99+'
+                                                : totalItems}
+                                        </span>
                                     )}
-                                    <span className={s.tabLabel}>{t(tab.labelKey)}</span>
                                 </>
                             );
                         }}

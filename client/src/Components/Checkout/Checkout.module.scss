@@ -1,0 +1,291 @@
+.page {
+    padding-top: var(--space-4);
+    padding-bottom: calc(120px + var(--safe-bottom, 0px));
+
+    @media (min-width: 900px) {
+        padding-bottom: var(--space-16);
+    }
+}
+
+.header {
+    margin: var(--space-4) 0 var(--space-5);
+}
+
+.title {
+    font-family: var(--font-display);
+    font-weight: var(--fw-extrabold);
+    font-size: clamp(26px, 3.6vw, 36px);
+    letter-spacing: -0.025em;
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.stepper {
+    margin-bottom: var(--space-6);
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+
+    @media (min-width: 900px) {
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: var(--space-8);
+        align-items: start;
+    }
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.sectionCard {
+    padding: var(--space-5);
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+}
+
+.sectionTitle {
+    font-family: var(--font-display);
+    font-weight: var(--fw-extrabold);
+    font-size: var(--fs-lg);
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-4);
+    color: var(--color-text-primary);
+}
+
+.fieldGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+
+    @media (min-width: 640px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.cityWrap {
+    position: relative;
+}
+
+.suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin: 4px 0 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-e3, 0 8px 24px rgba(14, 23, 19, 0.08));
+    z-index: 10;
+    max-height: 240px;
+    overflow-y: auto;
+
+    li {
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.15s;
+
+        &:hover {
+            background: var(--color-brand-50);
+            color: var(--color-brand-800);
+        }
+    }
+}
+
+.optionGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+
+    @media (min-width: 640px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.option {
+    display: block;
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-default);
+    text-align: left;
+    transition: border-color var(--dur-fast) var(--ease-standard),
+                background var(--dur-fast) var(--ease-standard),
+                transform var(--dur-fast) var(--ease-standard);
+}
+
+.option:hover {
+    border-color: var(--color-brand-300);
+}
+
+.option:active {
+    transform: scale(0.99);
+}
+
+.optionChecked {
+    border-color: var(--color-brand-600);
+    background: var(--color-brand-50);
+}
+
+.optionInner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.optionLogo {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+        max-width: 28px;
+        max-height: 28px;
+        object-fit: contain;
+    }
+}
+
+.optionIcon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.optionText {
+    flex: 1;
+    min-width: 0;
+}
+
+.optionTitle {
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-sm);
+    color: var(--color-text-primary);
+}
+
+.optionDesc {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+}
+
+.summary {
+    @media (min-width: 900px) {
+        position: sticky;
+        top: 88px;
+    }
+}
+
+.summaryCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+}
+
+.summaryTitle {
+    font-family: var(--font-display);
+    font-weight: var(--fw-extrabold);
+    font-size: var(--fs-lg);
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-1);
+    color: var(--color-text-primary);
+}
+
+.summaryRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--fs-sm);
+    color: var(--color-text-secondary);
+}
+
+.summaryMuted {
+    color: var(--color-text-muted);
+    font-size: var(--fs-xs);
+    font-style: italic;
+}
+
+.summaryTotal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+    font-family: var(--font-display);
+    font-weight: var(--fw-extrabold);
+    font-size: var(--fs-md);
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+}
+
+.alertText {
+    font-size: var(--fs-xs);
+}
+
+.profileList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-bottom: var(--space-4);
+}
+
+.profileItem {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-default);
+    text-align: left;
+    transition: border-color var(--dur-fast) var(--ease-standard),
+                background var(--dur-fast) var(--ease-standard);
+}
+
+.profileItem:hover {
+    border-color: var(--color-brand-400);
+    background: var(--color-brand-50);
+}
+
+.profileItemNew {
+    border-style: dashed;
+    color: var(--color-brand-700);
+}
+
+.profileName {
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-sm);
+    color: var(--color-text-primary);
+}
+
+.profileAddr {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+}

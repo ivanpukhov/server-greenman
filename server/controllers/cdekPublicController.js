@@ -61,9 +61,36 @@ const suggestCities = async (req, res) => {
     }
 };
 
+const pickupPoints = async (req, res) => {
+    const cityCode = Number(req.query.cityCode || req.query.city_code);
+    if (!Number.isFinite(cityCode) || cityCode <= 0) {
+        return res.status(400).json({ error: 'cityCode is required' });
+    }
+
+    const cacheKey = `pvz:${cityCode}`;
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+        return res.json(cached);
+    }
+
+    try {
+        const points = await cdekApi.listPickupPoints(cityCode);
+        setCache(cacheKey, points);
+        res.json(points);
+    } catch (error) {
+        const cdekDetail = error.response?.data?.message || error.response?.data?.error_description || error.response?.data?.error || null;
+        logError('cdekPublic.pickupPoints', error, { cityCode, cdekStatus: error.response?.status, cdekDetail });
+        res.status(502).json({
+            error: 'Не удалось получить список ПВЗ СДЭК',
+            detail: cdekDetail || error.message,
+            cdekStatus: error.response?.status
+        });
+    }
+};
+
 const calculate = async (req, res) => {
     try {
-        const { toCityCode, toAddress, products } = req.body || {};
+        const { toCityCode, toAddress, products, deliveryMode } = req.body || {};
         if (!toCityCode) {
             return res.status(400).json({ error: 'toCityCode is required' });
         }
@@ -102,7 +129,8 @@ const calculate = async (req, res) => {
         const result = await cdekApi.calculateTariff({
             toCityCode: Number(toCityCode),
             toAddress: toAddress || undefined,
-            products: canonicalProducts
+            products: canonicalProducts,
+            deliveryMode: String(deliveryMode || 'door').trim().toLowerCase()
         });
 
         res.json(result);
@@ -160,6 +188,7 @@ const webhook = async (req, res) => {
 
 module.exports = {
     suggestCities,
+    pickupPoints,
     calculate,
     webhook
 };

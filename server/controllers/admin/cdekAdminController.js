@@ -127,6 +127,7 @@ const updateOrderRf = async (req, res) => {
         }
         const allowedFields = [
             'customerName', 'email', 'phoneNumber', 'cdekAddress', 'cdekCityCode',
+            'cdekDeliveryMode', 'cdekPvzCode', 'cdekPvzName', 'cdekPvzAddress',
             'status', 'cdekStatus', 'cdekTrackingNumber', 'totalPrice', 'cdekCalcPriceRub'
         ];
         const patch = {};
@@ -168,6 +169,10 @@ const submitToCdek = async (req, res) => {
             phoneNumber: order.phoneNumber,
             cdekCityCode: order.cdekCityCode,
             cdekAddress: order.cdekAddress,
+            cdekDeliveryMode: order.cdekDeliveryMode,
+            cdekPvzCode: order.cdekPvzCode,
+            cdekPvzName: order.cdekPvzName,
+            cdekPvzAddress: order.cdekPvzAddress,
             products: productsForCdek
         });
 

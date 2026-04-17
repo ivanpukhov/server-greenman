@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ActionIcon, Anchor, Divider, Group, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import logo from '../../images/logo.svg';
 import {
@@ -9,6 +8,7 @@ import {
     IconPhone,
     IconClock,
     IconMapPin,
+    IconArrowNarrowRight,
 } from '../../icons';
 import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
 import s from './Footer.module.scss';
@@ -30,84 +30,113 @@ const Footer = () => {
             <div className={s.inner}>
                 <div className={s.grid}>
                     <div className={s.brandCol}>
-                        <Link to="/" className={s.brand}>
+                        <Link to="/" className={s.brand} aria-label={t('common.brand')}>
                             <img src={logo} alt="" />
                             <span>{t('common.brand')}</span>
                         </Link>
-                        <Text size="sm" c="dimmed" mt="sm" maw={320}>
-                            {t('footer.description')}
-                        </Text>
-                        <Group gap="xs" mt="md">
-                            <ActionIcon
-                                component="a"
+                        <p className={s.brandText}>{t('footer.description')}</p>
+                        <div className={s.social}>
+                            <a
+                                className={s.socialBtn}
                                 href={WA}
                                 target="_blank"
                                 rel="noreferrer"
-                                variant="light"
-                                color="greenman"
-                                size="lg"
-                                radius="xl"
                                 aria-label="WhatsApp"
                             >
                                 <IconBrandWhatsapp size={18} stroke={1.7} />
-                            </ActionIcon>
-                            <ActionIcon
-                                component="a"
+                            </a>
+                            <a
+                                className={s.socialBtn}
                                 href={IG}
                                 target="_blank"
                                 rel="noreferrer"
-                                variant="light"
-                                color="greenman"
-                                size="lg"
-                                radius="xl"
                                 aria-label="Instagram"
                             >
                                 <IconBrandInstagram size={18} stroke={1.7} />
-                            </ActionIcon>
-                        </Group>
+                            </a>
+                        </div>
                     </div>
 
                     <div className={s.col}>
-                        <Text fw={700} size="sm" mb="sm">{t('footer.nav_title')}</Text>
-                        <Stack gap={8}>
-                            <Link to="/" className={s.link}>{t('header.nav.home')}</Link>
-                            <Link to="/catalog" className={s.link}>{t('header.nav.catalog')}</Link>
-                            <Link to="/cart" className={s.link}>{t('header.nav.cart')}</Link>
-                            <Link to="/profile" className={s.link}>{t('header.nav.profile')}</Link>
-                        </Stack>
+                        <h3 className={s.colTitle}>{t('footer.nav_title')}</h3>
+                        <Link to="/" className={s.link}>
+                            <span>{t('header.nav.home')}</span>
+                        </Link>
+                        <Link to="/catalog" className={s.link}>
+                            <span>{t('header.nav.catalog')}</span>
+                        </Link>
+                        <Link to="/cart" className={s.link}>
+                            <span>{t('header.nav.cart')}</span>
+                        </Link>
+                        <Link to="/profile" className={s.link}>
+                            <span>{t('header.nav.profile')}</span>
+                        </Link>
                     </div>
 
                     <div className={s.col}>
-                        <Text fw={700} size="sm" mb="sm">{t('footer.contacts_title')}</Text>
-                        <Stack gap={10}>
-                            <Anchor href={PHONE_TEL} c="dark" underline="never" className={s.contactRow}>
-                                <IconPhone size={16} stroke={1.7} />
-                                <span>{PHONE}</span>
-                            </Anchor>
-                            <Anchor href={WA} target="_blank" rel="noreferrer" c="dark" underline="never" className={s.contactRow}>
-                                <IconBrandWhatsapp size={16} stroke={1.7} />
-                                <span>WhatsApp</span>
-                            </Anchor>
-                            <div className={s.contactRow}>
-                                <IconClock size={16} stroke={1.7} />
-                                <Text size="sm" c="dimmed">{t('footer.hours')}</Text>
-                            </div>
-                            <div className={s.contactRow}>
-                                <IconMapPin size={16} stroke={1.7} />
-                                <Text size="sm" c="dimmed">Petropavlovsk, KZ</Text>
-                            </div>
-                        </Stack>
+                        <h3 className={s.colTitle}>{t('footer.buyer_title')}</h3>
+                        <Link to="/#delivery" className={s.link}>
+                            <span>{t('footer.links.delivery')}</span>
+                        </Link>
+                        <Link to="/#faq" className={s.link}>
+                            <span>{t('footer.links.faq')}</span>
+                        </Link>
+                        <Link to="/#about" className={s.link}>
+                            <span>{t('footer.links.about')}</span>
+                        </Link>
+                        <a
+                            href={WA}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={s.link}
+                        >
+                            <span>{t('footer.links.consultation')}</span>
+                            <IconArrowNarrowRight size={16} stroke={1.7} />
+                        </a>
+                    </div>
+
+                    <div className={s.col}>
+                        <h3 className={s.colTitle}>{t('footer.contacts_title')}</h3>
+                        <a href={PHONE_TEL} className={s.link}>
+                            <IconPhone size={16} stroke={1.7} />
+                            <span>{PHONE}</span>
+                        </a>
+                        <a
+                            href={WA}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={s.link}
+                        >
+                            <IconBrandWhatsapp size={16} stroke={1.7} />
+                            <span>WhatsApp</span>
+                        </a>
+                        <span className={s.contactText}>
+                            <IconClock size={16} stroke={1.7} />
+                            {t('footer.hours')}
+                        </span>
+                        <span className={s.contactText}>
+                            <IconMapPin size={16} stroke={1.7} />
+                            {t('footer.city')}
+                        </span>
                     </div>
                 </div>
 
-                <Divider my="xl" />
+                <div className={s.divider} />
 
-                <Group justify="space-between" wrap="wrap" gap="md">
-                    <Text size="xs" c="dimmed">
-                        {t('footer.copyright', { year })}
-                    </Text>
-                    <LanguageSwitcher />
-                </Group>
+                <div className={s.legalRow}>
+                    <div className={s.legal}>
+                        <span>{t('footer.copyright', { year })}</span>
+                        <Link to="/#terms" className={s.legalLink}>
+                            {t('footer.legal.terms')}
+                        </Link>
+                        <Link to="/#privacy" className={s.legalLink}>
+                            {t('footer.legal.privacy')}
+                        </Link>
+                    </div>
+                    <div className={s.languageWrap}>
+                        <LanguageSwitcher compact />
+                    </div>
+                </div>
             </div>
         </footer>
     );

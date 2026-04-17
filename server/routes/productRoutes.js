@@ -33,6 +33,7 @@ const upload = multer({
 // Маршруты для продуктов
 router.post('/add', upload.single('video'), productController.addProduct);
 router.get('/', productController.getAllProducts);
+router.get('/facets', productController.getProductFacets);
 router.get('/:id', productController.getProductById);
 router.put('/:id',  upload.single('video'), productController.updateProduct);
 router.delete('/:id',  productController.deleteProduct);

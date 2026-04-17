@@ -1,0 +1,209 @@
+/* ============================================================
+   GreenMan — Design Tokens ("Calm Tide")
+   Single source of truth for color, space, type, motion, elevation.
+   Mantine theme & SCSS modules both read from these vars.
+   ============================================================ */
+
+:root {
+  /* -------- Brand (green ramp, preserved from legacy) -------- */
+  --color-brand-50:  #e8f6ee;
+  --color-brand-100: #cde9d6;
+  --color-brand-200: #9ad4ad;
+  --color-brand-300: #63bf84;
+  --color-brand-400: #3aad64;
+  --color-brand-500: #1fa150;
+  --color-brand-600: #0e9a47;
+  --color-brand-700: #00853a;
+  --color-brand-800: #007432;
+  --color-brand-900: #00622a;
+
+  /* -------- Sage / mint secondary -------- */
+  --color-sage-50:  #f1f9f4;
+  --color-sage-100: #dff1e6;
+  --color-sage-200: #c7ead5;
+  --color-sage-300: #9fd7b6;
+  --color-sage-400: #72c595;
+  --color-sage-500: #4fb77c;
+  --color-sage-600: #38a066;
+  --color-sage-700: #2a8553;
+  --color-sage-800: #1f6a42;
+  --color-sage-900: #164c2f;
+
+  /* -------- Ink (warm-gray neutral) -------- */
+  --color-ink-0:   #ffffff;
+  --color-ink-50:  #f7f8f7;
+  --color-ink-100: #eef1ef;
+  --color-ink-200: #e0e5e2;
+  --color-ink-300: #c7cfc9;
+  --color-ink-400: #9aa7a0;
+  --color-ink-500: #6f7d76;
+  --color-ink-600: #4f5c55;
+  --color-ink-700: #354a3f;
+  --color-ink-800: #1d2a23;
+  --color-ink-900: #0b1712;
+
+  /* -------- Semantic -------- */
+  --color-success-50:  var(--color-brand-50);
+  --color-success-500: var(--color-brand-600);
+  --color-success-700: var(--color-brand-800);
+
+  --color-warning-50:  #fdf5e6;
+  --color-warning-500: #d9941a;
+  --color-warning-700: #9c660c;
+
+  --color-danger-50:   #fbece7;
+  --color-danger-500:  #c8462c;
+  --color-danger-700:  #8f2c17;
+
+  --color-info-50:     #e8f0fb;
+  --color-info-500:    #2d7ecc;
+  --color-info-700:    #1a579a;
+
+  /* -------- Surfaces -------- */
+  --color-surface-canvas:  #fbfcfb; /* page bg */
+  --color-surface-default: #ffffff; /* card, input bg */
+  --color-surface-raised:  #ffffff; /* elevated card */
+  --color-surface-sunken:  var(--color-ink-50);  /* section alt bg */
+  --color-surface-inverse: var(--color-ink-900);
+
+  /* -------- Text -------- */
+  --color-text-primary:    var(--color-ink-900);
+  --color-text-secondary:  var(--color-ink-700);
+  --color-text-muted:      var(--color-ink-500);
+  --color-text-placeholder:var(--color-ink-400);
+  --color-text-on-brand:   #ffffff;
+  --color-text-on-inverse: #ffffff;
+
+  /* -------- Borders -------- */
+  --color-border-subtle:  var(--color-ink-100);
+  --color-border-default: var(--color-ink-200);
+  --color-border-strong:  var(--color-ink-300);
+  --color-border-brand:   var(--color-brand-600);
+  --color-border-focus:   var(--color-brand-500);
+
+  /* -------- Spacing (4px grid) -------- */
+  --space-0:    0;
+  --space-0_5:  2px;
+  --space-1:    4px;
+  --space-1_5:  6px;
+  --space-2:    8px;
+  --space-3:    12px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-8:    32px;
+  --space-10:   40px;
+  --space-12:   48px;
+  --space-14:   56px;
+  --space-16:   64px;
+  --space-20:   80px;
+  --space-24:   96px;
+  --space-32:   128px;
+
+  /* Page gutter + max widths */
+  --container-sm:  640px;
+  --container-md:  768px;
+  --container-lg:  1024px;
+  --container-xl:  1240px;
+  --container-2xl: 1440px;
+  --page-gutter:   clamp(16px, 4vw, 32px);
+
+  /* -------- Radii -------- */
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-2xl:  36px;
+  --radius-pill: 999px;
+
+  /* -------- Typography -------- */
+  --font-display: 'Hagrid', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+  --fw-extrabold:800;
+  --fw-heavy:    900;
+
+  --lh-display:  1.1;
+  --lh-heading:  1.2;
+  --lh-body:     1.5;
+  --lh-tight:    1.3;
+
+  --tracking-display: -0.02em;
+  --tracking-heading: -0.01em;
+  --tracking-body:    0;
+  --tracking-caps:    0.06em;
+
+  /* Fluid type ramp */
+  --fs-display: clamp(36px, 4.8vw + 12px, 72px);
+  --fs-h1:      clamp(28px, 2.4vw + 16px, 48px);
+  --fs-h2:      clamp(24px, 1.6vw + 14px, 36px);
+  --fs-h3:      clamp(20px, 0.8vw + 14px, 26px);
+  --fs-h4:      clamp(18px, 0.4vw + 14px, 20px);
+  --fs-lg:      18px;
+  --fs-md:      16px;
+  --fs-sm:      14px;
+  --fs-xs:      12px;
+  --fs-2xs:     11px;
+
+  /* -------- Elevation (named, replaces ad-hoc shadows) -------- */
+  --shadow-none: none;
+  --shadow-e1:   0 1px 2px rgba(11, 23, 18, 0.04), 0 0 0 1px rgba(11, 23, 18, 0.03);
+  --shadow-e2:   0 2px 6px rgba(11, 23, 18, 0.05), 0 8px 24px rgba(11, 23, 18, 0.06);
+  --shadow-e3:   0 4px 12px rgba(11, 23, 18, 0.08), 0 18px 40px rgba(11, 23, 18, 0.08);
+  --shadow-e4:   0 24px 60px rgba(11, 23, 18, 0.14), 0 8px 24px rgba(11, 23, 18, 0.08);
+  --shadow-focus:0 0 0 3px rgba(30, 161, 80, 0.22);
+  --shadow-inset:inset 0 0 0 1px var(--color-border-default);
+
+  /* -------- Motion -------- */
+  --dur-fast:  120ms;
+  --dur-base:  200ms;
+  --dur-slow:  320ms;
+  --dur-xslow: 500ms;
+  --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --ease-in:         cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:        cubic-bezier(0, 0, 0.2, 1);
+
+  /* -------- Z-index scale -------- */
+  --z-base:     0;
+  --z-sticky:   200;
+  --z-dropdown: 300;
+  --z-drawer:   400;
+  --z-modal:    500;
+  --z-toast:    600;
+  --z-top:      999;
+
+  /* -------- Layout chrome heights -------- */
+  --header-h:       64px;
+  --header-h-lg:    72px;
+  --bottombar-h:    64px;
+  --safe-bottom:    env(safe-area-inset-bottom, 0px);
+  --safe-top:       env(safe-area-inset-top, 0px);
+
+  /* -------- Focus ring -------- */
+  --ring-width: 2px;
+  --ring-offset: 2px;
+  --ring-color: var(--color-border-focus);
+}
+
+/* -------- Reduced motion -------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast:  0ms;
+    --dur-base:  0ms;
+    --dur-slow:  0ms;
+    --dur-xslow: 0ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

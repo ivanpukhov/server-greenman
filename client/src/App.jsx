@@ -1,19 +1,34 @@
-import React from 'react';
-import {BrowserRouter as Router, Link, Route, Routes, useLocation} from 'react-router-dom';
-import Header from "./Components/Header/Header";
-import Main from "./Components/Main/Main";
-import BottomBar from "./Components/BottomBar/BottomBar";
-import Footer from "./Components/Footer/Footer";
-import Cart from "./Components/Cart/Cart";
-import Auth from './Components/Auth/Auth.jsx';
-import Profile from './Components/Profile/Profile';
+import React, { Suspense, lazy } from 'react';
+import {
+    BrowserRouter as Router,
+    Route,
+    Routes,
+    useLocation,
+} from 'react-router-dom';
+import { Loader, Center } from '@mantine/core';
+import Header from './Components/Header/Header';
+import BottomBar from './Components/BottomBar/BottomBar';
+import Footer from './Components/Footer/Footer';
+import ScrollToTop from './Components/ScrollToTop';
+import CountryModal from './Components/CountrySelect/CountryModal';
 import './App.scss';
-import ProductInfo from "./Components/Catalog/ProductDetails";
-import Catalog from "./Components/Catalog/Catalog";
-import ScrollToTop from "./Components/ScrollToTop";
-import Search from "./Components/Catalog/Search";
-import AdminApp from "./admin/AdminApp";
-import CountryModal from "./Components/CountrySelect/CountryModal";
+
+const Main = lazy(() => import('./Components/Main/Main'));
+const Cart = lazy(() => import('./Components/Cart/Cart'));
+const Checkout = lazy(() => import('./Components/Checkout/Checkout'));
+const Auth = lazy(() => import('./Components/Auth/Auth.jsx'));
+const Profile = lazy(() => import('./Components/Profile/Profile'));
+const ProductInfo = lazy(() => import('./Components/Catalog/ProductDetails'));
+const Catalog = lazy(() => import('./Components/Catalog/Catalog'));
+const Search = lazy(() => import('./Components/Catalog/Search'));
+const AdminApp = lazy(() => import('./admin/AdminApp'));
+const NotFound = lazy(() => import('./Components/NotFound/NotFound'));
+
+const RouteFallback = () => (
+    <Center style={{ minHeight: 320 }}>
+        <Loader color="greenman" />
+    </Center>
+);
 
 function App() {
     return (
@@ -38,50 +53,37 @@ function AppRoutes() {
     return (
         <>
             {!isAdminRoute && <ScrollToTop />}
-            {!isAdminRoute && <Header/>}
+            {!isAdminRoute && <Header />}
             <div className={isAdminRoute ? '' : 'container'}>
-                <Routes>
-                    <Route path="/admin/*" element={<AdminApp />} />
-                    <Route path="/" element={<Main/>}/>
-                    <Route path="/cart" element={<Cart/>}/>
-                    <Route path="/catalog" element={<Catalog/>}/>
-                    <Route path="/product/:id" element={<ProductInfo/>}/>
-                    <Route path="/search/:type/:query" element={<Search/>}/>
-                    <Route path="/auth" element={<Auth/>}/>
-                    <Route path="/profile" element={<Profile/>}/>
-                    <Route
-                        path="/*"
-                        element={
-                            checkPath(location.pathname)
-                                ? redirectToExternalSite(location.pathname)
-                                : <NotFoundPage/>
-                        }
-                    />
-                </Routes>
+                <Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                        <Route path="/admin/*" element={<AdminApp />} />
+                        <Route path="/" element={<Main />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/catalog" element={<Catalog />} />
+                        <Route path="/product/:id" element={<ProductInfo />} />
+                        <Route
+                            path="/search/:type/:query"
+                            element={<Search />}
+                        />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route
+                            path="/*"
+                            element={
+                                checkPath(location.pathname)
+                                    ? redirectToExternalSite(location.pathname)
+                                    : <NotFound />
+                            }
+                        />
+                    </Routes>
+                </Suspense>
             </div>
-            {!isAdminRoute && <Footer/>}
-            {!isAdminRoute && <BottomBar/>}
-            {!isAdminRoute && <CountryModal/>}
+            {!isAdminRoute && <Footer />}
+            {!isAdminRoute && <BottomBar />}
+            {!isAdminRoute && <CountryModal />}
         </>
-    );
-}
-
-// Компонент для отображения страницы 404: Страница не найдена
-function NotFoundPage() {
-    return (
-        <div className="cart__n">
-            <div className="cart__null">
-                <div className="cart__null-title">
-                    Ошибка 404. Страница не найдена!
-                </div>
-                <div className="cart__null-text">
-                    Выберите товар в каталоге, либо введите название товара или болезни в поиске, и выберите то, что
-                    поможет именно Вам!
-                </div>
-                <Link to={'/'} className="cart__null--btn">На главную</Link>
-                <Link to={'/catalog'} className="cart__null--btn">Перейти в каталог</Link>
-            </div>
-        </div>
     );
 }
 

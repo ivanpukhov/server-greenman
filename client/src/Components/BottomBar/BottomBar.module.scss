@@ -2,16 +2,17 @@
     position: fixed;
     left: 12px;
     right: 12px;
-    bottom: 12px;
-    z-index: 99;
+    bottom: calc(12px + var(--safe-bottom, 0px));
+    z-index: var(--z-sticky);
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     padding: 8px 6px;
     background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: saturate(1.6) blur(18px);
-    border: 1px solid rgba(11, 23, 18, 0.06);
-    border-radius: 28px;
-    box-shadow: 0 12px 40px rgba(11, 23, 18, 0.1);
+    backdrop-filter: saturate(160%) blur(20px);
+    -webkit-backdrop-filter: saturate(160%) blur(20px);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-e3);
 
     @media (min-width: 900px) {
         display: none;
@@ -19,27 +20,44 @@
 }
 
 .tab {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
-    padding: 8px 6px;
-    border-radius: 18px;
+    padding: 8px 4px 6px;
+    border-radius: var(--radius-lg);
     text-decoration: none;
-    color: #6e7b75;
-    transition: color 0.15s, background 0.15s;
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--ease-standard),
+                transform var(--dur-fast) var(--ease-standard);
 
-    &:hover {
-        color: var(--mantine-color-greenman-7);
-    }
+    &:active { transform: scale(0.96); }
 }
 
 .tabActive {
-    color: var(--mantine-color-greenman-7);
-    background: var(--mantine-color-greenman-0);
+    color: var(--color-brand-700);
+}
+
+.tabActive::before {
+    content: '';
+    position: absolute;
+    inset: 2px 6px;
+    background: var(--color-brand-50);
+    border-radius: var(--radius-md);
+    z-index: 0;
+    animation: tabSlide var(--dur-base) var(--ease-emphasized);
+}
+
+@keyframes tabSlide {
+    0%   { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
 }
 
 .iconBox {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -48,27 +66,59 @@
 }
 
 .tabLabel {
+    position: relative;
+    z-index: 1;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
     letter-spacing: 0.01em;
+}
+
+.badge {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 22px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-brand-600);
+    color: #fff;
+    font-size: 10px;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    z-index: 2;
+    animation: badgePop var(--dur-base) var(--ease-emphasized);
+}
+
+@keyframes badgePop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
 }
 
 .cartCta {
     position: fixed;
     left: 16px;
     right: 16px;
-    bottom: 82px;
-    z-index: 99;
+    bottom: calc(82px + var(--safe-bottom, 0px));
+    z-index: var(--z-sticky);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     padding: 12px 18px;
-    background: var(--mantine-color-greenman-7);
+    background: var(--color-brand-700);
     color: #fff;
     text-decoration: none;
-    border-radius: 999px;
-    box-shadow: 0 10px 26px rgba(0, 132, 70, 0.25);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 12px 30px rgba(0, 98, 42, 0.28);
+    transition: transform var(--dur-fast) var(--ease-standard);
+
+    &:active { transform: scale(0.99); }
 
     @media (min-width: 900px) {
         display: none;
@@ -81,13 +131,13 @@
 }
 
 .cartCtaLabel {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-bold);
     letter-spacing: -0.01em;
 }
 
 .cartCtaMeta {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     opacity: 0.85;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
 }

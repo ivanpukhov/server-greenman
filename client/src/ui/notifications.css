@@ -1,0 +1,25 @@
+/* Position tweaks for Mantine notifications on mobile:
+   - On narrow screens move toast stack above BottomBar + safe-area.
+   - Use ink-flavored surface and token shadow.
+*/
+.mantine-Notifications-root {
+  z-index: var(--z-toast) !important;
+}
+
+@media (max-width: 768px) {
+  .mantine-Notifications-root {
+    top: auto !important;
+    right: var(--space-3) !important;
+    left: var(--space-3) !important;
+    bottom: calc(var(--bottombar-h) + var(--safe-bottom) + var(--space-3)) !important;
+    width: auto !important;
+  }
+  .mantine-Notifications-notification {
+    width: 100% !important;
+  }
+}
+
+.mantine-Notification-root {
+  box-shadow: var(--shadow-e3) !important;
+  border-color: var(--color-border-subtle) !important;
+}

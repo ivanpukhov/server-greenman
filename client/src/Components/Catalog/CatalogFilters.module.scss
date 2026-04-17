@@ -1,0 +1,109 @@
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    padding: var(--space-5);
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+
+    @media (min-width: 900px) {
+        top: calc(var(--header-h-lg) + 16px);
+    }
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.title {
+    font-family: var(--font-display);
+    font-weight: var(--fw-extrabold);
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);
+    color: var(--color-text-secondary);
+    margin: 0;
+}
+
+.priceRow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.priceInput {
+    flex: 1;
+}
+
+.priceDash {
+    color: var(--color-text-muted);
+    font-weight: var(--fw-bold);
+}
+
+.symbol {
+    color: var(--color-text-muted);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    padding-right: 6px;
+}
+
+.hint {
+    font-size: var(--fs-xs);
+    color: var(--color-text-muted);
+}
+
+.switch {
+    justify-content: space-between;
+}
+
+.diseaseList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.diseaseCheck {
+    align-items: center;
+}
+
+.diseaseCheckLabel {
+    flex: 1;
+}
+
+.diseaseLabel {
+    display: inline-flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+}
+
+.diseaseName {
+    color: var(--color-text-primary);
+    font-size: var(--fs-sm);
+    text-transform: capitalize;
+}
+
+.diseaseCount {
+    color: var(--color-text-muted);
+    font-size: var(--fs-xs);
+    background: var(--color-ink-50);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-weight: var(--fw-medium);
+}
+
+.footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: auto;
+}

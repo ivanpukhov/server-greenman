@@ -35,9 +35,23 @@
   "footer": {
     "description": "Natural tinctures, juices and syrups from medicinal plants. Crafting since 2018.",
     "nav_title": "Navigation",
+    "buyer_title": "For buyers",
+    "brand_title": "About brand",
     "contacts_title": "Contacts",
     "hours": "Every day, 9:00 — 18:00",
-    "copyright": "© {{year}} TEND.KZ · All rights reserved"
+    "city": "Petropavlovsk, Kazakhstan",
+    "copyright": "© {{year}} GreenMan · All rights reserved",
+    "links": {
+      "delivery": "Delivery & payment",
+      "faq": "FAQ",
+      "about": "About us",
+      "reviews": "Reviews",
+      "consultation": "Consultation"
+    },
+    "legal": {
+      "terms": "Terms",
+      "privacy": "Privacy policy"
+    }
   },
   "language": {
     "label": "Language",
@@ -60,7 +74,39 @@
       "title": "Natural wellness by GreenMan",
       "subtitle": "Tinctures, juices and syrups crafted from medicinal plants. Hand-made since 2018.",
       "cta_catalog": "Browse catalog",
-      "cta_consult": "Ask on WhatsApp"
+      "cta_consult": "Ask on WhatsApp",
+      "stats": {
+        "years": { "value": "7+", "label": "years crafting" },
+        "orders": { "value": "12k+", "label": "happy customers" },
+        "rating": { "value": "4.9", "label": "average rating" }
+      }
+    },
+    "how_it_works": {
+      "eyebrow": "How it works",
+      "title": "Pick, consult, receive",
+      "subtitle": "Three simple steps from choice to delivery — with live consultation and a video preview of every order.",
+      "steps": [
+        {
+          "n": "01",
+          "title": "Choose a product",
+          "text": "Search by product name or by condition. Each card lists indications, usage and contraindications."
+        },
+        {
+          "n": "02",
+          "title": "Get a consultation",
+          "text": "Message us on WhatsApp — we'll pick a course for your diagnosis and answer your questions for free."
+        },
+        {
+          "n": "03",
+          "title": "Pay and receive",
+          "text": "Kaspi payment or cash on delivery. Video preview before shipping, tracking sent after payment."
+        }
+      ]
+    },
+    "trust_section": {
+      "eyebrow": "Why people trust us",
+      "title": "Quality you can see",
+      "subtitle": "Natural ingredients, transparent process, live support."
     },
     "trust": {
       "natural": {
@@ -142,10 +188,42 @@
     "title": "Catalog",
     "subtitle": "Our full product collection",
     "all": "All",
-    "empty_title": "Nothing here yet",
-    "empty_text": "Try different filters or come back later.",
+    "empty_title": "No matches found",
+    "empty_text": "Try different filters or reset them.",
     "add_to_cart": "Add to cart",
-    "in_cart": "In cart"
+    "in_cart": "In cart",
+    "results_count": "Found: {{count}}",
+    "results_count_zero": "No matches",
+    "reset_filters": "Reset filters",
+    "show_filters": "Filters",
+    "hide_filters": "Hide",
+    "active_filters": "Active filters",
+    "load_more": "Show more",
+    "filters": {
+      "search_label": "Search",
+      "search_placeholder": "Product name",
+      "diseases_title": "Use cases",
+      "price_title": "Price",
+      "price_from": "from",
+      "price_to": "to",
+      "in_stock": "In stock",
+      "in_stock_only": "In stock only",
+      "all_diseases": "All"
+    },
+    "sort": {
+      "label": "Sort",
+      "popular": "Popular",
+      "new": "New",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low",
+      "name": "A → Z"
+    },
+    "toast": {
+      "added": "{{name}} added to cart",
+      "to_cart": "Go to cart",
+      "removed": "Removed from cart",
+      "load_error": "Couldn't load the catalog"
+    }
   },
   "product": {
     "back_to_catalog": "Back to catalog",
@@ -157,7 +235,22 @@
     "usage_children": "Children",
     "add_to_cart": "Add to cart",
     "not_found": "Product not found",
-    "error": "Failed to load product"
+    "error": "Failed to load product",
+    "from": "from",
+    "in_cart": "In cart",
+    "go_to_cart": "Go to cart",
+    "variant_label": "Pick a size",
+    "share": "Share",
+    "save": "Save",
+    "share_copied": "Link copied",
+    "tabs": {
+      "description": "Description",
+      "usage": "How to use",
+      "contraindications": "Contraindications",
+      "reviews": "Reviews"
+    },
+    "related": "Related products",
+    "recently_viewed": "Recently viewed"
   },
   "search": {
     "title": "Search",
@@ -235,12 +328,28 @@
       "resend": "Resend code",
       "resend_in": "Resend in {{seconds}}s",
       "change_phone": "Change number"
+    },
+    "why": {
+      "title": "Why we need your phone",
+      "body": "We only use the number for sign-in, order status, and delivery contact. No spam."
     }
   },
   "profile": {
     "title": "Profile",
     "orders_title": "My orders",
     "logout": "Sign out",
+    "tabs": {
+      "overview": "Overview",
+      "settings": "Settings"
+    },
+    "stats": {
+      "orders": "Total orders",
+      "delivered": "Delivered"
+    },
+    "overview": {
+      "active": "Active order",
+      "see_orders": "See all orders"
+    },
     "status": {
       "all": "All",
       "processing": "Processing",
@@ -256,7 +365,29 @@
       "number": "Order #{{number}}",
       "total": "Total",
       "processing": "Processing",
-      "track": "Track order"
+      "track": "Track order",
+      "reorder": "Reorder"
+    },
+    "reorder": {
+      "success": "Items added to cart",
+      "none": "Could not restore items",
+      "error": "Failed to reorder"
+    },
+    "settings": {
+      "account": "Account",
+      "region": "Region & language"
     }
+  },
+  "wishlist": {
+    "title": "Wishlist",
+    "add": "Save to wishlist",
+    "remove": "Remove from wishlist",
+    "empty_title": "Your wishlist is empty",
+    "empty_text": "Save items to quickly return to them later."
+  },
+  "not_found": {
+    "title": "Page not found",
+    "lead": "You may have followed an outdated link. Try the search or head back to the catalog.",
+    "whatsapp": "Message us"
   }
 }

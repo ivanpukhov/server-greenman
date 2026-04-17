@@ -1,0 +1,14 @@
+.btn {
+  transition: transform var(--dur-fast) var(--ease-standard),
+              box-shadow var(--dur-base) var(--ease-standard),
+              background var(--dur-base) var(--ease-standard) !important;
+  will-change: transform;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:focus-visible {
+  box-shadow: var(--shadow-focus) !important;
+}

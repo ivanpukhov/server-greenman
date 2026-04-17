@@ -21,6 +21,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
 const chatwootWebhookRoutes = require('./routes/chatwootWebhookRoutes');
 const cdekRoutes = require('./routes/cdekRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -32,6 +33,7 @@ require('./models/orders/ChatwootMessageSync');
 require('./models/orders/ProcessedWebhookMessage');
 require('./models/orders/CdekWebhookEvent');
 require('./models/orders/CdekSettings');
+require('./models/orders/WishlistItem');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -60,6 +62,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 app.use('/api/chatwoot-webhook', chatwootWebhookRoutes);
 app.use('/api/cdek', cdekRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {
@@ -189,7 +192,11 @@ const ensureRfOrderSchema = async () => {
             ['cdekTrackingNumber', { type: Sequelize.STRING, allowNull: true }],
             ['cdekIntakeUuid', { type: Sequelize.STRING, allowNull: true }],
             ['cdekCityCode', { type: Sequelize.INTEGER, allowNull: true }],
+            ['cdekDeliveryMode', { type: Sequelize.STRING, allowNull: true }],
             ['cdekAddress', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzCode', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzName', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzAddress', { type: Sequelize.STRING, allowNull: true }],
             ['cdekCalcPriceRub', { type: Sequelize.INTEGER, allowNull: true }],
             ['cdekRawResponse', { type: Sequelize.TEXT, allowNull: true }]
         ];

@@ -1,50 +1,61 @@
 .header {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: var(--z-sticky);
     width: 100%;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: saturate(1.4) blur(16px);
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
     border-bottom: 1px solid transparent;
-    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    transition:
+        background var(--dur-base) var(--ease-standard),
+        border-color var(--dur-base) var(--ease-standard),
+        box-shadow var(--dur-base) var(--ease-standard);
 }
 
 .scrolled {
     background: rgba(255, 255, 255, 0.92);
-    border-bottom-color: rgba(11, 23, 18, 0.06);
-    box-shadow: 0 2px 20px rgba(11, 23, 18, 0.04);
+    border-bottom-color: var(--color-border-subtle);
+    box-shadow: 0 1px 0 rgba(11, 23, 18, 0.02), 0 8px 24px rgba(11, 23, 18, 0.04);
 }
 
 .inner {
     display: flex;
     align-items: center;
-    gap: 12px;
-    max-width: 1240px;
+    gap: 14px;
+    max-width: var(--container-xl);
     margin: 0 auto;
-    padding: 12px 20px;
+    padding: 10px var(--page-gutter);
+    height: var(--header-h);
+}
+
+@media (min-width: 900px) {
+    .inner { height: var(--header-h-lg); }
 }
 
 .logo {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     text-decoration: none;
-    color: var(--mantine-color-greenman-7);
-    font-weight: 800;
-    font-size: 18px;
-    letter-spacing: -0.01em;
+    color: var(--color-brand-700);
+    font-family: var(--font-display);
+    font-weight: var(--fw-heavy);
+    font-size: 19px;
+    letter-spacing: var(--tracking-display);
     flex-shrink: 0;
-
-    img {
-        width: 28px;
-        height: 28px;
-    }
+    padding: 4px 8px;
+    margin-left: -8px;
+    border-radius: var(--radius-md);
+    transition: transform var(--dur-fast) var(--ease-standard);
 }
+.logo:hover { transform: scale(1.02); }
+.logo img { width: 30px; height: 30px; }
 
 .desktopNav {
     display: none;
-    margin-left: 24px;
-    gap: 4px;
+    margin-left: 8px;
+    gap: 2px;
 
     @media (min-width: 900px) {
         display: inline-flex;
@@ -55,27 +66,49 @@
 .navItem {
     position: relative;
     text-decoration: none;
-    color: #354a3f;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 9px 14px;
-    border-radius: 12px;
-    transition: background 0.15s, color 0.15s;
-
-    &:hover {
-        color: var(--mantine-color-greenman-7);
-        background: var(--mantine-color-greenman-0);
-    }
+    color: var(--color-text-secondary);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    transition: background var(--dur-fast) var(--ease-standard),
+                color var(--dur-fast) var(--ease-standard);
+}
+.navItem:hover {
+    color: var(--color-brand-700);
+    background: var(--color-brand-50);
 }
 
 .navItemActive {
-    color: var(--mantine-color-greenman-7);
-    background: var(--mantine-color-greenman-0);
+    color: var(--color-brand-700);
+    background: var(--color-brand-50);
+}
+.navItemActive::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 4px;
+    height: 2px;
+    background: var(--color-brand-600);
+    border-radius: 2px;
 }
 
 .right {
     margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
 }
+
+.divider {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border-default);
+    margin: 0 6px;
+    display: none;
+}
+@media (min-width: 768px) { .divider { display: inline-block; } }
 
 .hideOnMobile {
     display: none;
@@ -95,27 +128,78 @@
 
 .drawerLink {
     display: block;
-    padding: 12px 14px;
-    border-radius: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
     text-decoration: none;
-    font-size: 16px;
-    font-weight: 500;
-    color: #0b1712;
-    transition: background 0.15s, color 0.15s;
-
-    &:hover {
-        background: var(--mantine-color-greenman-0);
-        color: var(--mantine-color-greenman-7);
-    }
+    font-size: var(--fs-md);
+    font-weight: var(--fw-medium);
+    color: var(--color-text-primary);
+    transition: background var(--dur-fast) var(--ease-standard),
+                color var(--dur-fast) var(--ease-standard);
+}
+.drawerLink:hover {
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
 }
 
 .drawerLinkActive {
-    background: var(--mantine-color-greenman-0);
-    color: var(--mantine-color-greenman-7);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
 }
 
 .drawerDivider {
     height: 1px;
-    background: var(--mantine-color-gray-2);
+    background: var(--color-border-subtle);
     margin: 8px 0;
+}
+
+/* Cart / profile / wishlist icon buttons */
+.iconBtn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-pill);
+    color: var(--color-text-primary);
+    background: transparent;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-standard),
+                color var(--dur-fast) var(--ease-standard);
+    text-decoration: none;
+    position: relative;
+}
+.iconBtn:hover {
+    background: var(--color-ink-100);
+}
+.iconBtn.active {
+    color: var(--color-brand-700);
+    background: var(--color-brand-50);
+}
+
+.badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 99px;
+    background: var(--color-brand-600);
+    color: #fff;
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border: 2px solid var(--color-surface-canvas);
+    animation: badgePop var(--dur-base) var(--ease-emphasized);
+}
+
+@keyframes badgePop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
 }

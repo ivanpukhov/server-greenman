@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ActionIcon, Burger, Drawer, Group, Indicator, Stack, Text } from '@mantine/core';
+import { Burger, Drawer, Stack } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import logo from '../../images/logo.svg';
 import SearchBlock from '../Catalog/SearchBlock';
 import CountrySwitcher from '../CountrySelect/CountrySwitcher';
 import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
 import { useCart } from '../../CartContext.jsx';
-import { IconSearch, IconShoppingBag, IconUser } from '../../icons';
+import { useWishlist } from '../../contexts/WishlistContext.jsx';
+import {
+    IconHeart,
+    IconSearch,
+    IconShoppingBag,
+    IconUser,
+} from '../../icons';
 import classes from './Header.module.scss';
 
 const Header = () => {
@@ -18,7 +24,9 @@ const Header = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const { cart } = useCart();
+    const wishlist = useWishlist();
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    const wishCount = wishlist.ids.length;
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 4);
@@ -41,14 +49,20 @@ const Header = () => {
 
     return (
         <>
-            <header className={`${classes.header} ${scrolled ? classes.scrolled : ''}`}>
+            <header
+                className={`${classes.header} ${scrolled ? classes.scrolled : ''}`}
+            >
                 <div className={classes.inner}>
-                    <Link to="/" className={classes.logo} aria-label={t('common.brand')}>
+                    <Link
+                        to="/"
+                        className={classes.logo}
+                        aria-label={t('common.brand')}
+                    >
                         <img src={logo} alt="" />
                         <span>{t('common.brand')}</span>
                     </Link>
 
-                    <nav className={classes.desktopNav}>
+                    <nav className={classes.desktopNav} aria-label="Primary">
                         {navLinks.map((link) => (
                             <NavLink
                                 key={link.to}
@@ -63,17 +77,15 @@ const Header = () => {
                         ))}
                     </nav>
 
-                    <Group gap={6} className={classes.right} wrap="nowrap">
-                        <ActionIcon
-                            variant="subtle"
-                            size="lg"
-                            radius="xl"
+                    <div className={classes.right}>
+                        <button
+                            type="button"
+                            className={classes.iconBtn}
                             onClick={() => setSearchOpen(true)}
                             aria-label={t('search.title')}
-                            color="gray"
                         >
-                            <IconSearch size={20} stroke={1.7} />
-                        </ActionIcon>
+                            <IconSearch size={20} stroke={1.8} />
+                        </button>
 
                         <div className={classes.hideOnMobile}>
                             <LanguageSwitcher compact />
@@ -82,47 +94,68 @@ const Header = () => {
                             <CountrySwitcher compact />
                         </div>
 
-                        <ActionIcon
-                            component={NavLink}
-                            to="/cart"
-                            variant="subtle"
-                            size="lg"
-                            radius="xl"
-                            color="gray"
-                            aria-label={t('header.nav.cart')}
-                        >
-                            <Indicator
-                                label={totalItems}
-                                size={16}
-                                disabled={totalItems === 0}
-                                color="greenman"
-                                offset={2}
-                            >
-                                <IconShoppingBag size={20} stroke={1.7} />
-                            </Indicator>
-                        </ActionIcon>
+                        <span className={classes.divider} aria-hidden="true" />
 
-                        <ActionIcon
-                            component={NavLink}
+                        <NavLink
+                            to="/profile?tab=wishlist"
+                            className={({ isActive }) =>
+                                `${classes.iconBtn} ${classes.hideOnMobile} ${isActive ? classes.active : ''}`
+                            }
+                            aria-label={t('wishlist.title')}
+                        >
+                            <IconHeart size={20} stroke={1.8} />
+                            {wishCount > 0 && (
+                                <span
+                                    key={wishCount}
+                                    className={classes.badge}
+                                    aria-hidden="true"
+                                >
+                                    {wishCount > 99 ? '99+' : wishCount}
+                                </span>
+                            )}
+                        </NavLink>
+
+                        <NavLink
                             to="/profile"
-                            variant="subtle"
-                            size="lg"
-                            radius="xl"
-                            color="gray"
-                            className={classes.hideOnMobile}
+                            className={({ isActive }) =>
+                                `${classes.iconBtn} ${classes.hideOnMobile} ${isActive ? classes.active : ''}`
+                            }
                             aria-label={t('header.nav.profile')}
                         >
-                            <IconUser size={20} stroke={1.7} />
-                        </ActionIcon>
+                            <IconUser size={20} stroke={1.8} />
+                        </NavLink>
+
+                        <NavLink
+                            to="/cart"
+                            className={({ isActive }) =>
+                                `${classes.iconBtn} ${isActive ? classes.active : ''}`
+                            }
+                            aria-label={t('header.nav.cart')}
+                        >
+                            <IconShoppingBag size={20} stroke={1.8} />
+                            {totalItems > 0 && (
+                                <span
+                                    key={totalItems}
+                                    className={classes.badge}
+                                    aria-hidden="true"
+                                >
+                                    {totalItems > 99 ? '99+' : totalItems}
+                                </span>
+                            )}
+                        </NavLink>
 
                         <Burger
                             opened={menuOpen}
                             onClick={() => setMenuOpen((v) => !v)}
                             size="sm"
-                            aria-label={menuOpen ? t('header.menu_close') : t('header.menu_open')}
+                            aria-label={
+                                menuOpen
+                                    ? t('header.menu_close')
+                                    : t('header.menu_open')
+                            }
                             className={classes.burger}
                         />
-                    </Group>
+                    </div>
                 </div>
             </header>
 
@@ -134,18 +167,25 @@ const Header = () => {
                 title={t('search.title')}
                 padding="lg"
             >
-                <SearchBlock onSubmit={() => setSearchOpen(false)} />
+                <SearchBlock
+                    onSubmit={() => setSearchOpen(false)}
+                    autoFocus
+                />
             </Drawer>
 
             <Drawer
                 opened={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 position="right"
-                size="80%"
+                size="85%"
                 padding="lg"
-                title={t('common.brand')}
+                title={
+                    <span style={{ fontFamily: 'Hagrid', fontWeight: 800 }}>
+                        {t('common.brand')}
+                    </span>
+                }
             >
-                <Stack gap="md">
+                <Stack gap="xs">
                     {navLinks.map((link) => (
                         <NavLink
                             key={link.to}
@@ -166,17 +206,22 @@ const Header = () => {
                     >
                         {t('header.nav.profile')}
                     </NavLink>
+                    <NavLink
+                        to="/cart"
+                        className={({ isActive }) =>
+                            `${classes.drawerLink} ${isActive ? classes.drawerLinkActive : ''}`
+                        }
+                    >
+                        {t('header.nav.cart')}
+                        {totalItems > 0 && ` · ${totalItems}`}
+                    </NavLink>
 
                     <div className={classes.drawerDivider} />
 
-                    <Group gap="xs">
+                    <div style={{ display: 'flex', gap: 8 }}>
                         <LanguageSwitcher />
                         <CountrySwitcher />
-                    </Group>
-
-                    <Text size="xs" c="dimmed" mt="md">
-                        {t('common.tagline')}
-                    </Text>
+                    </div>
                 </Stack>
             </Drawer>
         </>

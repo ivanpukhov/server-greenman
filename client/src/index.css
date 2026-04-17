@@ -1,17 +1,94 @@
-body {
-  margin: 0;
-  font-family: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #182c22;
-}
-
-code {
-  font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
-}
+@import './theme/tokens.css';
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: var(--color-brand-200);
+  color: var(--color-ink-900);
+}
+
+:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+/* Respect notches / home indicator on mobile, bottom bar visible on <= md */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: calc(var(--bottombar-h) + var(--safe-bottom));
+  }
+}
+
+/* Hide scrollbars on horizontal rails but keep functional */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-snap-x::-webkit-scrollbar {
+  display: none;
+}
+.scroll-snap-x > * {
+  scroll-snap-align: start;
 }
