@@ -1,45 +1,66 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Hook для программной навигации
-import search from "../../images/search.svg";
+import { useNavigate } from 'react-router-dom';
+import { ActionIcon, SegmentedControl, Stack, TextInput } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import { IconSearch, IconArrowRight } from '../../icons';
 
-const SearchBlock = () => {
-    const [searchName, setSearchName] = useState('');
-    const [searchDisease, setSearchDisease] = useState('');
-    const navigate = useNavigate(); // Получаем функцию navigate для перенаправления
+const SearchBlock = ({ initialType = 'name', onSubmit }) => {
+    const { t } = useTranslation();
+    const [type, setType] = useState(initialType);
+    const [query, setQuery] = useState('');
+    const navigate = useNavigate();
 
-    const handleSearch = (type, query) => {
-        // Осуществляем переход к соответствующей странице поиска
-        if (query.trim() !== '') {
-            navigate(`/search/${type}/${encodeURIComponent(query)}`);
-        }
+    const handleSubmit = (e) => {
+        e?.preventDefault();
+        const trimmed = query.trim();
+        if (!trimmed) return;
+        navigate(`/search/${type}/${encodeURIComponent(trimmed)}`);
+        onSubmit?.();
     };
 
     return (
-        <div className="banner__form">
-            <div className="banner__input">
-                <input
-                    type="text"
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                    placeholder="Поиск по названию"
+        <form onSubmit={handleSubmit}>
+            <Stack gap="sm">
+                <SegmentedControl
+                    value={type}
+                    onChange={setType}
+                    fullWidth
+                    radius="xl"
+                    data={[
+                        { label: t('search.by_name'), value: 'name' },
+                        { label: t('search.by_disease'), value: 'disease' },
+                    ]}
                 />
-                <button type="button" className="banner__btn" onClick={() => handleSearch('name', searchName)}>
-                    <img src={search} alt="Search"/>
-                </button>
-            </div>
-            <div className="banner__input">
-                <input
-                    type="text"
-                    value={searchDisease}
-                    onChange={(e) => setSearchDisease(e.target.value)}
-                    placeholder="Поиск по болезни"
+                <TextInput
+                    size="lg"
+                    radius="xl"
+                    placeholder={
+                        type === 'name'
+                            ? t('header.search_placeholder_name')
+                            : t('header.search_placeholder_disease')
+                    }
+                    value={query}
+                    onChange={(e) => setQuery(e.currentTarget.value)}
+                    leftSection={<IconSearch size={18} stroke={1.7} />}
+                    rightSection={
+                        <ActionIcon
+                            type="submit"
+                            size="lg"
+                            radius="xl"
+                            variant="filled"
+                            color="greenman"
+                            aria-label={t('search.title')}
+                            disabled={!query.trim()}
+                        >
+                            <IconArrowRight size={18} stroke={1.8} />
+                        </ActionIcon>
+                    }
+                    rightSectionWidth={48}
+                    autoFocus
                 />
-                <button type="button" className="banner__btn" onClick={() => handleSearch('disease', searchDisease)}>
-                    <img src={search} alt="Search"/>
-                </button>
-            </div>
-        </div>
+            </Stack>
+        </form>
     );
-}
+};
 
 export default SearchBlock;

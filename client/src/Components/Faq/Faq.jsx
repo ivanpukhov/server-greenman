@@ -1,79 +1,79 @@
 import React from 'react';
-import { Accordion, Anchor, Text, Title } from '@mantine/core';
-import faqImage from '../../images/faq.png';
+import { Accordion, Anchor, Stack, Text, Title } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import { IconHelpCircle, IconBrandWhatsapp } from '../../icons';
 
-const faqData = [
-    {
-        question: 'В каком городе вы находитесь и как осуществляется доставка?',
-        answer: 'Мы находимся в городе Петропавловск. Доставка осуществляется Казпочтой. В города Щучинск, Кокшетау, Астана, Костанай можем отправить посылочку InDrive.'
-    },
-    {
-        question: 'Как узнать какой препарат мне подойдет?',
-        answer: 'Нужно пройти полное обследование и получить диагноз у лечащего врача. После отправьте точный диагноз нашему консультанту, и он предложит вам курс лечения в ',
-        linkText: 'WhatsApp',
-        linkUrl: 'https://wa.me/77770978675/'
-    },
-    {
-        question: 'Куда обратиться для личной консультации?',
-        answer: 'Консультация проводится по ',
-        linkText: 'WhatsApp',
-        linkUrl: 'https://wa.me/77770978675/'
-    },
-    {
-        question: 'Как оформить заказ на сайте?',
-        answer: 'Нажмите на значок поиска, введите название нужного вам продукта или болезнь. Выберите нужный продукт, ознакомьтесь с описанием и противопоказаниями, добавьте в корзину. Заполните данные для доставки, выберите способы оплаты и доставки, нажмите «Оформить заказ». Вы получите счет на оплату в Kaspi. После оплаты на WhatsApp придёт трек-номер посылки и видеообзор.'
-    },
-    {
-        question: 'Как происходит оплата?',
-        answer: 'Оплата через Kaspi — мы выставляем счёт перед отправкой собранной посылки. Перед отправкой предоставляем видеообзор.'
-    },
-    {
-        question: 'Сколько хранится ваша продукция?',
-        answer: 'Продукция хранится в холодильнике в течение года.'
-    }
-];
+const Faq = () => {
+    const { t } = useTranslation();
+    const items = t('main.faq.items', { returnObjects: true });
 
-const Faq = () => (
-    <div style={{ marginTop: 48 }}>
-        <Title order={3} ta="center" mb={4} style={{ color: '#00AB6D' }}>
-            <span style={{ color: '#00AB6D' }}>FAQ</span>
-        </Title>
-        <Text ta="center" c="dimmed" mb={24} size="sm">
-            Часто задаваемые вопросы
-        </Text>
-        <Accordion
-            radius="lg"
-            variant="separated"
-            styles={{
-                item: {
-                    border: '1px solid rgba(0,171,109,0.15)',
-                    background: '#fff'
-                },
-                control: { fontWeight: 600 },
-                label: { color: '#1c3328' }
-            }}
-        >
-            {faqData.map((item, index) => (
-                <Accordion.Item key={index} value={String(index)}>
-                    <Accordion.Control
-                        icon={<img src={faqImage} alt="" style={{ width: 22, height: 22 }} />}
+    const renderAnswer = (text) => {
+        const parts = text.split('WhatsApp');
+        if (parts.length === 1) return text;
+        return parts.map((part, i) => (
+            <React.Fragment key={i}>
+                {part}
+                {i < parts.length - 1 && (
+                    <Anchor
+                        href="https://wa.me/77770978675"
+                        target="_blank"
+                        rel="noreferrer"
+                        c="greenman"
+                        inline
+                        fw={600}
                     >
-                        {item.question}
-                    </Accordion.Control>
-                    <Accordion.Panel>
-                        <Text size="sm" c="dimmed">
-                            {item.answer}
-                            {item.linkUrl && (
-                                <Anchor href={item.linkUrl} target="_blank" c="greenman">
-                                    {item.linkText}
-                                </Anchor>
-                            )}
-                        </Text>
-                    </Accordion.Panel>
-                </Accordion.Item>
-            ))}
-        </Accordion>
-    </div>
-);
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}>
+                            <IconBrandWhatsapp size={15} stroke={1.8} />
+                            WhatsApp
+                        </span>
+                    </Anchor>
+                )}
+            </React.Fragment>
+        ));
+    };
+
+    return (
+        <section style={{ marginTop: 72 }}>
+            <Stack gap={4} align="center" mb="xl">
+                <Text size="sm" fw={600} c="greenman" tt="uppercase" lts={0.8}>
+                    {t('main.faq.subtitle')}
+                </Text>
+                <Title order={2} ta="center" style={{ letterSpacing: '-0.02em' }}>
+                    {t('main.faq.title')}
+                </Title>
+            </Stack>
+
+            <Accordion
+                radius="lg"
+                variant="separated"
+                chevronPosition="right"
+                styles={{
+                    item: {
+                        border: '1px solid var(--mantine-color-gray-2)',
+                        background: '#fff',
+                        marginBottom: 8,
+                    },
+                    control: { fontWeight: 600, padding: '18px 20px' },
+                    label: { color: '#0b1712' },
+                }}
+            >
+                {items.map((item, index) => (
+                    <Accordion.Item key={index} value={String(index)}>
+                        <Accordion.Control
+                            icon={<IconHelpCircle size={20} stroke={1.7} color="var(--mantine-color-greenman-7)" />}
+                        >
+                            {item.q}
+                        </Accordion.Control>
+                        <Accordion.Panel>
+                            <Text size="sm" c="dimmed" lh={1.65}>
+                                {renderAnswer(item.a)}
+                            </Text>
+                        </Accordion.Panel>
+                    </Accordion.Item>
+                ))}
+            </Accordion>
+        </section>
+    );
+};
 
 export default Faq;

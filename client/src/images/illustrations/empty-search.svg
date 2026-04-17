@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="searchBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#edfbf4"/>
+      <stop offset="1" stop-color="#d4f4e2"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="160" cy="215" rx="110" ry="8" fill="#d4f4e2"/>
+
+  <g transform="translate(80 40)">
+    <circle cx="70" cy="70" r="60" fill="url(#searchBg)" stroke="#2fc871" stroke-width="3"/>
+    <circle cx="70" cy="70" r="40" fill="#ffffff" opacity="0.7"/>
+    <line x1="115" y1="115" x2="155" y2="155" stroke="#00984d" stroke-width="8" stroke-linecap="round"/>
+    <path d="M50 70 Q 70 50 90 70" stroke="#4acf84" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <circle cx="58" cy="60" r="2" fill="#00984d"/>
+    <circle cx="82" cy="60" r="2" fill="#00984d"/>
+  </g>
+
+  <circle cx="40" cy="60" r="5" fill="#4acf84" opacity="0.5"/>
+  <circle cx="280" cy="80" r="8" fill="#72daa0" opacity="0.6"/>
+  <circle cx="270" cy="170" r="4" fill="#2fc871" opacity="0.4"/>
+</svg>

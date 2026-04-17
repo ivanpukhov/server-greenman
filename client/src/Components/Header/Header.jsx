@@ -1,68 +1,185 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ActionIcon, Drawer, Group, Indicator, Text } from '@mantine/core';
+import { ActionIcon, Burger, Drawer, Group, Indicator, Stack, Text } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
 import logo from '../../images/logo.svg';
 import SearchBlock from '../Catalog/SearchBlock';
-import { useCart } from '../../CartContext.jsx';
 import CountrySwitcher from '../CountrySelect/CountrySwitcher';
+import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
+import { useCart } from '../../CartContext.jsx';
+import { IconSearch, IconShoppingBag, IconUser } from '../../icons';
 import classes from './Header.module.scss';
 
 const Header = () => {
+    const { t } = useTranslation();
     const location = useLocation();
-    const isNotAuthPage = location.pathname !== '/auth';
+    const isAuthPage = location.pathname === '/auth';
     const [searchOpen, setSearchOpen] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
     const { cart } = useCart();
-    const totalItemsInCart = cart.reduce((total, item) => total + item.quantity, 0);
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-    if (!isNotAuthPage) return null;
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 4);
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
+    useEffect(() => {
+        setMenuOpen(false);
+        setSearchOpen(false);
+    }, [location.pathname]);
+
+    if (isAuthPage) return null;
+
+    const navLinks = [
+        { to: '/', label: t('header.nav.home'), end: true },
+        { to: '/catalog', label: t('header.nav.catalog') },
+    ];
 
     return (
-        <header className={classes.header}>
-            <Link to="/" className={classes.logo}>
-                <img src={logo} alt="greenman.kz" />
-                <span>GreenMan</span>
-            </Link>
+        <>
+            <header className={`${classes.header} ${scrolled ? classes.scrolled : ''}`}>
+                <div className={classes.inner}>
+                    <Link to="/" className={classes.logo} aria-label={t('common.brand')}>
+                        <img src={logo} alt="" />
+                        <span>{t('common.brand')}</span>
+                    </Link>
 
-            <nav className={classes.desktopNav}>
-                <NavLink to="/" className={({ isActive }) => `${classes.navItem} ${isActive ? classes.navItemActive : ''}`} end>
-                    Главная
-                </NavLink>
-                <NavLink to="/catalog" className={({ isActive }) => `${classes.navItem} ${isActive ? classes.navItemActive : ''}`}>
-                    Каталог
-                </NavLink>
-                <NavLink to="/cart" className={({ isActive }) => `${classes.navItem} ${isActive ? classes.navItemActive : ''}`}>
-                    <Indicator label={totalItemsInCart} size={16} disabled={totalItemsInCart === 0} color="greenman">
-                        <Text>Корзина</Text>
-                    </Indicator>
-                </NavLink>
-                <NavLink to="/profile" className={({ isActive }) => `${classes.navItem} ${isActive ? classes.navItemActive : ''}`}>
-                    Профиль
-                </NavLink>
-            </nav>
+                    <nav className={classes.desktopNav}>
+                        {navLinks.map((link) => (
+                            <NavLink
+                                key={link.to}
+                                to={link.to}
+                                end={link.end}
+                                className={({ isActive }) =>
+                                    `${classes.navItem} ${isActive ? classes.navItemActive : ''}`
+                                }
+                            >
+                                {link.label}
+                            </NavLink>
+                        ))}
+                    </nav>
 
-            <Group className={classes.right} gap="sm">
-                <CountrySwitcher />
-                <ActionIcon variant="subtle" color="greenman" size="lg" onClick={() => setSearchOpen(true)} aria-label="Поиск">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                </ActionIcon>
-            </Group>
+                    <Group gap={6} className={classes.right} wrap="nowrap">
+                        <ActionIcon
+                            variant="subtle"
+                            size="lg"
+                            radius="xl"
+                            onClick={() => setSearchOpen(true)}
+                            aria-label={t('search.title')}
+                            color="gray"
+                        >
+                            <IconSearch size={20} stroke={1.7} />
+                        </ActionIcon>
+
+                        <div className={classes.hideOnMobile}>
+                            <LanguageSwitcher compact />
+                        </div>
+                        <div className={classes.hideOnMobile}>
+                            <CountrySwitcher compact />
+                        </div>
+
+                        <ActionIcon
+                            component={NavLink}
+                            to="/cart"
+                            variant="subtle"
+                            size="lg"
+                            radius="xl"
+                            color="gray"
+                            aria-label={t('header.nav.cart')}
+                        >
+                            <Indicator
+                                label={totalItems}
+                                size={16}
+                                disabled={totalItems === 0}
+                                color="greenman"
+                                offset={2}
+                            >
+                                <IconShoppingBag size={20} stroke={1.7} />
+                            </Indicator>
+                        </ActionIcon>
+
+                        <ActionIcon
+                            component={NavLink}
+                            to="/profile"
+                            variant="subtle"
+                            size="lg"
+                            radius="xl"
+                            color="gray"
+                            className={classes.hideOnMobile}
+                            aria-label={t('header.nav.profile')}
+                        >
+                            <IconUser size={20} stroke={1.7} />
+                        </ActionIcon>
+
+                        <Burger
+                            opened={menuOpen}
+                            onClick={() => setMenuOpen((v) => !v)}
+                            size="sm"
+                            aria-label={menuOpen ? t('header.menu_close') : t('header.menu_open')}
+                            className={classes.burger}
+                        />
+                    </Group>
+                </div>
+            </header>
 
             <Drawer
                 opened={searchOpen}
                 onClose={() => setSearchOpen(false)}
                 position="top"
                 size="auto"
-                title="Поиск"
-                overlayProps={{ opacity: 0.4, blur: 2 }}
+                title={t('search.title')}
+                padding="lg"
             >
-                <div style={{ padding: '0 0 16px' }}>
-                    <SearchBlock />
-                </div>
+                <SearchBlock onSubmit={() => setSearchOpen(false)} />
             </Drawer>
-        </header>
+
+            <Drawer
+                opened={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                position="right"
+                size="80%"
+                padding="lg"
+                title={t('common.brand')}
+            >
+                <Stack gap="md">
+                    {navLinks.map((link) => (
+                        <NavLink
+                            key={link.to}
+                            to={link.to}
+                            end={link.end}
+                            className={({ isActive }) =>
+                                `${classes.drawerLink} ${isActive ? classes.drawerLinkActive : ''}`
+                            }
+                        >
+                            {link.label}
+                        </NavLink>
+                    ))}
+                    <NavLink
+                        to="/profile"
+                        className={({ isActive }) =>
+                            `${classes.drawerLink} ${isActive ? classes.drawerLinkActive : ''}`
+                        }
+                    >
+                        {t('header.nav.profile')}
+                    </NavLink>
+
+                    <div className={classes.drawerDivider} />
+
+                    <Group gap="xs">
+                        <LanguageSwitcher />
+                        <CountrySwitcher />
+                    </Group>
+
+                    <Text size="xs" c="dimmed" mt="md">
+                        {t('common.tagline')}
+                    </Text>
+                </Stack>
+            </Drawer>
+        </>
     );
 };
 

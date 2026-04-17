@@ -1,0 +1,38 @@
+.page {
+    padding-bottom: 120px;
+}
+
+.title {
+    font-size: clamp(28px, 4vw, 40px);
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+}
+
+.gallery {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    max-height: 480px;
+    border-radius: 28px;
+    background: linear-gradient(135deg, var(--mantine-color-greenman-0) 0%, var(--mantine-color-greenman-1) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.galleryInitial {
+    font-family: 'Hagrid', serif;
+    font-size: clamp(120px, 20vw, 180px);
+    font-weight: 800;
+    color: var(--mantine-color-greenman-7);
+    letter-spacing: -0.03em;
+    opacity: 0.9;
+}
+
+.galleryLeaf {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    color: var(--mantine-color-greenman-5);
+    opacity: 0.6;
+}

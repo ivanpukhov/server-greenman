@@ -9,7 +9,7 @@ export const CURRENCIES = {
 export const toDisplayPrice = (kztPrice, country) => {
     const base = Number(kztPrice) || 0;
     if (country === 'RF') {
-        return Math.round(base * KZT_TO_RUB_RATE * RF_MARKUP);
+        return Math.round(base * RF_MARKUP / KZT_TO_RUB_RATE);
     }
     return Math.round(base);
 };

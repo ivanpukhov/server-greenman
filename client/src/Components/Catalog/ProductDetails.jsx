@@ -1,126 +1,172 @@
-import {useEffect, useState} from "react";
-import axios from "axios";
-import {useNavigate, useParams} from "react-router-dom";
-import back from '../../images/ion_arrow-back.svg'
-import children from '../../images/children.png'
-import adults from '../../images/adults.png'
-import FaqItem from "../FaqItem/FaqItem";
-import AddToCartControl from "./AddToCartControl.jsx";
-import {Helmet} from "react-helmet";
-import ScrollToTop from "../ScrollToTop";
-import { Center, Loader, Text, UnstyledButton } from '@mantine/core';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+    ActionIcon,
+    Badge,
+    Button,
+    Center,
+    Container,
+    Group,
+    Loader,
+    SimpleGrid,
+    Stack,
+    Tabs,
+    Text,
+    Title,
+} from '@mantine/core';
+import { Helmet } from 'react-helmet';
+import { useTranslation } from 'react-i18next';
+import ScrollToTop from '../ScrollToTop';
+import FaqItem from '../FaqItem/FaqItem';
+import AddToCartControl from './AddToCartControl.jsx';
+import { useFormatPrice } from '../../contexts/CountryContext.jsx';
+import {
+    IconArrowLeft,
+    IconInfoCircle,
+    IconLeaf,
+    IconAlertCircle,
+    IconUser,
+    IconMoodKid,
+} from '../../icons';
+import s from './ProductDetails.module.scss';
 
 const ProductInfo = () => {
-    const [product, setproduct] = useState(null);
+    const { t } = useTranslation();
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const formatPrice = useFormatPrice();
+
+    const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    let {id} = useParams();
-    let navigate = useNavigate();
 
     useEffect(() => {
         setLoading(true);
-        axios.get(`/api/products/${id}`)
-            .then(response => {
-                setproduct(response.data);
-                setLoading(false);
-            })
-            .catch(error => {
-                console.error('Ошибка при получении данных о товаре:', error);
-                setError('Ошибка при получении данных о товаре');
-                setLoading(false);
-            });
-    }, [id]);
-
-    const [isExpanded, setIsExpanded] = useState(false);
-
+        axios
+            .get(`/api/products/${id}`)
+            .then((res) => setProduct(res.data))
+            .catch(() => setError(t('product.error')))
+            .finally(() => setLoading(false));
+    }, [id, t]);
 
     if (loading) return <Center py={80}><Loader color="greenman" size="lg" /></Center>;
     if (error) return <Center py={40}><Text c="red">{error}</Text></Center>;
-    if (!product) return <Center py={40}><Text c="dimmed">Данные о товаре не найдены.</Text></Center>;
+    if (!product) return <Center py={40}><Text c="dimmed">{t('product.not_found')}</Text></Center>;
 
-    const formatDescription = (description, shouldShorten = false) => {
-        const splitDescription = description.split(/[\•\*]/).map((item, index) => index === 0 ? item : `•${item}`).join('<br>');
-        return shouldShorten ? splitDescription.slice(0, 300) + (splitDescription.length > 300 ? '...' : '') : splitDescription;
-    };
-
-    const toggleExpand = () => {
-        setIsExpanded(!isExpanded);
-    };
-    const truncateString = (str, num = 220) => {
-        return str.length > num ? str.slice(0, num) + '...' : str;
-    };
-
+    const minPrice = product.types?.length ? Math.min(...product.types.map((tp) => tp.price)) : 0;
+    const initial = (product.name || '?').trim().charAt(0).toUpperCase();
 
     return (
-        <div className="productInfo">
+        <Container size="xl" px="md" py="md" className={s.page}>
             <Helmet>
-                <title>{product.name} - Продукция Greenman</title>
-                <meta name="description" content={truncateString(product.description, 160)}/>
-                <meta name="keywords"
-                      content={product.diseases && product.diseases.map(disease => disease).join(', ')}/>
-
-                {/* Open Graph tags */}
-                <meta property="og:title" content={`${product.name} - Продукция Greenman`}/>
-                <meta property="og:description" content={truncateString(product.description, 200)}/>
-                <meta property="og:type" content="product"/>
-                <meta property="og:url" content={`https://greenman.kz/${product.id}`}/>
-                <meta property="og:image" content={product.image}/>
-                <meta property="og:site_name" content="Greenman"/>
-
-
-                <meta name="robots" content="index, follow"/>
-                <meta name="author" content="Greenman"/>
+                <title>{`${product.name} — GreenMan`}</title>
+                <meta name="description" content={(product.description || '').slice(0, 160)} />
+                <meta property="og:title" content={`${product.name} — GreenMan`} />
+                <meta property="og:type" content="product" />
             </Helmet>
-            <ScrollToTop/>
-            <div className="productInfo__header">
-                <UnstyledButton className="productInfo__header--back" onClick={() => navigate(-1)}>
-                    <img src={back} alt=""/>
-                </UnstyledButton>
-                <h1 className="productInfo__header--title">
-                    {product.name}
-                </h1>
-            </div>
-            <div className="productInfo__desc">
-                <h2 className="productInfo__desc--title">Описание</h2>
-                <div className="productInfo__desc--content">
-                    <div dangerouslySetInnerHTML={{__html: formatDescription(product.description, !isExpanded)}}/>
-                    {product.description.length > 300 && (
-                        <span onClick={toggleExpand}>
-                            {isExpanded ? 'Скрыть' : 'Подробнее'}
-                        </span>
-                    )}
+            <ScrollToTop />
+
+            <Group gap="sm" mb="lg">
+                <ActionIcon variant="subtle" size="lg" radius="xl" onClick={() => navigate(-1)} aria-label={t('common.back')}>
+                    <IconArrowLeft size={20} stroke={1.7} />
+                </ActionIcon>
+                <Text size="sm" c="dimmed">{t('product.back_to_catalog')}</Text>
+            </Group>
+
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
+                <div className={s.gallery} aria-hidden="true">
+                    <span className={s.galleryInitial}>{initial}</span>
+                    <IconLeaf size={40} stroke={1.4} className={s.galleryLeaf} />
                 </div>
 
-            </div>
+                <Stack gap="md">
+                    <Stack gap={4}>
+                        <Title order={1} className={s.title}>{product.name}</Title>
+                        <Text size="md" c="dimmed" lh={1.6} lineClamp={4}>
+                            {product.description}
+                        </Text>
+                    </Stack>
 
-            <div className="productInfo__desc mt42">
-                <h2 className="productInfo__desc--title">Для лечения</h2>
-                {product.diseases && <ul className='diseases'>
-                    {product.diseases.map((disease, index) => (
-                        <li key={index} className="disease">{disease},</li>
-                    ))}
-                </ul>}
+                    <Group align="baseline" gap="xs">
+                        <Text fw={800} size="2rem" c="greenman" style={{ letterSpacing: '-0.02em' }}>
+                            {formatPrice(minPrice)}
+                        </Text>
+                    </Group>
 
-            </div>
+                    <AddToCartControl product={product} />
 
-            <div className="productInfo__desc mt42 contraindications">
-                <h2 className="productInfo__desc--title">Противопоказания</h2>
-                <ul className='diseases'>
-                    <li className="disease ">{product.contraindications}</li>
-                </ul>
+                    {product.diseases?.length > 0 && (
+                        <Group gap={6} wrap="wrap" mt="xs">
+                            {product.diseases.slice(0, 6).map((d, i) => (
+                                <Badge key={i} variant="light" color="greenman" radius="sm" size="md">
+                                    {d}
+                                </Badge>
+                            ))}
+                        </Group>
+                    )}
+                </Stack>
+            </SimpleGrid>
 
-            </div>
-            <FaqItem question={'Способ применения для взрослых'} answer={product.applicationMethodAdults}
-                     imageUrl={adults}/>
-            <FaqItem question={'Способ применения для детей'} answer={product.applicationMethodChildren}
-                     imageUrl={children}/>
-            <div className="product__add">
-                <AddToCartControl product={product}/>
-            </div>
+            <Tabs defaultValue="description" mt={48} color="greenman" variant="pills" radius="xl">
+                <Tabs.List grow>
+                    <Tabs.Tab value="description" leftSection={<IconInfoCircle size={16} stroke={1.7} />}>
+                        {t('product.description')}
+                    </Tabs.Tab>
+                    <Tabs.Tab value="indications" leftSection={<IconLeaf size={16} stroke={1.7} />}>
+                        {t('product.indications')}
+                    </Tabs.Tab>
+                    <Tabs.Tab value="contraindications" leftSection={<IconAlertCircle size={16} stroke={1.7} />}>
+                        {t('product.contraindications')}
+                    </Tabs.Tab>
+                </Tabs.List>
 
+                <Tabs.Panel value="description" pt="lg">
+                    <Text size="md" lh={1.7} style={{ whiteSpace: 'pre-line' }}>
+                        {product.description}
+                    </Text>
+                </Tabs.Panel>
 
-        </div>
+                <Tabs.Panel value="indications" pt="lg">
+                    {product.diseases?.length > 0 ? (
+                        <Group gap={6} wrap="wrap">
+                            {product.diseases.map((d, i) => (
+                                <Badge key={i} variant="light" color="greenman" radius="sm" size="lg">
+                                    {d}
+                                </Badge>
+                            ))}
+                        </Group>
+                    ) : (
+                        <Text c="dimmed">—</Text>
+                    )}
+                </Tabs.Panel>
+
+                <Tabs.Panel value="contraindications" pt="lg">
+                    <Text size="md" c="dimmed" lh={1.7}>
+                        {product.contraindications || '—'}
+                    </Text>
+                </Tabs.Panel>
+            </Tabs>
+
+            <Stack gap="sm" mt={40}>
+                <Title order={3} style={{ letterSpacing: '-0.02em' }}>{t('product.usage')}</Title>
+                {product.applicationMethodAdults && (
+                    <FaqItem
+                        question={t('product.usage_adults')}
+                        answer={product.applicationMethodAdults}
+                        icon={IconUser}
+                    />
+                )}
+                {product.applicationMethodChildren && (
+                    <FaqItem
+                        question={t('product.usage_children')}
+                        answer={product.applicationMethodChildren}
+                        icon={IconMoodKid}
+                    />
+                )}
+            </Stack>
+        </Container>
     );
-}
+};
 
 export default ProductInfo;

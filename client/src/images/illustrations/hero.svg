@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none">
+  <defs>
+    <linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#edfbf4"/>
+      <stop offset="1" stop-color="#a5e7c2"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2fc871"/>
+      <stop offset="1" stop-color="#00833f"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="240" cy="240" r="220" fill="url(#heroBg)"/>
+  <circle cx="240" cy="240" r="170" fill="#ffffff" opacity="0.55"/>
+
+  <g transform="translate(140 90)">
+    <path d="M100 300 C 60 220, 60 120, 110 60 C 160 120, 160 220, 120 300 Z" fill="url(#leaf)"/>
+    <path d="M110 60 L110 300" stroke="#edfbf4" stroke-width="2" stroke-linecap="round"/>
+    <path d="M110 110 L70 140 M110 150 L70 180 M110 190 L70 220 M110 230 L70 260" stroke="#edfbf4" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+    <path d="M110 110 L150 140 M110 150 L150 180 M110 190 L150 220 M110 230 L150 260" stroke="#edfbf4" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  </g>
+
+  <g transform="translate(310 120)">
+    <path d="M0 60 C -20 20, 20 -10, 40 20 C 55 -5, 90 0, 80 35 C 100 50, 80 90, 50 75 C 40 95, 10 95, 0 60 Z" fill="#72daa0" opacity="0.9"/>
+    <circle cx="40" cy="40" r="6" fill="#ffffff" opacity="0.8"/>
+  </g>
+
+  <g transform="translate(320 290)">
+    <circle cx="40" cy="40" r="38" fill="#ffffff" stroke="#2fc871" stroke-width="2"/>
+    <path d="M25 40 L35 50 L55 30" stroke="#0eac59" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <circle cx="90" cy="140" r="10" fill="#2fc871" opacity="0.4"/>
+  <circle cx="110" cy="380" r="6" fill="#00984d" opacity="0.5"/>
+  <circle cx="380" cy="380" r="14" fill="#a5e7c2"/>
+  <circle cx="420" cy="220" r="8" fill="#2fc871" opacity="0.5"/>
+</svg>

@@ -1,93 +1,122 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ActionIcon, Indicator, Text } from '@mantine/core';
+import { Indicator, Transition } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import {
+    IconHome,
+    IconHomeFilled,
+    IconCategory,
+    IconCategoryFilled,
+    IconShoppingBag,
+    IconShoppingBagCheck,
+    IconUser,
+    IconUserFilled,
+    IconArrowNarrowRight,
+} from '../../icons';
 import { useCart } from '../../CartContext.jsx';
 import { useFormatPrice } from '../../contexts/CountryContext.jsx';
-import iconHome from '../../images/bottom_bar/home.svg';
-import iconHomeOp from '../../images/bottom_bar/homeOp.svg';
-import iconCart from '../../images/bottom_bar/cart.svg';
-import iconCartOp from '../../images/bottom_bar/cartOp.svg';
-import iconCatalog from '../../images/bottom_bar/catalog.svg';
-import iconCatalogOp from '../../images/bottom_bar/catalogOp.svg';
-import iconProfile from '../../images/bottom_bar/profile.svg';
-import iconProfileOp from '../../images/bottom_bar/profileOp.svg';
+import s from './BottomBar.module.scss';
+
+const TABS = [
+    {
+        to: '/',
+        end: true,
+        labelKey: 'header.nav.home',
+        icon: IconHome,
+        iconActive: IconHomeFilled,
+    },
+    {
+        to: '/catalog',
+        labelKey: 'header.nav.catalog',
+        icon: IconCategory,
+        iconActive: IconCategoryFilled,
+    },
+    {
+        to: '/cart',
+        labelKey: 'header.nav.cart',
+        icon: IconShoppingBag,
+        iconActive: IconShoppingBagCheck,
+        withBadge: true,
+    },
+    {
+        to: '/profile',
+        labelKey: 'header.nav.profile',
+        icon: IconUser,
+        iconActive: IconUserFilled,
+    },
+];
 
 const BottomBar = () => {
+    const { t } = useTranslation();
     const { cart } = useCart();
     const formatPrice = useFormatPrice();
     const location = useLocation();
 
-    const totalItemsInCart = cart.reduce((total, item) => total + item.quantity, 0);
-    const totalItemsPriceInCart = cart.reduce((total, item) => total + item.type.price * item.quantity, 0);
-    const isNotCartPage = location.pathname !== '/cart';
-    const isNotAuthPage = location.pathname !== '/auth';
-    const isNotProductPage = !/\/product\/.*/.test(location.pathname);
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    const totalPrice = cart.reduce((sum, item) => sum + item.type.price * item.quantity, 0);
 
-    if (!isNotAuthPage) return null;
+    const isCartPage = location.pathname === '/cart';
+    const isAuthPage = location.pathname === '/auth';
+    const isProductPage = /\/product\/.*/.test(location.pathname);
+
+    if (isAuthPage) return null;
+
+    const showCartCTA = !isCartPage && !isProductPage && totalItems > 0;
 
     return (
-        <div className="bar">
-            {isNotCartPage && isNotProductPage && totalItemsInCart > 0 && (
-                <Link to="cart" className="link__cart">
-                    <div className="link__text">К оформлению</div>
-                    <div className="link__data">
-                        {totalItemsInCart} шт. {formatPrice(totalItemsPriceInCart)}
-                    </div>
-                </Link>
-            )}
-
-            <NavLink to="/" className="bar__item" end>
-                {({ isActive }) => (
-                    <>
-                        <div className="bar__icon">
-                            <img src={isActive ? iconHome : iconHomeOp} alt="Главная" />
+        <>
+            <Transition mounted={showCartCTA} transition="slide-up" duration={180}>
+                {(style) => (
+                    <Link to="/cart" className={s.cartCta} style={style}>
+                        <div className={s.cartCtaText}>
+                            <span className={s.cartCtaLabel}>{t('cart.actions.to_checkout')}</span>
+                            <span className={s.cartCtaMeta}>
+                                {totalItems} {t('common.pieces')} · {formatPrice(totalPrice)}
+                            </span>
                         </div>
-                        <div className={`bar__text ${isActive ? 'bar__text-green' : ''}`}>Главная</div>
-                    </>
+                        <IconArrowNarrowRight size={20} stroke={1.8} />
+                    </Link>
                 )}
-            </NavLink>
+            </Transition>
 
-            <NavLink to="/catalog" className="bar__item">
-                {({ isActive }) => (
-                    <>
-                        <div className="bar__icon">
-                            <img src={isActive ? iconCatalog : iconCatalogOp} alt="Каталог" />
-                        </div>
-                        <div className={`bar__text ${isActive ? 'bar__text-green' : ''}`}>Каталог</div>
-                    </>
-                )}
-            </NavLink>
-
-            <NavLink to="/cart" className="bar__item">
-                {({ isActive }) => (
-                    <>
-                        <div className="bar__icon" style={{ position: 'relative' }}>
-                            <Indicator
-                                label={totalItemsInCart || ''}
-                                size={16}
-                                disabled={totalItemsInCart === 0}
-                                color="greenman"
-                                offset={2}
-                            >
-                                <img src={isActive ? iconCart : iconCartOp} alt="Корзина" />
-                            </Indicator>
-                        </div>
-                        <div className={`bar__text ${isActive ? 'bar__text-green' : ''}`}>Корзина</div>
-                    </>
-                )}
-            </NavLink>
-
-            <NavLink to="/profile" className="bar__item">
-                {({ isActive }) => (
-                    <>
-                        <div className="bar__icon">
-                            <img src={isActive ? iconProfile : iconProfileOp} alt="Профиль" />
-                        </div>
-                        <div className={`bar__text ${isActive ? 'bar__text-green' : ''}`}>Профиль</div>
-                    </>
-                )}
-            </NavLink>
-        </div>
+            <nav className={s.bar} aria-label="Primary">
+                {TABS.map((tab) => (
+                    <NavLink
+                        key={tab.to}
+                        to={tab.to}
+                        end={tab.end}
+                        className={({ isActive }) => `${s.tab} ${isActive ? s.tabActive : ''}`}
+                    >
+                        {({ isActive }) => {
+                            const Icon = isActive ? tab.iconActive : tab.icon;
+                            const node = (
+                                <span className={s.iconBox}>
+                                    <Icon size={22} stroke={isActive ? 2 : 1.7} />
+                                </span>
+                            );
+                            return (
+                                <>
+                                    {tab.withBadge ? (
+                                        <Indicator
+                                            label={totalItems || ''}
+                                            size={14}
+                                            disabled={totalItems === 0}
+                                            color="greenman"
+                                            offset={3}
+                                        >
+                                            {node}
+                                        </Indicator>
+                                    ) : (
+                                        node
+                                    )}
+                                    <span className={s.tabLabel}>{t(tab.labelKey)}</span>
+                                </>
+                            );
+                        }}
+                    </NavLink>
+                ))}
+            </nav>
+        </>
     );
 };
 

@@ -1,61 +1,89 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import Product from './Product';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { Center, Loader, Stack, Text, Title } from '@mantine/core';
+import {
+    ActionIcon,
+    Container,
+    Group,
+    SimpleGrid,
+    Skeleton,
+    Stack,
+    Text,
+    Title,
+} from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import Product from './Product';
+import SearchBlock from './SearchBlock';
+import { IconArrowLeft } from '../../icons';
+import emptySearch from '../../images/illustrations/empty-search.svg';
 
 const Search = () => {
+    const { t } = useTranslation();
+    const { type, query } = useParams();
+    const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { type, query } = useParams();
 
     useEffect(() => {
         if (!query) return;
         setLoading(true);
-        axios.get(`/api/products/search/${query}?type=${type}`)
-            .then(res => {
-                setProducts(Array.isArray(res.data) ? res.data : []);
-                setLoading(false);
+        axios
+            .get(`/api/products/search/${query}?type=${type}`)
+            .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
+            .catch((err) => {
+                if (err.response?.status === 404) setProducts([]);
+                else setError(err.message);
             })
-            .catch(err => {
-                if (err.response?.status === 404) {
-                    setProducts([]);
-                } else {
-                    setError(err.message);
-                }
-                setLoading(false);
-            });
+            .finally(() => setLoading(false));
     }, [query, type]);
 
-    if (loading) return <Center py={60}><Loader color="greenman" size="lg" /></Center>;
-    if (error) return <Center py={40}><Text c="red">{error}</Text></Center>;
-
     return (
-        <div className="search-page">
+        <Container size="xl" px="md" py="md">
             <Helmet>
-                <title>{type === 'name' ? 'Поиск продуктов по имени' : 'Поиск продуктов по болезни'}</title>
-                <meta name="description" content={`Поиск продуктов по ${type === 'name' ? 'имени' : 'болезни'} "${query}"`} />
+                <title>{t('search.title')} — GreenMan</title>
+                <meta name="description" content={t('search.results_for', { query })} />
             </Helmet>
-            <Title order={2} className="search__title" mb="lg">
-                Результаты поиска для «{query}»
-            </Title>
-            {products.length > 0 ? (
-                <div className="product-list">
-                    {products.map(product => (
+
+            <Group gap="sm" mb="md">
+                <ActionIcon variant="subtle" size="lg" radius="xl" onClick={() => navigate(-1)} aria-label={t('common.back')}>
+                    <IconArrowLeft size={20} stroke={1.7} />
+                </ActionIcon>
+                <Stack gap={0}>
+                    <Title order={2} style={{ letterSpacing: '-0.02em' }}>{t('search.title')}</Title>
+                    <Text size="sm" c="dimmed">{t('search.results_for', { query })}</Text>
+                </Stack>
+            </Group>
+
+            <div style={{ marginBottom: 24 }}>
+                <SearchBlock initialType={type} />
+            </div>
+
+            {loading ? (
+                <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} h={260} radius="lg" />
+                    ))}
+                </SimpleGrid>
+            ) : error ? (
+                <Stack align="center" py="xl" gap="xs">
+                    <Text c="red">{error}</Text>
+                </Stack>
+            ) : products.length === 0 ? (
+                <Stack align="center" py={64} gap="xs">
+                    <img src={emptySearch} alt="" style={{ width: 200, height: 'auto' }} />
+                    <Title order={4}>{t('search.empty_title')}</Title>
+                    <Text size="sm" c="dimmed">{t('search.empty_text')}</Text>
+                </Stack>
+            ) : (
+                <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+                    {products.map((product) => (
                         <Product key={product.id} product={product} />
                     ))}
-                </div>
-            ) : (
-                <Center py={48}>
-                    <Stack align="center" gap="xs">
-                        <Text size="2rem">🔍</Text>
-                        <Text c="greenman" fw={500}>Продукты не найдены</Text>
-                    </Stack>
-                </Center>
+                </SimpleGrid>
             )}
-        </div>
+        </Container>
     );
 };
 

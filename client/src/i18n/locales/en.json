@@ -1,0 +1,255 @@
+{
+  "common": {
+    "brand": "GreenMan",
+    "tagline": "Medicinal tinctures, juices and syrups from healing plants",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "back": "Back",
+    "home": "Go home",
+    "catalog": "Browse catalog",
+    "continue": "Continue",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "more": "Read more",
+    "less": "Show less",
+    "currency_kzt": "₸",
+    "currency_rub": "₽",
+    "pieces": "pcs"
+  },
+  "header": {
+    "nav": {
+      "home": "Home",
+      "catalog": "Catalog",
+      "cart": "Cart",
+      "profile": "Profile"
+    },
+    "search_placeholder_name": "Search by product name",
+    "search_placeholder_disease": "Search by condition",
+    "search_toggle_name": "By name",
+    "search_toggle_disease": "By condition",
+    "menu_open": "Open menu",
+    "menu_close": "Close menu"
+  },
+  "footer": {
+    "description": "Natural tinctures, juices and syrups from medicinal plants. Crafting since 2018.",
+    "nav_title": "Navigation",
+    "contacts_title": "Contacts",
+    "hours": "Every day, 9:00 — 18:00",
+    "copyright": "© {{year}} GreenMan · All rights reserved"
+  },
+  "language": {
+    "label": "Language",
+    "ru": "Русский",
+    "kz": "Қазақша",
+    "en": "English"
+  },
+  "country": {
+    "label": "Country",
+    "kz": "Kazakhstan",
+    "rf": "Russia",
+    "choose_title": "Choose your country",
+    "choose_subtitle": "This affects pricing, delivery and payment options"
+  },
+  "main": {
+    "seo_title": "GreenMan — Medicinal tinctures, juices and syrups",
+    "seo_description": "Natural juices, tinctures and extracts from medicinal herbs, roots, seeds and fruits. Free diagnosis-based consultation.",
+    "hero": {
+      "eyebrow": "Nature's power in every drop",
+      "title": "Natural wellness by GreenMan",
+      "subtitle": "Tinctures, juices and syrups crafted from medicinal plants. Hand-made since 2018.",
+      "cta_catalog": "Browse catalog",
+      "cta_consult": "Ask on WhatsApp"
+    },
+    "trust": {
+      "natural": {
+        "title": "100% natural",
+        "text": "Just plants, water and cold pressing. No preservatives."
+      },
+      "delivery": {
+        "title": "Nationwide delivery",
+        "text": "KazPost, courier and InDrive to nearby cities."
+      },
+      "consult": {
+        "title": "Free consultation",
+        "text": "We help pick the right product for your diagnosis."
+      },
+      "quality": {
+        "title": "Video preview before shipping",
+        "text": "You see your order before it leaves our workshop."
+      }
+    },
+    "about": {
+      "eyebrow": "About us",
+      "title": "What we do",
+      "text": "We craft juices, tinctures and extracts from medicinal herbs, roots, seeds and fruits. We pick products for your diagnosis and consult for free on WhatsApp."
+    },
+    "top": {
+      "title": "Popular products",
+      "subtitle": "Most-purchased and recommended",
+      "see_all": "See all"
+    },
+    "faq": {
+      "title": "Questions & answers",
+      "subtitle": "Short and to the point",
+      "items": [
+        {
+          "q": "Where are you and how do you ship?",
+          "a": "We're in Petropavlovsk. We ship across Kazakhstan via KazPost. To Shchuchinsk, Kokshetau, Astana and Kostanay we can also ship via InDrive."
+        },
+        {
+          "q": "How do I know which product suits me?",
+          "a": "Get a diagnosis from your doctor, send it to our consultant on WhatsApp — we'll suggest a treatment course."
+        },
+        {
+          "q": "Where can I get a personal consultation?",
+          "a": "Consultations happen on WhatsApp — every day from 9:00 to 18:00."
+        },
+        {
+          "q": "How do I place an order?",
+          "a": "Find a product via search (by name or condition), add it to cart, fill in delivery details and pick a payment method. You'll receive a Kaspi invoice, and after payment — tracking and a video preview on WhatsApp."
+        },
+        {
+          "q": "How does payment work?",
+          "a": "We issue a Kaspi invoice before shipping. After payment you get a video preview of the packed order and a tracking number."
+        },
+        {
+          "q": "How long does the product last?",
+          "a": "Up to 12 months in the fridge."
+        }
+      ]
+    }
+  },
+  "banner": {
+    "eyebrow": "Got questions?",
+    "title": "Free consultation on WhatsApp",
+    "subtitle": "We'll pick the right product for your diagnosis. Available 9:00 — 18:00 every day.",
+    "phone_label": "Call us",
+    "whatsapp": "Message on WhatsApp",
+    "instagram": "Instagram"
+  },
+  "catalog": {
+    "seo_title": "GreenMan catalog — tinctures, juices, syrups",
+    "seo_description": "Full catalog of natural medicinal tinctures, juices and syrups.",
+    "title": "Catalog",
+    "subtitle": "Our full product collection",
+    "all": "All",
+    "empty_title": "Nothing here yet",
+    "empty_text": "Try different filters or come back later.",
+    "add_to_cart": "Add to cart",
+    "in_cart": "In cart"
+  },
+  "product": {
+    "back_to_catalog": "Back to catalog",
+    "description": "Description",
+    "indications": "Used for",
+    "contraindications": "Contraindications",
+    "usage": "How to use",
+    "usage_adults": "Adults",
+    "usage_children": "Children",
+    "add_to_cart": "Add to cart",
+    "not_found": "Product not found",
+    "error": "Failed to load product"
+  },
+  "search": {
+    "title": "Search",
+    "by_name": "By name",
+    "by_disease": "By condition",
+    "results_for": "Results for «{{query}}»",
+    "empty_title": "Nothing found",
+    "empty_text": "Try a different query or browse the catalog."
+  },
+  "cart": {
+    "seo_title": "Cart — GreenMan",
+    "title": "Cart",
+    "items": "Items",
+    "empty_title": "Your cart is empty",
+    "empty_text": "Pick a product from the catalog, or search by condition — we'll help you find the right one.",
+    "delivery": {
+      "title": "Delivery details",
+      "fullname": "Full name",
+      "whatsapp": "WhatsApp number",
+      "kaspi": "Kaspi number for invoice",
+      "city": "City",
+      "street": "Street",
+      "house": "House number",
+      "postal": "Postal code",
+      "method_title": "Delivery method",
+      "method_kazpost": "KazPost",
+      "method_courier": "Courier",
+      "method_indrive": "InDrive",
+      "method_cdek": "CDEK"
+    },
+    "payment": {
+      "title": "Payment method",
+      "cash": "Cash",
+      "kaspi": "Kaspi",
+      "card": "Card"
+    },
+    "summary": {
+      "title": "Summary",
+      "subtotal": "Subtotal",
+      "delivery": "Delivery",
+      "total": "Total",
+      "delivery_calc": "Calculated at checkout"
+    },
+    "actions": {
+      "checkout": "Place order",
+      "sending": "Sending…",
+      "to_checkout": "Checkout"
+    },
+    "address_drawer": {
+      "title": "Delivery address",
+      "new": "Add new address"
+    },
+    "success": "Order placed successfully!",
+    "error": "Could not place order. Please try again.",
+    "validation": "Please fill in required fields and choose delivery & payment."
+  },
+  "auth": {
+    "seo_title": "Sign in — GreenMan",
+    "phone": {
+      "title": "Sign in",
+      "subtitle": "Enter your phone number — we'll send a confirmation code",
+      "label": "Phone number",
+      "placeholder": "+7 (___) ___-__-__",
+      "cta": "Send code",
+      "invalid": "Please enter a valid phone number",
+      "error": "Failed to send code. Try again."
+    },
+    "code": {
+      "title": "Verification",
+      "subtitle": "We sent a code to",
+      "cta": "Confirm",
+      "invalid": "Please enter all 6 digits",
+      "wrong": "Wrong code. Try again.",
+      "resend_error": "Failed to resend",
+      "resend": "Resend code",
+      "resend_in": "Resend in {{seconds}}s",
+      "change_phone": "Change number"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "orders_title": "My orders",
+    "logout": "Sign out",
+    "status": {
+      "all": "All",
+      "processing": "Processing",
+      "paid": "Paid",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "empty_title": "No orders yet",
+    "empty_text": "Pick a product from the catalog or search by condition.",
+    "empty_status": "No orders with this status yet",
+    "order": {
+      "number": "Order #{{number}}",
+      "total": "Total",
+      "processing": "Processing",
+      "track": "Track order"
+    }
+  }
+}

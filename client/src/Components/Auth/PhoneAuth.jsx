@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { apiUrl } from '../../config/api';
+import { useTranslation } from 'react-i18next';
 import { Button, Stack, Text, TextInput, Title } from '@mantine/core';
+import { apiUrl } from '../../config/api';
+import { IconPhone } from '../../icons';
 
 const formatDisplay = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 11);
@@ -15,7 +17,8 @@ const formatDisplay = (raw) => {
 };
 
 const PhoneAuth = ({ onCodeSent, phoneNumber: initialPhoneNumber }) => {
-    const [phone, setPhone] = useState(initialPhoneNumber ? ('+7' + initialPhoneNumber) : '');
+    const { t } = useTranslation();
+    const [phone, setPhone] = useState(initialPhoneNumber ? '+7' + initialPhoneNumber : '');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -28,16 +31,16 @@ const PhoneAuth = ({ onCodeSent, phoneNumber: initialPhoneNumber }) => {
         e.preventDefault();
         const digits = phone.replace(/\D/g, '');
         if (digits.length < 11) {
-            setError('Введите корректный номер телефона');
+            setError(t('auth.phone.invalid'));
             return;
         }
-        const formattedPhoneNumber = digits.slice(1);
+        const normalized = digits.slice(1);
         setLoading(true);
         try {
-            await axios.post(apiUrl('/auth/register-login'), { phoneNumber: formattedPhoneNumber });
-            onCodeSent(formattedPhoneNumber);
+            await axios.post(apiUrl('/auth/register-login'), { phoneNumber: normalized });
+            onCodeSent(normalized);
         } catch {
-            setError('Ошибка при отправке. Попробуйте снова.');
+            setError(t('auth.phone.error'));
         } finally {
             setLoading(false);
         }
@@ -46,19 +49,34 @@ const PhoneAuth = ({ onCodeSent, phoneNumber: initialPhoneNumber }) => {
     return (
         <form onSubmit={handleSubmit}>
             <Stack gap="md">
-                <Title order={3} fw={600}>Вход</Title>
+                <Stack gap={4}>
+                    <Title order={3} fw={700} style={{ letterSpacing: '-0.02em' }}>
+                        {t('auth.phone.title')}
+                    </Title>
+                    <Text size="sm" c="dimmed">{t('auth.phone.subtitle')}</Text>
+                </Stack>
                 <TextInput
-                    label="Номер телефона"
-                    placeholder="+7 (000) 000-00-00"
+                    label={t('auth.phone.label')}
+                    placeholder={t('auth.phone.placeholder')}
                     value={phone}
                     onChange={handleChange}
                     type="tel"
                     error={error}
                     size="md"
                     radius="md"
+                    leftSection={<IconPhone size={16} stroke={1.7} />}
+                    autoFocus
                 />
-                <Button type="submit" color="greenman" fullWidth size="md" radius="md" loading={loading}>
-                    Отправить код
+                <Button
+                    type="submit"
+                    color="greenman"
+                    fullWidth
+                    size="md"
+                    radius="xl"
+                    loading={loading}
+                    mt={4}
+                >
+                    {t('auth.phone.cta')}
                 </Button>
             </Stack>
         </form>

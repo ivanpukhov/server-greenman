@@ -1,0 +1,115 @@
+.heroWrap {
+    padding-top: 16px;
+}
+
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: 40px 28px;
+    border-radius: 32px;
+    background: linear-gradient(135deg, #edfbf4 0%, #d4f4e2 60%, #a5e7c2 100%);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: center;
+
+    @media (min-width: 900px) {
+        padding: 72px 64px;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 40px;
+    }
+}
+
+.heroDecor {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 92% 8%, rgba(255, 255, 255, 0.5), transparent 40%),
+        radial-gradient(circle at 0% 100%, rgba(47, 200, 113, 0.2), transparent 45%);
+}
+
+.heroText {
+    position: relative;
+    z-index: 1;
+}
+
+.heroTitle {
+    font-size: clamp(32px, 5.5vw, 56px);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: #0b1712;
+}
+
+.heroArt {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    z-index: 1;
+
+    img {
+        width: 100%;
+        max-width: 360px;
+        height: auto;
+    }
+}
+
+.trustCard {
+    padding: 20px;
+    border-radius: 20px;
+    background: #fff;
+    border: 1px solid var(--mantine-color-gray-2);
+    transition: border-color 0.15s, transform 0.15s;
+
+    &:hover {
+        border-color: var(--mantine-color-greenman-3);
+        transform: translateY(-2px);
+    }
+}
+
+.trustIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: var(--mantine-color-greenman-0);
+    color: var(--mantine-color-greenman-7);
+}
+
+.about {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 32px;
+    align-items: center;
+
+    @media (min-width: 900px) {
+        grid-template-columns: 1fr 1fr;
+        gap: 64px;
+    }
+}
+
+.aboutText {
+    order: 2;
+
+    @media (min-width: 900px) {
+        order: 1;
+    }
+}
+
+.aboutArt {
+    order: 1;
+    display: flex;
+    justify-content: center;
+
+    img {
+        width: 100%;
+        max-width: 400px;
+        height: auto;
+    }
+
+    @media (min-width: 900px) {
+        order: 2;
+    }
+}

@@ -1,0 +1,24 @@
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--mantine-color-greenman-0);
+    border: 1px solid var(--mantine-color-greenman-2);
+}
+
+.count {
+    min-width: 22px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--mantine-color-greenman-8);
+}
+
+.warn {
+    background: var(--mantine-color-red-0);
+    border: 1px solid var(--mantine-color-red-2);
+    padding: 12px;
+    border-radius: 14px;
+}

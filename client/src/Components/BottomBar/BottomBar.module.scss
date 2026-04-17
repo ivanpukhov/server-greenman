@@ -1,0 +1,93 @@
+.bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 99;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: saturate(1.6) blur(18px);
+    border: 1px solid rgba(11, 23, 18, 0.06);
+    border-radius: 28px;
+    box-shadow: 0 12px 40px rgba(11, 23, 18, 0.1);
+
+    @media (min-width: 900px) {
+        display: none;
+    }
+}
+
+.tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 6px;
+    border-radius: 18px;
+    text-decoration: none;
+    color: #6e7b75;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+        color: var(--mantine-color-greenman-7);
+    }
+}
+
+.tabActive {
+    color: var(--mantine-color-greenman-7);
+    background: var(--mantine-color-greenman-0);
+}
+
+.iconBox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+}
+
+.tabLabel {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.cartCta {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 82px;
+    z-index: 99;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--mantine-color-greenman-7);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 999px;
+    box-shadow: 0 10px 26px rgba(0, 132, 70, 0.25);
+
+    @media (min-width: 900px) {
+        display: none;
+    }
+}
+
+.cartCtaText {
+    display: flex;
+    flex-direction: column;
+}
+
+.cartCtaLabel {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.cartCtaMeta {
+    font-size: 12px;
+    opacity: 0.85;
+    font-weight: 500;
+}

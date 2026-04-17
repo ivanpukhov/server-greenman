@@ -7,7 +7,7 @@ const stripSpirit = (name) => {
     return String(name).replace(SPIRIT_REGEX, '').replace(/\s+/g, ' ').trim();
 };
 
-const kztToRub = (kztPrice) => Math.round(Number(kztPrice || 0) * KZT_TO_RUB_RATE * RF_MARKUP);
+const kztToRub = (kztPrice) => Math.round(Number(kztPrice || 0) * RF_MARKUP / KZT_TO_RUB_RATE);
 
 const truncate = (str, max) => (str.length > max ? str.slice(0, max) : str);
 

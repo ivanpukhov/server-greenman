@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="cartBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#edfbf4"/>
+      <stop offset="1" stop-color="#d4f4e2"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="160" cy="210" rx="120" ry="10" fill="#d4f4e2"/>
+
+  <g transform="translate(80 50)">
+    <rect x="10" y="40" width="140" height="100" rx="14" fill="url(#cartBg)" stroke="#2fc871" stroke-width="2"/>
+    <path d="M10 60 L150 60" stroke="#72daa0" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="40" cy="160" r="12" fill="#ffffff" stroke="#2fc871" stroke-width="2"/>
+    <circle cx="120" cy="160" r="12" fill="#ffffff" stroke="#2fc871" stroke-width="2"/>
+    <path d="M0 20 L30 20 L40 60" stroke="#00984d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <g transform="translate(140 95)">
+    <path d="M20 45 C 0 20, 10 -5, 25 0 C 30 -10, 50 -5, 50 10 C 65 10, 65 35, 45 40 C 50 55, 25 60, 20 45 Z" fill="#4acf84" opacity="0.9"/>
+    <path d="M25 5 L25 45" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+  </g>
+
+  <circle cx="60" cy="60" r="6" fill="#4acf84" opacity="0.5"/>
+  <circle cx="260" cy="70" r="8" fill="#72daa0" opacity="0.6"/>
+  <circle cx="250" cy="170" r="5" fill="#00984d" opacity="0.4"/>
+</svg>
