@@ -11,45 +11,24 @@
 
 .card {
     width: 100%;
-    max-width: 760px;
+    max-width: 640px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-5);
-    padding: clamp(28px, 4vw, 48px);
+    padding: var(--space-8) var(--space-5);
     text-align: center;
-    background:
-        radial-gradient(circle at top right, rgba(114, 184, 139, 0.24), transparent 28%),
-        radial-gradient(circle at bottom left, rgba(177, 212, 189, 0.24), transparent 24%),
-        linear-gradient(135deg, #fcfffd 0%, #f4faf6 100%);
-    border: 1px solid rgba(79, 126, 93, 0.14);
-    border-radius: 32px;
-    box-shadow: 0 28px 60px rgba(27, 53, 39, 0.08);
-    overflow: hidden;
-}
-
-.hero {
-    width: 100%;
-    display: grid;
-    gap: var(--space-5);
-    align-items: center;
-
-    @media (min-width: 900px) {
-        grid-template-columns: 240px minmax(0, 1fr);
-        text-align: left;
-    }
-}
-
-.badgeWrap {
-    position: relative;
-    display: grid;
-    place-items: center;
-    min-height: 200px;
+    background: linear-gradient(
+        135deg,
+        var(--color-brand-50) 0%,
+        var(--color-sage-50) 100%
+    );
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-e1);
 }
 
 .badge {
-    position: relative;
-    z-index: 1;
     font-family: var(--font-display);
     font-weight: var(--fw-heavy);
     font-size: clamp(96px, 20vw, 176px);
@@ -66,68 +45,26 @@
     color: transparent;
 }
 
-.badgeShadow {
-    position: absolute;
-    inset: auto;
-    font-family: var(--font-display);
-    font-weight: var(--fw-heavy);
-    font-size: clamp(96px, 20vw, 176px);
-    line-height: 1;
-    letter-spacing: -0.04em;
-    color: rgba(42, 82, 56, 0.08);
-    transform: translate(10px, 14px);
-    pointer-events: none;
-}
-
-.copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    align-items: center;
-
-    @media (min-width: 900px) {
-        align-items: flex-start;
-    }
-}
-
 .title {
     font-family: var(--font-display);
     font-weight: var(--fw-extrabold);
-    font-size: clamp(30px, 4vw, 48px);
+    font-size: clamp(24px, 3vw, 32px);
     letter-spacing: -0.02em;
     margin: 0;
     color: var(--color-text-primary);
-    max-width: 12ch;
 }
 
 .lead {
     margin: 0;
-    max-width: 520px;
+    max-width: 480px;
     font-size: var(--fs-md);
     line-height: var(--lh-body);
     color: var(--color-text-secondary);
 }
 
-.searchPanel {
-    width: 100%;
-    padding: 18px;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.86);
-    border: 1px solid rgba(79, 126, 93, 0.12);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.searchLabel {
-    margin-bottom: 12px;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-brand-700);
-}
-
 .searchBox {
     width: 100%;
+    max-width: 520px;
 }
 
 .actions {
@@ -135,11 +72,4 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: var(--space-3);
-}
-
-.footerNote {
-    font-size: var(--fs-sm);
-    line-height: 1.6;
-    color: var(--color-text-muted);
-    max-width: 560px;
 }

@@ -21,22 +21,12 @@ const NotFound = () => {
             </Helmet>
 
             <div className={s.card}>
-                <div className={s.hero}>
-                    <div className={s.badgeWrap}>
-                        <div className={s.badge}>404</div>
-                        <div className={s.badgeShadow}>404</div>
-                    </div>
-                    <div className={s.copy}>
-                        <h1 className={s.title}>{t('not_found.title')}</h1>
-                        <p className={s.lead}>{t('not_found.lead')}</p>
-                    </div>
-                </div>
+                <div className={s.badge}>404</div>
+                <h1 className={s.title}>{t('not_found.title')}</h1>
+                <p className={s.lead}>{t('not_found.lead')}</p>
 
-                <div className={s.searchPanel}>
-                    <div className={s.searchLabel}>Попробуйте найти нужный товар</div>
-                    <div className={s.searchBox}>
-                        <SearchBlock />
-                    </div>
+                <div className={s.searchBox}>
+                    <SearchBlock />
                 </div>
 
                 <div className={s.actions}>
@@ -75,10 +65,6 @@ const NotFound = () => {
                     >
                         {t('not_found.whatsapp')}
                     </Button>
-                </div>
-
-                <div className={s.footerNote}>
-                    Если страница устарела, начните с каталога или напишите нам в WhatsApp.
                 </div>
             </div>
         </PageContainer>

@@ -5,12 +5,6 @@ import { useCart } from '../../../CartContext.jsx';
 import { useFormatPrice, usePrice } from '../../../contexts/CountryContext.jsx';
 import { apiUrl } from '../../../config/api';
 import { Button, toast } from '../../../ui';
-import {
-    IconArrowNarrowRight,
-    IconBuildingStore,
-    IconMapPin,
-    IconTruck,
-} from '../../../icons';
 import useDeliveryCalculation from './useDeliveryCalculation';
 import styles from './CdekCheckout.module.scss';
 
@@ -212,25 +206,7 @@ const CdekCheckout = () => {
 
     return (
         <div className={styles.checkout}>
-            <div className={styles.header}>
-                <div>
-                    <div className={styles.eyebrow}>Оформление по России</div>
-                    <div className={styles.title}>Данные получателя</div>
-                </div>
-                <div className={styles.headerBadge}>
-                    {deliveryMode === 'pvz' ? (
-                        <>
-                            <IconBuildingStore size={16} stroke={1.8} />
-                            ПВЗ СДЭК
-                        </>
-                    ) : (
-                        <>
-                            <IconTruck size={16} stroke={1.8} />
-                            Доставка курьером
-                        </>
-                    )}
-                </div>
-            </div>
+            <div className={styles.subtitle}>Данные получателя</div>
 
             <div className={styles.field}>
                 <label>ФИО</label>
@@ -343,10 +319,7 @@ const CdekCheckout = () => {
                     )}
                     {selectedPvz && (
                         <div className={styles.pvzCard}>
-                            <div className={styles.pvzTitle}>
-                                <IconMapPin size={16} stroke={1.8} />
-                                <b>{selectedPvz.name}</b>
-                            </div>
+                            <div><b>{selectedPvz.name}</b></div>
                             <div>{selectedPvz.full_address || selectedPvz.address}</div>
                             {selectedPvz.work_time && <div>График: {selectedPvz.work_time}</div>}
                             {selectedPvz.note && <div>{selectedPvz.note}</div>}
@@ -377,24 +350,20 @@ const CdekCheckout = () => {
                     : 'Оплата наличными курьеру при получении.'}
             </div>
 
-            <div className={styles.summaryCard}>
-                <div className={styles.summaryTitle}>Итог по заказу</div>
-
-                <div className={styles.summaryRow}>
-                    <div className={styles.summaryLabel}>Сумма заказа</div>
-                    <div className={styles.summaryValue}>{formatPrice(totalKzt)}</div>
+            <div className={styles.total}>
+                <div className={styles.totalSub}>
+                    <div className={styles.totalSubItem}>Сумма заказа</div>
+                    <div className={styles.totalSubItem}>{formatPrice(totalKzt)}</div>
                 </div>
-
-                <div className={styles.summaryRow}>
-                    <div className={styles.summaryLabel}>Доставка</div>
-                    <div className={styles.summaryValue}>
+                <div className={styles.totalSub}>
+                    <div className={styles.totalSubItem}>Доставка</div>
+                    <div className={styles.totalSubItem}>
                         {deliveryResult ? `${deliveryRub.toLocaleString('ru-RU')} ₽` : '—'}
                     </div>
                 </div>
-
-                <div className={styles.summaryTotal}>
-                    <div>Итого</div>
-                    <div>
+                <div className={styles.totalMain}>
+                    <div className={styles.totalMainItem}>Итого</div>
+                    <div className={styles.totalMainItem}>
                         {grandTotalRub.toLocaleString('ru-RU')} ₽
                     </div>
                 </div>
@@ -409,7 +378,6 @@ const CdekCheckout = () => {
                 className={styles.submitButton}
                 disabled={!isFormValid || isSubmitting}
                 onClick={handleSubmit}
-                rightSection={<IconArrowNarrowRight size={18} stroke={1.8} />}
             >
                 {isSubmitting ? 'Отправка…' : 'Оформить заказ'}
             </Button>
