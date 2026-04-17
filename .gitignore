@@ -1,0 +1,4 @@
+database/*.db
+server/database/*.db
+server/bin/database/*.db
+server/logs/*.log

@@ -1,8 +1,13 @@
+const path = require('path');
 const Sequelize = require('sequelize');
+
+const orderStoragePath = process.env.ORDER_DB_PATH
+    ? path.resolve(process.env.ORDER_DB_PATH)
+    : path.resolve(__dirname, '../database/order.db');
 
 const orderDB = new Sequelize({
     dialect: 'sqlite',
-    storage: './database/order.db'
+    storage: orderStoragePath
 });
 
 orderDB.authenticate()
