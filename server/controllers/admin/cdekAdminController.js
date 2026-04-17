@@ -59,6 +59,29 @@ const serializeOrder = (order) => ({
     products: Array.isArray(order.products) ? order.products : []
 });
 
+const getLatestCdekOrderStatus = (cdekResponse) => {
+    const statuses = Array.isArray(cdekResponse?.entity?.statuses) ? cdekResponse.entity.statuses : [];
+    return statuses.length > 0 ? statuses[0]?.code || null : null;
+};
+
+const getCdekRequestErrorMessage = (cdekResponse) => {
+    const requests = Array.isArray(cdekResponse?.requests) ? cdekResponse.requests : [];
+    const invalidRequest = requests.find((request) =>
+        request?.state === 'INVALID' || (Array.isArray(request?.errors) && request.errors.length > 0)
+    );
+
+    if (!invalidRequest) return null;
+
+    if (Array.isArray(invalidRequest.errors) && invalidRequest.errors.length > 0) {
+        return invalidRequest.errors
+            .map((item) => item?.message || item?.code)
+            .filter(Boolean)
+            .join('; ');
+    }
+
+    return invalidRequest.state || 'INVALID';
+};
+
 const listOrdersRf = async (req, res) => {
     try {
         const { offset, limit } = parsePagination(req.query);
@@ -190,11 +213,21 @@ const submitToCdek = async (req, res) => {
         });
 
         try {
-            const polled = await cdekApi.pollOrderUntilRegistered(uuid, { timeoutMs: 15000, intervalMs: 2000 });
+            const polled = await cdekApi.pollOrderUntilRegistered(uuid, { timeoutMs: 20000, intervalMs: 2000 });
+            const patch = {
+                cdekRawResponse: JSON.stringify(polled || response)
+            };
             const cdekNumber = polled?.entity?.cdek_number;
+            const latestStatus = getLatestCdekOrderStatus(polled);
+
             if (cdekNumber) {
-                await order.update({ cdekNumber: String(cdekNumber) });
+                patch.cdekNumber = String(cdekNumber);
             }
+            if (latestStatus) {
+                patch.cdekStatus = latestStatus;
+            }
+
+            await order.update(patch);
         } catch (pollError) {
             logError('cdekAdmin.submitToCdek.poll', pollError, { orderId: order.id, uuid });
         }
@@ -263,12 +296,27 @@ const printPdf = async (req, res, kind) => {
         if (!order.cdekNumber) {
             try {
                 const refreshed = await cdekApi.pollOrderUntilRegistered(order.cdekUuid, {
-                    timeoutMs: 15000,
+                    timeoutMs: 60000,
                     intervalMs: 2000
                 });
                 const cdekNumber = refreshed?.entity?.cdek_number;
+                const latestStatus = getLatestCdekOrderStatus(refreshed);
+                const patch = {};
                 if (cdekNumber) {
-                    await order.update({ cdekNumber: String(cdekNumber) });
+                    patch.cdekNumber = String(cdekNumber);
+                }
+                if (latestStatus) {
+                    patch.cdekStatus = latestStatus;
+                }
+                if (Object.keys(patch).length > 0) {
+                    await order.update(patch);
+                }
+
+                const requestErrorMessage = getCdekRequestErrorMessage(refreshed);
+                if (!cdekNumber && requestErrorMessage) {
+                    return res.status(409).json({
+                        message: `Заказ отклонён в СДЭК: ${requestErrorMessage}`
+                    });
                 }
             } catch (pollError) {
                 logError(`cdekAdmin.print.${kind}.pollOrder`, pollError, {

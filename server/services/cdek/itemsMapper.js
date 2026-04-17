@@ -1,6 +1,7 @@
 const { kztToRub } = require('./pricing');
 
 const SPIRIT_REGEX = /\bспирт\w*/giu;
+const DEFAULT_ITEM_WEIGHT_GRAMS = 1000;
 
 const stripSpirit = (name) => {
     if (!name) return '';
@@ -13,7 +14,7 @@ const truncate = (str, max) => (str.length > max ? str.slice(0, max) : str);
  * Преобразует позиции заказа в формат items для СДЭК.
  * Требования задачи:
  *  - из названия удалить слово «спирт»
- *  - вес всегда 1000 г (укажем в packages.weight; здесь items.weight оставим 0 — СДЭК требует для ТТН при type=1)
+ *  - вес нетто за единицу передаём в items.weight, иначе СДЭК валидирует заказ как INVALID
  *  - payment.value = cost * amount (наложенный платёж)
  */
 const buildCdekItems = (orderProducts) => {
@@ -35,7 +36,7 @@ const buildCdekItems = (orderProducts) => {
             ware_key: truncate(String(productTypeId ?? `item-${index}`), 50),
             cost: costRub,
             amount,
-            weight: 0,
+            weight: DEFAULT_ITEM_WEIGHT_GRAMS,
             payment: { value: costRub * amount }
         };
     });
