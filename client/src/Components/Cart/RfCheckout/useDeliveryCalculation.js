@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { apiUrl } from '../../../config/api';
 
-export const useDeliveryCalculation = ({ cityCode, address, cart }) => {
+export const useDeliveryCalculation = ({ cityCode, address, cart, deliveryMode }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [result, setResult] = useState(null);
@@ -34,7 +34,8 @@ export const useDeliveryCalculation = ({ cityCode, address, cart }) => {
                 const response = await axios.post(apiUrl('/cdek/calculate'), {
                     toCityCode: cityCode,
                     toAddress: address || undefined,
-                    products
+                    products,
+                    deliveryMode
                 });
                 if (requestId !== requestIdRef.current) return;
                 setResult(response.data);
@@ -55,7 +56,7 @@ export const useDeliveryCalculation = ({ cityCode, address, cart }) => {
                 clearTimeout(timerRef.current);
             }
         };
-    }, [cityCode, address, cart]);
+    }, [cityCode, address, cart, deliveryMode]);
 
     return { loading, error, result };
 };

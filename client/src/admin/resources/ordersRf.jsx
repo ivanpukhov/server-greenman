@@ -119,7 +119,8 @@ export const OrderRfList = () => (
             <TextField source="id" label="ID" />
             <TextField source="customerName" label="Клиент" />
             <TextField source="phoneNumber" label="Телефон" />
-            <TextField source="cdekAddress" label="Адрес СДЭК" />
+            <TextField source="cdekDeliveryMode" label="Тип доставки" />
+            <TextField source="cdekAddress" label="Адрес / ПВЗ" />
             <TextField source="totalPrice" label="Сумма (₽)" />
             <TextField source="status" label="Статус" />
             <CdekStatusField label="СДЭК" />
@@ -336,7 +337,16 @@ const CdekActionsToolbar = () => {
                         Город: <b>{record.cdekCityCode || '—'}</b>
                     </Typography>
                     <Typography variant="body2">
+                        Режим: <b>{record.cdekDeliveryMode === 'pvz' ? 'Дверь-ПВЗ' : 'Дверь-дверь'}</b>
+                    </Typography>
+                    <Typography variant="body2">
                         Адрес: <b>{record.cdekAddress || '—'}</b>
+                    </Typography>
+                    <Typography variant="body2">
+                        ПВЗ: <b>{record.cdekPvzName || record.cdekPvzCode || '—'}</b>
+                    </Typography>
+                    <Typography variant="body2">
+                        Адрес ПВЗ: <b>{record.cdekPvzAddress || '—'}</b>
                     </Typography>
                     <Typography variant="body2">
                         Доставка: <b>{formatRub(record.cdekCalcPriceRub)}</b>
@@ -362,6 +372,10 @@ export const OrderRfEdit = () => (
             <TextInput source="phoneNumber" label="Телефон" fullWidth />
             <TextInput source="cdekAddress" label="Адрес СДЭК" fullWidth />
             <NumberInput source="cdekCityCode" label="Код города СДЭК" />
+            <TextInput source="cdekDeliveryMode" label="Режим доставки" fullWidth />
+            <TextInput source="cdekPvzCode" label="Код ПВЗ" fullWidth />
+            <TextInput source="cdekPvzName" label="Название ПВЗ" fullWidth />
+            <TextInput source="cdekPvzAddress" label="Адрес ПВЗ" fullWidth />
             <NumberInput source="totalPrice" label="Сумма (₽)" min={0} />
             <NumberInput source="cdekCalcPriceRub" label="Стоимость доставки (₽)" min={0} />
             <SelectInput source="status" label="Статус заказа" choices={orderStatusChoices} />

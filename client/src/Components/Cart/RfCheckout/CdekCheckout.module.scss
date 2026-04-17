@@ -17,7 +17,8 @@
         font-size: 14px;
     }
 
-    input {
+    input,
+    select {
         border: 1px solid #E2E6EA;
         border-radius: 10px;
         padding: 12px 14px;
@@ -30,6 +31,51 @@
             border-color: var(--mantine-color-greenman-7);
         }
     }
+}
+
+.select {
+    appearance: none;
+}
+
+.deliveryModeBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.deliveryModeTitle {
+    color: var(--mantine-color-greenman-7);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.deliveryModes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.deliveryModeBtn {
+    border: 1px solid #D7E4DC;
+    border-radius: 12px;
+    background: #fff;
+    color: #274837;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+        border-color: #9EC4AE;
+        background: #F7FBF8;
+    }
+}
+
+.deliveryModeBtnActive {
+    border-color: var(--mantine-color-greenman-7);
+    background: #F3F8F5;
+    color: var(--mantine-color-greenman-7);
 }
 
 .cityField {
@@ -78,6 +124,18 @@
 
 .deliveryHint {
     color: #6B7280;
+}
+
+.pvzCard {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #F8FAF8;
+    border: 1px solid #E2E6EA;
+    color: #334155;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .paymentNotice {

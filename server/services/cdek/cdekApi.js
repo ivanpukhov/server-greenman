@@ -3,7 +3,8 @@ const { get: getSetting } = require('./settingsStore');
 const { logError } = require('../../utilities/errorLogger');
 const { buildCdekItems } = require('./itemsMapper');
 const { buildPackages } = require('./buildPackages');
-const { DEFAULT_TARIFF_CODE } = require('./buildOrderPayload');
+const { DEFAULT_TARIFF_CODE, DEFAULT_PVZ_TARIFF_CODE } = require('./buildOrderPayload');
+const { normalizeCdekMoneyToRub } = require('./pricing');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -25,13 +26,51 @@ const suggestCities = async (query, { countryCode = 'RU' } = {}) => {
     }
 };
 
-const calculateTariff = async ({ toCityCode, toAddress, products }) => {
+const listPickupPoints = async (cityCode) => {
+    if (!cityCode) throw new Error('cityCode is required');
+
+    const client = await getClient();
+    try {
+        const response = await client.get('/deliverypoints', {
+            params: { city_code: Number(cityCode), type: 'PVZ' }
+        });
+        const points = Array.isArray(response.data) ? response.data : [];
+        return points
+            .filter((point) => point?.code && point?.is_handout !== false && point?.allowed_cod !== false)
+            .map((point) => ({
+                code: point.code,
+                name: point.name || point.code,
+                address: point.location?.address_full || point.location?.address || point.address_comment || point.address || '',
+                full_address: point.location?.address_full || point.location?.address || point.address || '',
+                work_time: point.work_time || '',
+                phones: Array.isArray(point.phones) ? point.phones.map((phone) => phone?.number).filter(Boolean) : [],
+                note: point.note || point.address_comment || '',
+                is_dressing_room: Boolean(point.is_dressing_room),
+                have_cashless: Boolean(point.have_cashless),
+                have_cash: Boolean(point.have_cash),
+                allowed_cod: point.allowed_cod !== false
+            }));
+    } catch (error) {
+        logError('cdek.listPickupPoints', error, {
+            cityCode,
+            status: error.response?.status,
+            data: error.response?.data
+        });
+        throw error;
+    }
+};
+
+const calculateTariff = async ({ toCityCode, toAddress, products, deliveryMode = 'door' }) => {
     if (!toCityCode) throw new Error('toCityCode is required');
 
     const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
     if (!senderCityCode) throw new Error('CDEK_SENDER_CITY_CODE не настроен — заполните настройки СДЭК в админке');
 
-    const tariffCode = Number(await getSetting('CDEK_TARIFF_CODE') || DEFAULT_TARIFF_CODE);
+    const normalizedMode = String(deliveryMode || 'door').trim().toLowerCase() === 'pvz' ? 'pvz' : 'door';
+    const tariffCode = Number(
+        await getSetting(normalizedMode === 'pvz' ? 'CDEK_TARIFF_CODE_PVZ' : 'CDEK_TARIFF_CODE')
+        || (normalizedMode === 'pvz' ? DEFAULT_PVZ_TARIFF_CODE : DEFAULT_TARIFF_CODE)
+    );
 
     const items = buildCdekItems(products || []);
     const packages = buildPackages({ orderNumber: 'calc', items });
@@ -42,7 +81,7 @@ const calculateTariff = async ({ toCityCode, toAddress, products }) => {
         from_location: { code: senderCityCode },
         to_location: {
             code: Number(toCityCode),
-            address: toAddress || undefined
+            address: normalizedMode === 'door' ? (toAddress || undefined) : undefined
         },
         packages: packages.map((pkg) => ({
             weight: pkg.weight,
@@ -56,13 +95,21 @@ const calculateTariff = async ({ toCityCode, toAddress, products }) => {
     try {
         const response = await client.post('/calculator/tariff', payload);
         const data = response.data || {};
+        const sourceCurrency = String(data.currency || 'RUB').trim().toUpperCase();
+        const deliverySum = Number(data.delivery_sum ?? data.total_sum ?? 0);
+        const totalSum = Number(data.total_sum ?? data.delivery_sum ?? 0);
+
         return {
-            delivery_sum: Number(data.delivery_sum ?? data.total_sum ?? 0),
-            total_sum: Number(data.total_sum ?? data.delivery_sum ?? 0),
+            delivery_sum: normalizeCdekMoneyToRub(deliverySum, sourceCurrency),
+            total_sum: normalizeCdekMoneyToRub(totalSum, sourceCurrency),
             period_min: Number(data.period_min ?? data.calendar_min ?? 0),
             period_max: Number(data.period_max ?? data.calendar_max ?? 0),
             tariff_code: tariffCode,
-            currency: data.currency || 'RUB'
+            currency: 'RUB',
+            delivery_mode: normalizedMode,
+            source_currency: sourceCurrency,
+            source_delivery_sum: deliverySum,
+            source_total_sum: totalSum
         };
     } catch (error) {
         logError('cdek.calculateTariff', error, {
@@ -226,6 +273,7 @@ const subscribeWebhook = async ({ url, type = 'ORDER_STATUS' }) => {
 
 module.exports = {
     suggestCities,
+    listPickupPoints,
     calculateTariff,
     createOrder,
     getOrderByUuid,

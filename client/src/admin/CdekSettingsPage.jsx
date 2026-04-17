@@ -26,7 +26,8 @@ const DEFAULT = {
     CDEK_SENDER_PHONE: '',
     CDEK_SENDER_EMAIL: '',
     CDEK_SENDER_COMPANY: '',
-    CDEK_TARIFF_CODE: '482'
+    CDEK_TARIFF_CODE: '482',
+    CDEK_TARIFF_CODE_PVZ: '483'
 };
 
 const CdekSettingsPage = () => {
@@ -162,14 +163,24 @@ const CdekSettingsPage = () => {
                     helperText={!secretEditing && form.CDEK_CLIENT_SECRET === PLACEHOLDER ? 'Секрет сохранён. Нажмите для изменения.' : ''}
                 />
 
-                <TextField
-                    label="Код тарифа"
-                    value={form.CDEK_TARIFF_CODE}
-                    onChange={handleChange('CDEK_TARIFF_CODE')}
-                    type="number"
-                    sx={{ width: 180 }}
-                    helperText="482 = дверь-дверь"
-                />
+                <Stack direction="row" gap={2} flexWrap="wrap">
+                    <TextField
+                        label="Тариф дверь-дверь"
+                        value={form.CDEK_TARIFF_CODE}
+                        onChange={handleChange('CDEK_TARIFF_CODE')}
+                        type="number"
+                        sx={{ width: 220 }}
+                        helperText="Обычно 482"
+                    />
+                    <TextField
+                        label="Тариф дверь-ПВЗ"
+                        value={form.CDEK_TARIFF_CODE_PVZ}
+                        onChange={handleChange('CDEK_TARIFF_CODE_PVZ')}
+                        type="number"
+                        sx={{ width: 220 }}
+                        helperText="Обычно 483"
+                    />
+                </Stack>
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>

@@ -48,13 +48,18 @@ const orderController = {
                 email,
                 cdekCityCode,
                 cdekAddress,
-                cdekCalcPriceRub
+                cdekCalcPriceRub,
+                cdekDeliveryMode,
+                cdekPvzCode,
+                cdekPvzName,
+                cdekPvzAddress
             } = req.body;
 
             console.log("Полученные данные:", req.body);
 
             const normalizedCountry = country === 'RF' ? 'RF' : 'KZ';
             const isRfOrder = normalizedCountry === 'RF';
+            const normalizedCdekDeliveryMode = String(cdekDeliveryMode || 'door').trim().toLowerCase() === 'pvz' ? 'pvz' : 'door';
 
             if (isRfOrder) {
                 if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -63,8 +68,11 @@ const orderController = {
                 if (!cdekCityCode) {
                     return res.status(400).json({ error: 'Для заказа в РФ требуется cdekCityCode' });
                 }
-                if (!cdekAddress || !String(cdekAddress).trim()) {
+                if (normalizedCdekDeliveryMode === 'door' && (!cdekAddress || !String(cdekAddress).trim())) {
                     return res.status(400).json({ error: 'Для заказа в РФ требуется cdekAddress' });
+                }
+                if (normalizedCdekDeliveryMode === 'pvz' && !String(cdekPvzCode || '').trim()) {
+                    return res.status(400).json({ error: 'Для заказа в РФ с выдачей в ПВЗ требуется cdekPvzCode' });
                 }
                 const phoneDigits = String(phoneNumber || '').replace(/\D/g, '');
                 if (phoneDigits.length < 11 || phoneDigits.length > 12) {
@@ -91,7 +99,13 @@ const orderController = {
                 currency: isRfOrder ? 'RUB' : 'KZT',
                 email: email || null,
                 cdekCityCode: isRfOrder ? Number(cdekCityCode) : null,
-                cdekAddress: isRfOrder ? cdekAddress : null,
+                cdekDeliveryMode: isRfOrder ? normalizedCdekDeliveryMode : null,
+                cdekAddress: isRfOrder
+                    ? (normalizedCdekDeliveryMode === 'door' ? cdekAddress : (cdekPvzAddress || null))
+                    : null,
+                cdekPvzCode: isRfOrder && normalizedCdekDeliveryMode === 'pvz' ? String(cdekPvzCode || '').trim() : null,
+                cdekPvzName: isRfOrder && normalizedCdekDeliveryMode === 'pvz' ? (cdekPvzName || null) : null,
+                cdekPvzAddress: isRfOrder && normalizedCdekDeliveryMode === 'pvz' ? (cdekPvzAddress || null) : null,
                 cdekCalcPriceRub: isRfOrder ? Number(cdekCalcPriceRub) || null : null
             };
 
@@ -114,7 +128,7 @@ const orderController = {
                 orderData.status = 'Оплачено';
             }
 
-            if (userId) {
+            if (userId && !isRfOrder) {
                 const profileData = {
                     userId,
                     name: customerName,
@@ -207,16 +221,24 @@ const orderController = {
 
             const currencyLabel = isRfOrder ? 'рублей' : 'тенге';
             const addressLine = isRfOrder
-                ? `${orderData.city}, ${cdekAddress}`
+                ? (normalizedCdekDeliveryMode === 'pvz'
+                    ? `${orderData.city}, ПВЗ ${orderData.cdekPvzCode || ''}${orderData.cdekPvzAddress ? `, ${orderData.cdekPvzAddress}` : ''}`
+                    : `${orderData.city}, ${cdekAddress}`)
                 : `${street}, ${houseNumber}`;
+            const deliveryLabel = normalizedCdekDeliveryMode === 'pvz'
+                ? 'СДЭК (дверь-ПВЗ)'
+                : 'СДЭК (дверь-дверь)';
+            const deliveryDestination = normalizedCdekDeliveryMode === 'pvz'
+                ? `ПВЗ: *${orderData.cdekPvzName || orderData.cdekPvzCode || '—'}*\nАдрес ПВЗ: *${orderData.cdekPvzAddress || '—'}*`
+                : `Адрес: *${cdekAddress}*`;
 
             const notificationMessage = isRfOrder ? `
 Имя и Фамилия: *${customerName}*
 Номер телефона: *${orderData.phoneNumber}*
 Email: *${email}*
 Город: *${orderData.city}*
-Адрес: *${cdekAddress}*
-Метод доставки: *СДЭК (дверь-дверь)*
+${deliveryDestination}
+Метод доставки: *${deliveryLabel}*
 Метод оплаты: *Наличными при получении*
 Итоговая сумма: *${totalPrice}* ${currencyLabel}
 
@@ -237,7 +259,12 @@ ${productDetails}`;
 
 await sendNotification(orderData.phoneNumber, notificationMessage);
 if (isRfOrder) {
-    await sendNotification(orderData.phoneNumber, `Ваш заказ принят. Курьер СДЭК свяжется с вами. Оплата наличными при получении — *${totalPrice}* ${currencyLabel}.`);
+    await sendNotification(
+        orderData.phoneNumber,
+        normalizedCdekDeliveryMode === 'pvz'
+            ? `Ваш заказ принят. Забрать посылку можно будет в выбранном ПВЗ СДЭК. Оплата наличными при получении — *${totalPrice}* ${currencyLabel}.`
+            : `Ваш заказ принят. Курьер СДЭК свяжется с вами. Оплата наличными при получении — *${totalPrice}* ${currencyLabel}.`
+    );
 } else {
     await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет на сумму *${totalPrice}* тенге в приложении Каспи.`);
 }

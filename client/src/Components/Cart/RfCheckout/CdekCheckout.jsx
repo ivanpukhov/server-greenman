@@ -34,11 +34,16 @@ const CdekCheckout = () => {
     const [customerName, setCustomerName] = useState('');
     const [email, setEmail] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [deliveryMode, setDeliveryMode] = useState('door');
     const [cityQuery, setCityQuery] = useState('');
     const [selectedCity, setSelectedCity] = useState(null);
     const [citySuggestions, setCitySuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [address, setAddress] = useState('');
+    const [pickupPoints, setPickupPoints] = useState([]);
+    const [selectedPvzCode, setSelectedPvzCode] = useState('');
+    const [pickupPointsLoading, setPickupPointsLoading] = useState(false);
+    const [pickupPointsError, setPickupPointsError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const suggestTimerRef = useRef(null);
 
@@ -69,6 +74,38 @@ const CdekCheckout = () => {
         };
     }, [cityQuery, selectedCity]);
 
+    useEffect(() => {
+        setSelectedPvzCode('');
+        setPickupPoints([]);
+        setPickupPointsError('');
+
+        if (deliveryMode !== 'pvz' || !selectedCity?.code) {
+            setPickupPointsLoading(false);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setPickupPointsLoading(true);
+
+        axios.get(apiUrl('/cdek/pickup-points'), {
+            params: { cityCode: selectedCity.code }
+        }).then((response) => {
+            if (cancelled) return;
+            setPickupPoints(Array.isArray(response.data) ? response.data : []);
+        }).catch((error) => {
+            if (cancelled) return;
+            console.error('Ошибка загрузки ПВЗ:', error);
+            setPickupPoints([]);
+            setPickupPointsError(error.response?.data?.error || 'Не удалось загрузить список ПВЗ');
+        }).finally(() => {
+            if (!cancelled) setPickupPointsLoading(false);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [deliveryMode, selectedCity]);
+
     const totalKzt = useMemo(
         () => cart.reduce((sum, item) => sum + item.type.price * item.quantity, 0),
         [cart]
@@ -77,24 +114,29 @@ const CdekCheckout = () => {
     const { loading: deliveryLoading, error: deliveryError, result: deliveryResult } = useDeliveryCalculation({
         cityCode: selectedCity?.code || null,
         address,
-        cart
+        cart,
+        deliveryMode
     });
 
     const deliveryRub = deliveryResult?.delivery_sum || 0;
     const totalRub = usePrice(totalKzt);
     const grandTotalRub = totalRub + deliveryRub;
+    const selectedPvz = pickupPoints.find((point) => point.code === selectedPvzCode) || null;
 
     const isPhoneValid = phoneNumber.replace(/\D/g, '').length === 11;
     const isEmailValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    const hasDeliveryTarget = deliveryMode === 'pvz' ? Boolean(selectedPvz) : Boolean(address.trim());
     const isFormValid = Boolean(
         customerName.trim() &&
         isEmailValid &&
         isPhoneValid &&
         selectedCity?.code &&
-        address.trim() &&
+        hasDeliveryTarget &&
         deliveryResult &&
         !deliveryLoading &&
-        !deliveryError
+        !deliveryError &&
+        !pickupPointsLoading &&
+        !pickupPointsError
     );
 
     const handleCitySelect = (city) => {
@@ -102,6 +144,7 @@ const CdekCheckout = () => {
         setCityQuery(city.full_name || `${city.city}${city.region ? ', ' + city.region : ''}`);
         setCitySuggestions([]);
         setShowSuggestions(false);
+        setSelectedPvzCode('');
     };
 
     const handleSubmit = async () => {
@@ -130,9 +173,13 @@ const CdekCheckout = () => {
             paymentMethod: 'cod',
             products,
             totalPrice: grandTotalRub,
+            cdekDeliveryMode: deliveryMode,
             cdekCityCode: selectedCity.code,
             cdekCityLabel: selectedCity.full_name || selectedCity.city,
-            cdekAddress: address,
+            cdekAddress: deliveryMode === 'door' ? address : null,
+            cdekPvzCode: deliveryMode === 'pvz' ? selectedPvz?.code : null,
+            cdekPvzName: deliveryMode === 'pvz' ? selectedPvz?.name : null,
+            cdekPvzAddress: deliveryMode === 'pvz' ? (selectedPvz?.full_address || selectedPvz?.address) : null,
             cdekCalcPriceRub: deliveryRub
         };
 
@@ -144,7 +191,9 @@ const CdekCheckout = () => {
             await Swal.fire({
                 icon: 'success',
                 title: 'Заказ принят!',
-                text: 'Курьер СДЭК свяжется с вами. Оплата наличными при получении.',
+                text: deliveryMode === 'pvz'
+                    ? 'Заказ принят. Забрать его можно будет в выбранном ПВЗ СДЭК.'
+                    : 'Курьер СДЭК свяжется с вами. Оплата наличными при получении.',
                 confirmButtonText: 'Хорошо'
             });
             navigate('/');
@@ -194,6 +243,26 @@ const CdekCheckout = () => {
                 />
             </div>
 
+            <div className={styles.deliveryModeBlock}>
+                <div className={styles.deliveryModeTitle}>Способ доставки</div>
+                <div className={styles.deliveryModes}>
+                    <button
+                        type="button"
+                        className={`${styles.deliveryModeBtn} ${deliveryMode === 'door' ? styles.deliveryModeBtnActive : ''}`}
+                        onClick={() => setDeliveryMode('door')}
+                    >
+                        Дверь-дверь
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.deliveryModeBtn} ${deliveryMode === 'pvz' ? styles.deliveryModeBtnActive : ''}`}
+                        onClick={() => setDeliveryMode('pvz')}
+                    >
+                        Дверь-ПВЗ
+                    </button>
+                </div>
+            </div>
+
             <div className={`${styles.field} ${styles.cityField}`}>
                 <label>Город доставки</label>
                 <input
@@ -203,6 +272,7 @@ const CdekCheckout = () => {
                     onChange={(e) => {
                         setCityQuery(e.target.value);
                         setSelectedCity(null);
+                        setSelectedPvzCode('');
                         setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
@@ -222,22 +292,53 @@ const CdekCheckout = () => {
                 )}
             </div>
 
-            <div className={styles.field}>
-                <label>Адрес (улица, дом, квартира)</label>
-                <input
-                    type="text"
-                    placeholder="ул. Тверская, д. 1, кв. 10"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                />
-            </div>
+            {deliveryMode === 'door' ? (
+                <div className={styles.field}>
+                    <label>Адрес (улица, дом, квартира)</label>
+                    <input
+                        type="text"
+                        placeholder="ул. Тверская, д. 1, кв. 10"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                    />
+                </div>
+            ) : (
+                <div className={styles.field}>
+                    <label>Пункт выдачи СДЭК</label>
+                    <select
+                        className={styles.select}
+                        value={selectedPvzCode}
+                        onChange={(e) => setSelectedPvzCode(e.target.value)}
+                        disabled={!selectedCity?.code || pickupPointsLoading}
+                    >
+                        <option value="">{pickupPointsLoading ? 'Загрузка ПВЗ...' : 'Выберите пункт выдачи'}</option>
+                        {pickupPoints.map((point) => (
+                            <option key={point.code} value={point.code}>
+                                {point.name} {point.address ? `— ${point.address}` : ''}
+                            </option>
+                        ))}
+                    </select>
+                    {pickupPointsError && <div className={styles.deliveryError}>{pickupPointsError}</div>}
+                    {!pickupPointsLoading && selectedCity?.code && pickupPoints.length === 0 && !pickupPointsError && (
+                        <div className={styles.deliveryHint}>Для выбранного города не найдено доступных ПВЗ</div>
+                    )}
+                    {selectedPvz && (
+                        <div className={styles.pvzCard}>
+                            <div><b>{selectedPvz.name}</b></div>
+                            <div>{selectedPvz.full_address || selectedPvz.address}</div>
+                            {selectedPvz.work_time && <div>График: {selectedPvz.work_time}</div>}
+                            {selectedPvz.note && <div>{selectedPvz.note}</div>}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className={styles.deliveryInfo}>
                 {deliveryLoading && <span>Расчёт стоимости доставки…</span>}
                 {deliveryError && <span className={styles.deliveryError}>{deliveryError}</span>}
                 {deliveryResult && !deliveryLoading && !deliveryError && (
                     <span>
-                        Доставка СДЭК (дверь-дверь): <b>{deliveryRub.toLocaleString('ru-RU')} ₽</b>
+                        Доставка СДЭК ({deliveryMode === 'pvz' ? 'дверь-ПВЗ' : 'дверь-дверь'}): <b>{deliveryRub.toLocaleString('ru-RU')} ₽</b>
                         {deliveryResult.period_min && deliveryResult.period_max && (
                             <>, {deliveryResult.period_min}–{deliveryResult.period_max} дн.</>
                         )}
@@ -249,7 +350,9 @@ const CdekCheckout = () => {
             </div>
 
             <div className={styles.paymentNotice}>
-                Оплата наличными курьеру при получении.
+                {deliveryMode === 'pvz'
+                    ? 'Оплата наличными при получении в выбранном ПВЗ.'
+                    : 'Оплата наличными курьеру при получении.'}
             </div>
 
             <div className="total">

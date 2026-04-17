@@ -189,7 +189,11 @@ const ensureRfOrderSchema = async () => {
             ['cdekTrackingNumber', { type: Sequelize.STRING, allowNull: true }],
             ['cdekIntakeUuid', { type: Sequelize.STRING, allowNull: true }],
             ['cdekCityCode', { type: Sequelize.INTEGER, allowNull: true }],
+            ['cdekDeliveryMode', { type: Sequelize.STRING, allowNull: true }],
             ['cdekAddress', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzCode', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzName', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekPvzAddress', { type: Sequelize.STRING, allowNull: true }],
             ['cdekCalcPriceRub', { type: Sequelize.INTEGER, allowNull: true }],
             ['cdekRawResponse', { type: Sequelize.TEXT, allowNull: true }]
         ];
