@@ -87,10 +87,10 @@ const orderController = {
                 totalPrice,
                 userId,
                 customerName,
-                addressIndex: isRfOrder ? null : addressIndex,
+                addressIndex: isRfOrder ? '' : addressIndex,
                 city: isRfOrder ? (req.body.cdekCityLabel || '') : city,
-                street,
-                houseNumber,
+                street: isRfOrder ? '' : street,
+                houseNumber: isRfOrder ? '' : houseNumber,
                 phoneNumber: isRfOrder
                     ? (String(phoneNumber || '').startsWith('+') ? phoneNumber : `+${String(phoneNumber || '').replace(/\D/g, '')}`)
                     : phoneNumber,

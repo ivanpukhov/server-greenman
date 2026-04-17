@@ -4,7 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../CartContext.jsx';
 import { useFormatPrice, usePrice } from '../../../contexts/CountryContext.jsx';
 import { apiUrl } from '../../../config/api';
-import { toast } from '../../../ui';
+import { Button, toast } from '../../../ui';
+import {
+    IconArrowNarrowRight,
+    IconBuildingStore,
+    IconMapPin,
+    IconTruck,
+} from '../../../icons';
 import useDeliveryCalculation from './useDeliveryCalculation';
 import styles from './CdekCheckout.module.scss';
 
@@ -206,7 +212,25 @@ const CdekCheckout = () => {
 
     return (
         <div className={styles.checkout}>
-            <div className="cart__subtitle">Данные получателя</div>
+            <div className={styles.header}>
+                <div>
+                    <div className={styles.eyebrow}>Оформление по России</div>
+                    <div className={styles.title}>Данные получателя</div>
+                </div>
+                <div className={styles.headerBadge}>
+                    {deliveryMode === 'pvz' ? (
+                        <>
+                            <IconBuildingStore size={16} stroke={1.8} />
+                            ПВЗ СДЭК
+                        </>
+                    ) : (
+                        <>
+                            <IconTruck size={16} stroke={1.8} />
+                            Доставка курьером
+                        </>
+                    )}
+                </div>
+            </div>
 
             <div className={styles.field}>
                 <label>ФИО</label>
@@ -319,7 +343,10 @@ const CdekCheckout = () => {
                     )}
                     {selectedPvz && (
                         <div className={styles.pvzCard}>
-                            <div><b>{selectedPvz.name}</b></div>
+                            <div className={styles.pvzTitle}>
+                                <IconMapPin size={16} stroke={1.8} />
+                                <b>{selectedPvz.name}</b>
+                            </div>
                             <div>{selectedPvz.full_address || selectedPvz.address}</div>
                             {selectedPvz.work_time && <div>График: {selectedPvz.work_time}</div>}
                             {selectedPvz.note && <div>{selectedPvz.note}</div>}
@@ -350,31 +377,42 @@ const CdekCheckout = () => {
                     : 'Оплата наличными курьеру при получении.'}
             </div>
 
-            <div className="total">
-                <div className="total__sub">
-                    <div className="total__sub-item">Сумма заказа</div>
-                    <div className="total__sub-item">{formatPrice(totalKzt)}</div>
+            <div className={styles.summaryCard}>
+                <div className={styles.summaryTitle}>Итог по заказу</div>
+
+                <div className={styles.summaryRow}>
+                    <div className={styles.summaryLabel}>Сумма заказа</div>
+                    <div className={styles.summaryValue}>{formatPrice(totalKzt)}</div>
                 </div>
-                <div className="total__sub">
-                    <div className="total__sub-item">Доставка</div>
-                    <div className="total__sub-item">
+
+                <div className={styles.summaryRow}>
+                    <div className={styles.summaryLabel}>Доставка</div>
+                    <div className={styles.summaryValue}>
                         {deliveryResult ? `${deliveryRub.toLocaleString('ru-RU')} ₽` : '—'}
                     </div>
                 </div>
-                <div className="total__main">
-                    <div className="total__main-item">Итого</div>
-                    <div className="total__main-item">
+
+                <div className={styles.summaryTotal}>
+                    <div>Итого</div>
+                    <div>
                         {grandTotalRub.toLocaleString('ru-RU')} ₽
                     </div>
                 </div>
             </div>
 
-            <div
-                className={`cart__btn ${isFormValid && !isSubmitting ? '' : 'disabled'}`}
+            <Button
+                type="button"
+                size="lg"
+                radius="xl"
+                color="greenman"
+                fullWidth
+                className={styles.submitButton}
+                disabled={!isFormValid || isSubmitting}
                 onClick={handleSubmit}
+                rightSection={<IconArrowNarrowRight size={18} stroke={1.8} />}
             >
                 {isSubmitting ? 'Отправка…' : 'Оформить заказ'}
-            </div>
+            </Button>
         </div>
     );
 };

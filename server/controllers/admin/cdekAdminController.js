@@ -260,21 +260,45 @@ const printPdf = async (req, res, kind) => {
             return res.status(400).json({ message: 'Заказ ещё не отправлен в СДЭК' });
         }
 
-        const requested = await cdekApi.requestPrint(order.cdekUuid, kind);
+        if (!order.cdekNumber) {
+            try {
+                const refreshed = await cdekApi.pollOrderUntilRegistered(order.cdekUuid, { timeoutMs: 15000, intervalMs: 2000 });
+                const cdekNumber = refreshed?.entity?.cdek_number;
+                if (cdekNumber) {
+                    await order.update({ cdekNumber: String(cdekNumber) });
+                }
+            } catch (pollError) {
+                logError(`cdekAdmin.print.${kind}.pollOrder`, pollError, {
+                    orderId: order.id,
+                    cdekUuid: order.cdekUuid
+                });
+            }
+        }
+
+        if (!order.cdekNumber) {
+            return res.status(409).json({ message: 'У заказа ещё нет cdek_number. Обновите заказ из СДЭК и повторите печать через минуту.' });
+        }
+
+        const requested = await cdekApi.requestPrint({
+            orderUuid: order.cdekUuid,
+            cdekNumber: order.cdekNumber,
+            orderNumber: `GM-${order.id}`
+        }, kind);
         const formUuid = requested?.entity?.uuid;
         if (!formUuid) {
             return res.status(502).json({ message: 'СДЭК не вернул uuid печатной формы' });
         }
 
         const { url } = await cdekApi.pollPrintReady(formUuid, kind, { timeoutMs: 60000, intervalMs: 2500 });
-        const stream = await cdekApi.downloadPrintPdfStream(url);
+        const pdf = await cdekApi.downloadPrintPdf(url);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader(
             'Content-Disposition',
             `inline; filename="cdek-${kind}-${order.id}.pdf"`
         );
-        stream.data.pipe(res);
+        res.setHeader('Content-Length', pdf.data.length);
+        res.end(pdf.data);
     } catch (error) {
         logError(`cdekAdmin.print.${kind}`, error, {
             orderId: req.params.id,

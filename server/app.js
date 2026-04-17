@@ -21,7 +21,6 @@ const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
 const chatwootWebhookRoutes = require('./routes/chatwootWebhookRoutes');
 const cdekRoutes = require('./routes/cdekRoutes');
-const wishlistRoutes = require('./routes/wishlistRoutes');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -33,7 +32,6 @@ require('./models/orders/ChatwootMessageSync');
 require('./models/orders/ProcessedWebhookMessage');
 require('./models/orders/CdekWebhookEvent');
 require('./models/orders/CdekSettings');
-require('./models/orders/WishlistItem');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -62,7 +60,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 app.use('/api/chatwoot-webhook', chatwootWebhookRoutes);
 app.use('/api/cdek', cdekRoutes);
-app.use('/api/wishlist', wishlistRoutes);
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {
@@ -204,6 +201,18 @@ const ensureRfOrderSchema = async () => {
         for (const [name, options] of columnsToAdd) {
             if (!tableDefinition[name]) {
                 await queryInterface.addColumn('orders', name, options);
+            }
+        }
+
+        const columnsToRelax = [
+            ['addressIndex', { type: Sequelize.STRING, allowNull: true }],
+            ['street', { type: Sequelize.STRING, allowNull: true }],
+            ['houseNumber', { type: Sequelize.STRING, allowNull: true }]
+        ];
+
+        for (const [name, options] of columnsToRelax) {
+            if (tableDefinition[name] && tableDefinition[name].allowNull === false) {
+                await queryInterface.changeColumn('orders', name, options);
             }
         }
     } catch (error) {
