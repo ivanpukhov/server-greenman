@@ -1,1 +1,2 @@
-database/
+database/*.db
+server/database/*.db
