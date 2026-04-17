@@ -20,6 +20,7 @@ const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
 const chatwootWebhookRoutes = require('./routes/chatwootWebhookRoutes');
+const cdekRoutes = require('./routes/cdekRoutes');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -29,6 +30,7 @@ require('./models/orders/KazpostRequest');
 require('./models/orders/OrderDraftRequest');
 require('./models/orders/ChatwootMessageSync');
 require('./models/orders/ProcessedWebhookMessage');
+require('./models/orders/CdekWebhookEvent');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
@@ -56,6 +58,7 @@ app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 app.use('/api/chatwoot-webhook', chatwootWebhookRoutes);
+app.use('/api/cdek', cdekRoutes);
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {
@@ -166,6 +169,37 @@ const ensureOrderSchema = async () => {
         }
     } catch (error) {
         console.error('Ошибка при проверке структуры таблицы orders:', error);
+    }
+};
+
+const ensureRfOrderSchema = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+
+    try {
+        const tableDefinition = await queryInterface.describeTable('orders');
+
+        const columnsToAdd = [
+            ['country', { type: Sequelize.STRING(2), allowNull: false, defaultValue: 'KZ' }],
+            ['currency', { type: Sequelize.STRING(3), allowNull: false, defaultValue: 'KZT' }],
+            ['email', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekUuid', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekNumber', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekStatus', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekTrackingNumber', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekIntakeUuid', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekCityCode', { type: Sequelize.INTEGER, allowNull: true }],
+            ['cdekAddress', { type: Sequelize.STRING, allowNull: true }],
+            ['cdekCalcPriceRub', { type: Sequelize.INTEGER, allowNull: true }],
+            ['cdekRawResponse', { type: Sequelize.TEXT, allowNull: true }]
+        ];
+
+        for (const [name, options] of columnsToAdd) {
+            if (!tableDefinition[name]) {
+                await queryInterface.addColumn('orders', name, options);
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка при проверке RF-полей таблицы orders:', error);
     }
 };
 
@@ -649,6 +683,7 @@ sequelize.sync().then(async () => {
         await ensureAdminUsersSchema();
         await ensureDefaultAdmins();
         await ensureOrderSchema();
+        await ensureRfOrderSchema();
         await ensureSentPaymentLinksSchema();
         await ensureKazpostRequestsSchema();
         await ensureOrderDraftRequestsSchema();

@@ -8,6 +8,7 @@ import FaqItem from "../FaqItem/FaqItem";
 import AddToCartControl from "./AddToCartControl.jsx";
 import {Helmet} from "react-helmet";
 import ScrollToTop from "../ScrollToTop";
+import { Center, Loader, Text, UnstyledButton } from '@mantine/core';
 
 const ProductInfo = () => {
     const [product, setproduct] = useState(null);
@@ -33,9 +34,9 @@ const ProductInfo = () => {
     const [isExpanded, setIsExpanded] = useState(false);
 
 
-    if (loading) return <div>Загрузка...</div>;
-    if (error) return <div>{error}</div>;
-    if (!product) return <div>Данные о товаре не найдены.</div>;
+    if (loading) return <Center py={80}><Loader color="greenman" size="lg" /></Center>;
+    if (error) return <Center py={40}><Text c="red">{error}</Text></Center>;
+    if (!product) return <Center py={40}><Text c="dimmed">Данные о товаре не найдены.</Text></Center>;
 
     const formatDescription = (description, shouldShorten = false) => {
         const splitDescription = description.split(/[\•\*]/).map((item, index) => index === 0 ? item : `•${item}`).join('<br>');
@@ -72,9 +73,9 @@ const ProductInfo = () => {
             </Helmet>
             <ScrollToTop/>
             <div className="productInfo__header">
-                <div className="productInfo__header--back" onClick={() => navigate(-1)}>
+                <UnstyledButton className="productInfo__header--back" onClick={() => navigate(-1)}>
                     <img src={back} alt=""/>
-                </div>
+                </UnstyledButton>
                 <h1 className="productInfo__header--title">
                     {product.name}
                 </h1>

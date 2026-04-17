@@ -1,110 +1,99 @@
-import React, {useState} from 'react';
-import {useCart} from '../../CartContext.jsx';
+import React, { useState } from 'react';
+import { useCart } from '../../CartContext.jsx';
+import { ActionIcon, Button, Drawer, Group, SegmentedControl, Stack, Text } from '@mantine/core';
+import { Link, useLocation } from 'react-router-dom';
+import { useFormatPrice } from '../../contexts/CountryContext.jsx';
 import cardAdd from '../../images/card__add.svg';
 import iconMinus from '../../images/bottom_bar/Icon-minus.svg';
 import iconPlus from '../../images/bottom_bar/Icon-plus.svg';
-import Sheet from 'react-modal-sheet';
-import {Link, useLocation} from "react-router-dom";
 
-const AddToCartControl = ({product}) => {
+const AddToCartControl = ({ product }) => {
     const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
+    const formatPrice = useFormatPrice();
     const [open, setOpen] = useState(false);
     const [selectedTypeIndex, setSelectedTypeIndex] = useState(0);
-    const [quantity, setQuantity] = useState(1);
-
-    const inCart = cart.find(item => item.id === product.id);
-
-    const handleAddToCart = () => {
-        addToCart({ ...product, type: product.types[selectedTypeIndex], quantity });
-        setOpen(false);
-    };
-
-    const incrementQuantity = () => {
-        updateQuantity(product.id, inCart.quantity + 1);
-    };
-
-    const decrementQuantity = () => {
-        if (inCart.quantity > 1) {
-            updateQuantity(product.id, inCart.quantity - 1);
-        } else {
-            handleRemoveFromCart();
-        }
-    };
-
-    const handleRemoveFromCart = () => {
-        removeFromCart(product.id);
-        setOpen(false);
-    };
     const location = useLocation();
 
+    const inCart = cart.find(item => item.id === product.id);
     const isProductPage = /\/product\/.*/.test(location.pathname);
 
+    const handleAddToCart = () => {
+        addToCart({ ...product, type: product.types[selectedTypeIndex], quantity: 1 });
+        setOpen(false);
+    };
+
+    const increment = () => updateQuantity(product.id, inCart.quantity + 1);
+    const decrement = () => {
+        if (inCart.quantity > 1) updateQuantity(product.id, inCart.quantity - 1);
+        else removeFromCart(product.id);
+    };
 
     return (
-       <>
-           <div className="product__buy">
-               {inCart ? (
-                   <div className="productDetails">
-                       { isProductPage && (
-                           <Link to={'/cart'} onClick={() => setOpen(true)} className="cardAdd__btn">
-                               Оформить заказ
-                           </Link>
-                       )}
+        <>
+            <div className="product__buy" style={{ marginTop: 8 }}>
+                {inCart ? (
+                    <div className="productDetails">
+                        {isProductPage && (
+                            <Link to="/cart" className="cardAdd__btn" style={{ marginBottom: 8, display: 'block' }}>
+                                Оформить заказ
+                            </Link>
+                        )}
+                        <div className="product__inCart">
+                            <button onClick={decrement}>
+                                <img className="iconMinus" src={iconMinus} alt="-" />
+                            </button>
+                            <div className="product__quantity">{inCart.quantity}</div>
+                            <button onClick={increment}>
+                                <img src={iconPlus} className="iconPlus" alt="+" />
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <button onClick={() => setOpen(true)} className="cardAdd__btn">
+                        <img src={cardAdd} className="cardAdd" alt="В корзину" />
+                    </button>
+                )}
+            </div>
 
-                       <div className='product__inCart'>
-                           <button onClick={decrementQuantity}>
-                               <img className="iconMinus" src={iconMinus} alt=""/>
-                           </button>
-                           <div className="product__quantity">{inCart.quantity}</div>
-                           <button onClick={incrementQuantity}>
-                               <img src={iconPlus} className="iconPlus" alt=""/>
-                           </button>
-                       </div>
-                   </div>
-               ) : (
-                   <button onClick={() => setOpen(true)} className="cardAdd__btn">
-                       <img src={cardAdd} className="cardAdd" alt=""/>
-                   </button>
-               )}
-           </div>
+            <Drawer
+                opened={open}
+                onClose={() => setOpen(false)}
+                position="bottom"
+                size="auto"
+                radius="lg"
+                title={<Text fw={700}>Выберите тип товара</Text>}
+                overlayProps={{ opacity: 0.35, blur: 2 }}
+            >
+                <Stack gap="md" pb="md">
+                    <SegmentedControl
+                        fullWidth
+                        color="greenman"
+                        data={product.types.map((type, index) => ({
+                            label: type.type,
+                            value: String(index)
+                        }))}
+                        value={String(selectedTypeIndex)}
+                        onChange={(val) => setSelectedTypeIndex(Number(val))}
+                    />
 
-           <Sheet isOpen={open} onClose={() => setOpen(false)}>
-               <Sheet.Container>
-                   <Sheet.Header />
-                   <Sheet.Content>
+                    <Group justify="space-between" align="center">
+                        <Text fw={700} size="lg" c="greenman">
+                            {formatPrice(product.types[selectedTypeIndex].price)}
+                        </Text>
+                        <Button color="greenman" onClick={handleAddToCart} radius="md">
+                            В корзину
+                        </Button>
+                    </Group>
 
-                       <h2 className="product__typeTitle">Выберите тип товара</h2>
-
-                       <div className="product__typeBlock">
-                           {product.types.map((type, index) => (
-                               <button
-                                   key={index}
-                                   className={selectedTypeIndex === index ? 'product__type' : 'product__type-active'}
-                                   onClick={() => setSelectedTypeIndex(index)}
-                               >
-                                   {type.type}
-                               </button>
-                           ))}
-                       </div>
-
-                       <div className="product__bottom">
-                           <div className="product__Modalprice">
-                               {product.types[selectedTypeIndex].price} ₸
-                           </div>
-                           <button onClick={handleAddToCart}>В корзину</button>
-                       </div>
-                       <div className="productInfo__desc mt42 contraindications">
-                           <h2 className="productInfo__desc--title">Внимательно ознакомьтесь с противопоказаниями:</h2>
-                           <ul className='diseases'>
-                               <br/>
-                               <li  className="disease ">{product.contraindications}</li>
-                           </ul>
-                       </div>
-                   </Sheet.Content>
-               </Sheet.Container>
-               <Sheet.Backdrop />
-           </Sheet>
-       </>
+                    {product.contraindications && (
+                        <div className="productInfo__desc contraindications">
+                            <Text size="sm" fw={600} mb={4}>Противопоказания:</Text>
+                            <Text size="sm" c="dimmed">{product.contraindications}</Text>
+                        </div>
+                    )}
+                </Stack>
+            </Drawer>
+        </>
     );
 };
 

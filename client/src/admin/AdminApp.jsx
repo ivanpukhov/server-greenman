@@ -31,6 +31,7 @@ import WhatsAppConnectionPage from './WhatsAppConnectionPage';
 import KazpostRequestsPage from './KazpostRequestsPage';
 import OrderDraftRequestsPage from './OrderDraftRequestsPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
+import { OrderRfEdit, OrderRfList, OrderRfShow } from './resources/ordersRf';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
 import { adminAuthStorage } from './authProvider';
 import './AdminApp.css';
@@ -123,6 +124,14 @@ const AdminApp = () => {
             edit={OrderEdit}
             create={OrderCreate}
             icon={ShoppingCartOutlinedIcon}
+        />
+        <Resource
+            name="orders-rf"
+            options={{ label: 'Заказы РФ' }}
+            list={OrderRfList}
+            show={OrderRfShow}
+            edit={OrderRfEdit}
+            icon={LocalShippingOutlinedIcon}
         />
         <Resource
             name="accounting"

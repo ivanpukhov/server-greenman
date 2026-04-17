@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const adminController = require('../controllers/adminController');
 const adminWhatsAppController = require('../controllers/adminWhatsAppController');
+const cdekAdminController = require('../controllers/admin/cdekAdminController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 
 const router = express.Router();
@@ -63,6 +64,15 @@ router.get('/order-bundles/:code', adminController.getOrderBundle);
 router.put('/inventory/types/:id/alias', adminController.updateInventoryTypeAlias);
 router.get('/kazpost-requests', adminController.getKazpostRequests);
 router.post('/kazpost-requests/:id/retry', adminController.retryKazpostRequest);
+router.get('/orders-rf', cdekAdminController.listOrdersRf);
+router.get('/orders-rf/:id', cdekAdminController.getOrderRf);
+router.put('/orders-rf/:id', cdekAdminController.updateOrderRf);
+router.post('/orders-rf/:id/cdek/submit', cdekAdminController.submitToCdek);
+router.get('/orders-rf/:id/cdek/refresh', cdekAdminController.refreshFromCdek);
+router.get('/orders-rf/:id/cdek/print/barcode.pdf', cdekAdminController.printBarcode);
+router.get('/orders-rf/:id/cdek/print/waybill.pdf', cdekAdminController.printWaybill);
+router.post('/orders-rf/:id/cdek/intake', cdekAdminController.createIntake);
+
 router.get('/order-draft-requests', adminController.getOrderDraftRequests);
 router.post('/order-draft-requests/:id/retry', adminController.retryOrderDraftRequest);
 router.delete('/order-draft-requests/:id', adminController.deleteOrderDraftRequest);

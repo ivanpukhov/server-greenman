@@ -1,14 +1,15 @@
-import React, {useEffect, useState} from 'react';
-import {Link, useNavigate} from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '../../config/api';
+import { hasValidSiteSession, useAuth } from '../../AuthContext.jsx';
+import Banner from '../Banner/Banner.jsx';
+import ScrollToTop from '../ScrollToTop';
+import {
+    Accordion, ActionIcon, Anchor, Badge, Box, Button, Center,
+    Group, Loader, Paper, SegmentedControl, Stack, Text, Title
+} from '@mantine/core';
 import logoutImg from '../../images/logout.svg';
-import icon from '../../images/profile.png';
-import profile__order from '../../images/profile__order.png';
-import {hasValidSiteSession, useAuth} from "../../AuthContext.jsx";
-import Banner from "../Banner/Banner.jsx";
-import {TailSpin} from "react-loader-spinner";
-import ScrollToTop from "../ScrollToTop";
 
 const STATUS_FILTERS = [
     { value: 'all', label: 'Все' },
@@ -20,188 +21,175 @@ const STATUS_FILTERS = [
 ];
 
 const STATUS_SORT_PRIORITY = {
-    'в обработке': 0,
-    'оплачено': 1,
-    'отправлено': 2,
-    'доставлено': 3,
-    'отменено': 4
+    'в обработке': 0, 'оплачено': 1, 'отправлено': 2, 'доставлено': 3, 'отменено': 4
 };
 
-const normalizeStatus = (status) => String(status || '').trim().toLowerCase();
+const STATUS_COLORS = {
+    'в обработке': 'yellow', 'оплачено': 'blue', 'отправлено': 'violet',
+    'доставлено': 'greenman', 'отменено': 'red'
+};
 
-const Track = (order) => {
-    return (
-        <div className="profile-bottom__item">
-            <div className="profile-bottom__title">Отследить заказ</div>
-            <a href={'https://track.greenman.kz/' + order.trackingNumber} target="_blank"
-               className="profile-bottom__btn">Подробнее</a>
-        </div>
-    )
-}
+const normalizeStatus = (s) => String(s || '').trim().toLowerCase();
 
 const Profile = () => {
     const navigate = useNavigate();
-    const {logout} = useAuth();
+    const { logout } = useAuth();
     const [profileData, setProfileData] = useState(null);
-    const [expandedOrders, setExpandedOrders] = useState({});
     const [selectedStatus, setSelectedStatus] = useState('all');
 
     useEffect(() => {
-        if (!hasValidSiteSession()) {
-            navigate('/auth');
-        }
+        if (!hasValidSiteSession()) navigate('/auth');
     }, [navigate]);
+
     useEffect(() => {
         const token = localStorage.getItem('token');
-        axios.get(apiUrl('/profile/'), {headers: {'Authorization': `Bearer ${token}`}})
-            .then(response => setProfileData(response.data))
-            .catch(error => {
-                console.error('Ошибка при получении данных профиля:', error);
-                if (error.response && error.response.status === 401) {
-                    logout();
-                    navigate('/auth');
-                }
+        axios.get(apiUrl('/profile/'), { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => setProfileData(r.data))
+            .catch(err => {
+                if (err.response?.status === 401) { logout(); navigate('/auth'); }
             });
     }, [logout, navigate]);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/auth');
-    };
+    const handleLogout = () => { logout(); navigate('/auth'); };
 
-    const toggleOrderVisibility = (orderId) => {
-        setExpandedOrders(prevState => ({
-            ...prevState,
-            [orderId]: !prevState[orderId]
-        }));
-    };
+    if (!profileData) {
+        return <Center py={80}><Loader color="greenman" size="lg" /></Center>;
+    }
 
     const orders = profileData?.orders || [];
-    const availableStatuses = STATUS_FILTERS.filter(({value}) =>
-        value === 'all' || orders.some(order => normalizeStatus(order.status) === normalizeStatus(value))
+
+    if (orders.length === 0) {
+        return (
+            <div>
+                <ScrollToTop />
+                <Center py={60}>
+                    <Stack align="center" gap="md" maw={360}>
+                        <Text size="3rem">🛒</Text>
+                        <Title order={3}>У вас ещё нет заказов</Title>
+                        <Text c="dimmed" ta="center" size="sm">
+                            Выберите товар в каталоге или введите название болезни в поиске
+                        </Text>
+                        <Group>
+                            <Button component={Link} to="/" variant="light" color="greenman" radius="md">На главную</Button>
+                            <Button component={Link} to="/catalog" color="greenman" radius="md">Каталог</Button>
+                        </Group>
+                    </Stack>
+                </Center>
+                <Banner />
+            </div>
+        );
+    }
+
+    const availableStatuses = STATUS_FILTERS.filter(({ value }) =>
+        value === 'all' || orders.some(o => normalizeStatus(o.status) === normalizeStatus(value))
     );
+
     const filteredOrders = [...orders]
-        .filter(order => selectedStatus === 'all' || normalizeStatus(order.status) === normalizeStatus(selectedStatus))
-        .sort((firstOrder, secondOrder) => {
-            const firstPriority = STATUS_SORT_PRIORITY[normalizeStatus(firstOrder.status)] ?? Number.MAX_SAFE_INTEGER;
-            const secondPriority = STATUS_SORT_PRIORITY[normalizeStatus(secondOrder.status)] ?? Number.MAX_SAFE_INTEGER;
-
-            if (firstPriority !== secondPriority) {
-                return firstPriority - secondPriority;
-            }
-
-            return secondOrder.id - firstOrder.id;
+        .filter(o => selectedStatus === 'all' || normalizeStatus(o.status) === normalizeStatus(selectedStatus))
+        .sort((a, b) => {
+            const pa = STATUS_SORT_PRIORITY[normalizeStatus(a.status)] ?? 99;
+            const pb = STATUS_SORT_PRIORITY[normalizeStatus(b.status)] ?? 99;
+            return pa !== pb ? pa - pb : b.id - a.id;
         });
 
     return (
         <div>
-            <ScrollToTop/>
+            <ScrollToTop />
+            <Stack gap="lg" pb="xl">
+                <Paper p="md" radius="lg" withBorder style={{ border: '1px solid rgba(0,171,109,0.15)' }}>
+                    <Group justify="space-between" align="center">
+                        <Stack gap={2}>
+                            <Text fw={700} size="lg">Профиль</Text>
+                            <Text c="dimmed" size="sm">+7{profileData.phoneNumber}</Text>
+                        </Stack>
+                        <ActionIcon variant="subtle" color="red" size="lg" onClick={handleLogout}>
+                            <img src={logoutImg} alt="Выйти" style={{ width: 20, height: 20 }} />
+                        </ActionIcon>
+                    </Group>
+                </Paper>
 
-            {profileData ? (
-                orders.length > 0 ? (
-                    <div className="profile">
-                        <div className="profile__top">
-                            <div className="profile__img">
-                                <img src={icon} alt=""/>
-                            </div>
-                            <div className="profile__number">
-                                Профиль
-                                <p>+7{profileData.phoneNumber}</p>
-                            </div>
-                            <div className="profile__img" onClick={handleLogout}>
-                                <img src={logoutImg} alt=""/>
-                            </div>
-                        </div>
-                        <div className="profile__title">
-                            Заказы
-                        </div>
-                        <div className="profile__filters">
-                            {availableStatuses.map(statusOption => (
-                                <button
-                                    key={statusOption.value}
-                                    type="button"
-                                    className={`profile__filter-btn ${selectedStatus === statusOption.value ? 'active' : ''}`}
-                                    onClick={() => setSelectedStatus(statusOption.value)}
-                                >
-                                    {statusOption.label}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="profile__orders">
-                            {filteredOrders.length > 0 ? filteredOrders.map(order => (
-                                <div key={order.id}
-                                     className={`profile__order ${expandedOrders[order.id] ? 'expanded' : ''}`}>
-                                    <div className="profile__order-status"
-                                         onClick={() => toggleOrderVisibility(order.id)}>
-                                        <img src={profile__order} alt="" className="img-pulse"/>
-                                        <div className="profile__acc">
-                                            {expandedOrders[order.id] ? '–' : '+'}
-                                        </div>
-                                        <div className="profile__order--status">
-                                            <p>{order.status}</p>
-                                            <span>№{order.id} {order.trackingNumber || 'Обрабатывается'}</span>
-                                        </div>
-                                    </div>
-                                    {expandedOrders[order.id] && (
-                                        <div className="profile__order-block">
-                                            <div className="profile__order-item">
-                                                <div className="profile__order-title">№ заказа</div>
-                                                <div className="profile__order-content">{order.id}</div>
-                                            </div>
-                                            <div className="profile__order-item">
-                                                <div className="profile__order-title">Трек номер:</div>
-                                                <div
-                                                    className="profile__order-content">{order.trackingNumber || 'Обрабатывается'}</div>
-                                            </div>
-                                            <ul className="profile-products">
-                                                {order.products.map(product => (
-                                                    <Link to={'/product/' + product.productId} key={product.productId}
-                                                          className="profile-product">
-                                                        <div
-                                                            className="profile-product__title"> {product.product + ' ' + product.type}
-                                                            <span>x{product.quantity} </span></div>
-                                                        <div className="profile-product__title"></div>
-                                                        <div className="profile-product__type"> Аннотация</div>
-                                                    </Link>
-                                                ))}
-                                            </ul>
-                                            <div className="profile-bottom">
-                                                <div className="profile-bottom__item">
-                                                    <div className="profile-bottom__title">Сумма заказа</div>
-                                                    <div className="profile-bottom__text">{order.totalPrice} ₸</div>
-                                                </div>
-                                                {order.trackingNumber !== null && <Track order={order}/>}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )) : (
-                                <div className="profile__orders-empty">
-                                    Заказов со статусом "{availableStatuses.find(status => status.value === selectedStatus)?.label || selectedStatus}" пока нет.
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                <Title order={3}>Заказы</Title>
+
+                {availableStatuses.length > 1 && (
+                    <SegmentedControl
+                        fullWidth
+                        color="greenman"
+                        data={availableStatuses.map(s => ({ label: s.label, value: s.value }))}
+                        value={selectedStatus}
+                        onChange={setSelectedStatus}
+                        size="sm"
+                    />
+                )}
+
+                {filteredOrders.length === 0 ? (
+                    <Center py={32}>
+                        <Text c="dimmed">Заказов с этим статусом пока нет</Text>
+                    </Center>
                 ) : (
-                    <div className="cart__n">
-                        <div className="cart__null">
-                            <div className="cart__null-title">
-                                У вас еще нет заказов
-                            </div>
-                            <div className="cart__null-text">
-                                Выберите товар в каталоге, либо введите название товара или болезни в поиске, и выберите
-                                то, что поможет именно Вам!
-                            </div>
-                            <Link to={'/'} className="cart__null--btn">На главную</Link>
-                            <Link to={'/catalog'} className="cart__null--btn">Перейти в каталог</Link>
-                        </div>
-                    </div>
-                )
-            ) : (
-                <div className="loading"><TailSpin color="#00AB6D" height={80} width={80}/></div>
-
-            )}
-            <Banner/>
+                    <Accordion variant="separated" radius="lg">
+                        {filteredOrders.map(order => (
+                            <Accordion.Item key={order.id} value={String(order.id)} style={{ border: '1px solid rgba(0,171,109,0.15)' }}>
+                                <Accordion.Control>
+                                    <Group gap="sm" wrap="nowrap">
+                                        <Badge
+                                            color={STATUS_COLORS[normalizeStatus(order.status)] || 'gray'}
+                                            variant="light"
+                                            size="sm"
+                                        >
+                                            {order.status}
+                                        </Badge>
+                                        <Box style={{ flex: 1, minWidth: 0 }}>
+                                            <Text size="sm" fw={600}>№{order.id}</Text>
+                                            <Text size="xs" c="dimmed" truncate>
+                                                {order.trackingNumber || 'Обрабатывается'}
+                                            </Text>
+                                        </Box>
+                                    </Group>
+                                </Accordion.Control>
+                                <Accordion.Panel>
+                                    <Stack gap="sm">
+                                        <Stack gap={4}>
+                                            {order.products.map(product => (
+                                                <Anchor
+                                                    key={product.productId}
+                                                    component={Link}
+                                                    to={`/product/${product.productId}`}
+                                                    style={{ textDecoration: 'none' }}
+                                                >
+                                                    <Paper p="xs" radius="md" withBorder style={{ border: '1px solid rgba(0,171,109,0.1)' }}>
+                                                        <Group justify="space-between">
+                                                            <Text size="sm">{product.product} {product.type}</Text>
+                                                            <Text size="sm" c="dimmed" fw={500}>×{product.quantity}</Text>
+                                                        </Group>
+                                                    </Paper>
+                                                </Anchor>
+                                            ))}
+                                        </Stack>
+                                        <Group justify="space-between" pt="xs">
+                                            <Text size="sm" c="dimmed">Сумма заказа</Text>
+                                            <Text fw={700} c="greenman">
+                                                {new Intl.NumberFormat(order.currency === 'RUB' ? 'ru-RU' : 'ru-KZ', { maximumFractionDigits: 0 }).format(order.totalPrice)}
+                                                {' '}{order.currency === 'RUB' ? '₽' : '₸'}
+                                            </Text>
+                                        </Group>
+                                        {order.trackingNumber && (
+                                            <Anchor
+                                                href={`https://track.greenman.kz/${order.trackingNumber}`}
+                                                target="_blank"
+                                                size="sm"
+                                                c="greenman"
+                                            >
+                                                Отследить заказ →
+                                            </Anchor>
+                                        )}
+                                    </Stack>
+                                </Accordion.Panel>
+                            </Accordion.Item>
+                        ))}
+                    </Accordion>
+                )}
+            </Stack>
+            <Banner />
         </div>
     );
 };

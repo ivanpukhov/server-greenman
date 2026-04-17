@@ -43,24 +43,56 @@ const orderController = {
                 paymentMethod,
                 products,
                 totalPrice,
-                kaspiNumber
+                kaspiNumber,
+                country,
+                email,
+                cdekCityCode,
+                cdekAddress,
+                cdekCalcPriceRub
             } = req.body;
 
             console.log("Полученные данные:", req.body);
 
+            const normalizedCountry = country === 'RF' ? 'RF' : 'KZ';
+            const isRfOrder = normalizedCountry === 'RF';
+
+            if (isRfOrder) {
+                if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+                    return res.status(400).json({ error: 'Для заказа в РФ требуется корректный email' });
+                }
+                if (!cdekCityCode) {
+                    return res.status(400).json({ error: 'Для заказа в РФ требуется cdekCityCode' });
+                }
+                if (!cdekAddress || !String(cdekAddress).trim()) {
+                    return res.status(400).json({ error: 'Для заказа в РФ требуется cdekAddress' });
+                }
+                const phoneDigits = String(phoneNumber || '').replace(/\D/g, '');
+                if (phoneDigits.length < 11 || phoneDigits.length > 12) {
+                    return res.status(400).json({ error: 'Некорректный номер телефона для РФ (нужен формат +7XXXXXXXXXX)' });
+                }
+            }
+
             let orderData = {
-                deliveryMethod,
-                paymentMethod,
+                deliveryMethod: isRfOrder ? 'cdek' : deliveryMethod,
+                paymentMethod: isRfOrder ? 'cod' : paymentMethod,
                 products,
                 totalPrice,
                 userId,
                 customerName,
-                addressIndex,
-                city,
+                addressIndex: isRfOrder ? null : addressIndex,
+                city: isRfOrder ? (req.body.cdekCityLabel || '') : city,
                 street,
                 houseNumber,
-                phoneNumber,
-                kaspiNumber
+                phoneNumber: isRfOrder
+                    ? (String(phoneNumber || '').startsWith('+') ? phoneNumber : `+${String(phoneNumber || '').replace(/\D/g, '')}`)
+                    : phoneNumber,
+                kaspiNumber: isRfOrder ? null : kaspiNumber,
+                country: normalizedCountry,
+                currency: isRfOrder ? 'RUB' : 'KZT',
+                email: email || null,
+                cdekCityCode: isRfOrder ? Number(cdekCityCode) : null,
+                cdekAddress: isRfOrder ? cdekAddress : null,
+                cdekCalcPriceRub: isRfOrder ? Number(cdekCalcPriceRub) || null : null
             };
 
             const paymentLinkConnection = await attachRecentPaymentLinkToOrder(orderData, phoneNumber);
@@ -173,24 +205,44 @@ const orderController = {
 Количество: ${product.quantity}
 `).join('\n');
 
-            const notificationMessage = `
+            const currencyLabel = isRfOrder ? 'рублей' : 'тенге';
+            const addressLine = isRfOrder
+                ? `${orderData.city}, ${cdekAddress}`
+                : `${street}, ${houseNumber}`;
+
+            const notificationMessage = isRfOrder ? `
+Имя и Фамилия: *${customerName}*
+Номер телефона: *${orderData.phoneNumber}*
+Email: *${email}*
+Город: *${orderData.city}*
+Адрес: *${cdekAddress}*
+Метод доставки: *СДЭК (дверь-дверь)*
+Метод оплаты: *Наличными при получении*
+Итоговая сумма: *${totalPrice}* ${currencyLabel}
+
+*Товары*:
+${productDetails}` : `
 Имя и Фамилия: *${customerName}*
 Номер телефона: *${phoneNumber}*
 Номер телефона Kaspi: *${kaspiNumber}*
 Город: *${city}*
-Адрес: *${street}, ${houseNumber}*
+Адрес: *${addressLine}*
 Почтовый индекс: *${addressIndex}*
 Метод доставки: *${deliveryMethod}*
 Метод оплаты: *${paymentMethod}*
-Итоговая сумма: *${totalPrice}* тенге
+Итоговая сумма: *${totalPrice}* ${currencyLabel}
 
 *Товары*:
 ${productDetails}`;
 
-await sendNotification(phoneNumber, notificationMessage);
-await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет на сумму *${totalPrice}* тенге в приложении Каспи.`);
+await sendNotification(orderData.phoneNumber, notificationMessage);
+if (isRfOrder) {
+    await sendNotification(orderData.phoneNumber, `Ваш заказ принят. Курьер СДЭК свяжется с вами. Оплата наличными при получении — *${totalPrice}* ${currencyLabel}.`);
+} else {
+    await sendNotification(phoneNumber, `Ваш заказ создан. Оплатите счет на сумму *${totalPrice}* тенге в приложении Каспи.`);
+}
 
-console.log("Уведомление отправлено на номер:", phoneNumber);
+console.log("Уведомление отправлено на номер:", orderData.phoneNumber);
 
 res.status(201).json(newOrder);
 } catch (err) {

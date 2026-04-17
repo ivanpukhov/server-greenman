@@ -13,6 +13,7 @@ import Catalog from "./Components/Catalog/Catalog";
 import ScrollToTop from "./Components/ScrollToTop";
 import Search from "./Components/Catalog/Search";
 import AdminApp from "./admin/AdminApp";
+import CountryModal from "./Components/CountrySelect/CountryModal";
 
 function App() {
     return (
@@ -60,6 +61,7 @@ function AppRoutes() {
             </div>
             {!isAdminRoute && <Footer/>}
             {!isAdminRoute && <BottomBar/>}
+            {!isAdminRoute && <CountryModal/>}
         </>
     );
 }

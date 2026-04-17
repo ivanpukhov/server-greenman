@@ -1,63 +1,50 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { apiUrl } from "../../config/api";
-import Product from "./Product";
-import { Helmet } from "react-helmet";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Empty } from 'antd';
-import { TailSpin } from 'react-loader-spinner';
-import back from "../../images/ion_arrow-back.svg";
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { apiUrl } from '../../config/api';
+import Product from './Product';
+import { Helmet } from 'react-helmet';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Center, Loader, Stack, Text, Title, UnstyledButton } from '@mantine/core';
+import back from '../../images/ion_arrow-back.svg';
 
 const Catalog = () => {
-    const API_URL = apiUrl('/products');
     const navigate = useNavigate();
-
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const location = useLocation();
-
     const isCatalogPage = location.pathname === '/catalog';
 
     useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const response = await axios.get(API_URL);
-                setProducts(Array.isArray(response.data) ? response.data : []);
+        axios.get(apiUrl('/products'))
+            .then(res => {
+                setProducts(Array.isArray(res.data) ? res.data : []);
                 setLoading(false);
-            } catch (err) {
+            })
+            .catch(err => {
                 setError(err.message);
                 setLoading(false);
-            }
-        };
-
-        fetchProducts();
+            });
     }, []);
 
-    if (loading) return <div className="loading"><TailSpin color="#00AB6D" height={80} width={80} /></div>;
-    if (error) return <p>Error: {error}</p>;
+    if (loading) return <Center py={60}><Loader color="greenman" size="lg" /></Center>;
+    if (error) return <Center py={40}><Text c="red">{error}</Text></Center>;
 
-    // Разделяем продукты
-    const productsWithTypes = products.filter(product => product.types && product.types.length > 0);
-    const productsWithoutTypes = products.filter(product => !product.types || product.types.length === 0);
+    const productsWithTypes = products.filter(p => p.types && p.types.length > 0);
 
     return (
         <div className="catalog-page">
             {isCatalogPage && (
-                <>
-                    <Helmet>
-                        <title>Каталог Greenman - Натуральные лекарственные настойки и соки</title>
-                        <meta name="description" content="Исследуйте наш каталог натуральных лекарственных настоек, соков и сиропов, изготовленных из чистых лечебных трав, корней и плодов. Найдите идеальные продукты для улучшения вашего здоровья и благополучия с Greenman." />
-                    </Helmet>
-                </>
+                <Helmet>
+                    <title>Каталог Greenman — Натуральные лекарственные настойки и соки</title>
+                    <meta name="description" content="Исследуйте наш каталог натуральных лекарственных настоек, соков и сиропов." />
+                </Helmet>
             )}
             <div className="productInfo__header">
-                <div className="productInfo__header--back" onClick={() => navigate(-1)}>
-                    <img src={back} alt=""/>
-                </div>
-                <h1 className="productInfo__header--title">
-                    Каталог
-                </h1>
+                <UnstyledButton className="productInfo__header--back" onClick={() => navigate(-1)}>
+                    <img src={back} alt="" />
+                </UnstyledButton>
+                <h1 className="productInfo__header--title">Каталог</h1>
             </div>
             {productsWithTypes.length > 0 ? (
                 <>
@@ -68,19 +55,13 @@ const Catalog = () => {
                         ))}
                     </div>
                 </>
-            ) : null}
-            {productsWithoutTypes.length > 0 ? (
-                <>
-
-                </>
             ) : (
-                <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    imageStyle={{
-                        height: 60
-                    }}
-                    description={<span style={{ color: '#00AB6D' }}>В каталоге нет продуктов</span>}
-                />
+                <Center py={48}>
+                    <Stack align="center" gap="xs">
+                        <Text size="2rem">🌿</Text>
+                        <Text c="greenman" fw={500}>В каталоге нет продуктов</Text>
+                    </Stack>
+                </Center>
             )}
         </div>
     );

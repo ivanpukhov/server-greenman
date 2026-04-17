@@ -1,50 +1,44 @@
-// Components/Auth/Auth.js
-
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import PhoneAuth from './PhoneAuth.jsx';
 import CodeConfirm from './CodeConfirm.jsx';
-import s from './scss/Login.module.scss'
-import {Helmet} from "react-helmet";
-import {useNavigate} from "react-router-dom";
-import { hasValidSiteSession } from "../../AuthContext.jsx";
+import { Helmet } from 'react-helmet';
+import { useNavigate } from 'react-router-dom';
+import { hasValidSiteSession } from '../../AuthContext.jsx';
+import { Box, Center, Paper, Stack, Text, Title } from '@mantine/core';
 
 const Auth = () => {
-    const [step, setStep] = useState(1); // 1 для PhoneAuth, 2 для CodeConfirm
+    const [step, setStep] = useState(1);
     const [phoneNumber, setPhoneNumber] = useState('');
     const navigate = useNavigate();
+
     useEffect(() => {
-        if (hasValidSiteSession()) {
-            navigate('/profile');
-        }
+        if (hasValidSiteSession()) navigate('/profile');
     }, [navigate]);
+
     const handleCodeSent = (phone) => {
         setPhoneNumber(phone);
         setStep(2);
     };
 
-    const handlePhoneNumberChange = () => {
-        setStep(1);
-    };
-
     return (
-        <div className={s.back}>
+        <Box style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #EDF4EF, #E5EEE8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
             <Helmet>
-                <title>Войдите в личный кабинет Greenman для доступа к натуральным лекарственным настойкам и сокам</title>
-                <meta name="description" content="Войдите в свой личный кабинет Greenman, чтобы получить доступ к эксклюзивному ассортименту натуральных лекарственных настоек, соков и сиропов. Откройте для себя силу природы для поддержания и улучшения вашего здоровья и благополучия." />
-                <meta name="keywords" content="личный кабинет Greenman, натуральные настойки, лекарственные соки, здоровье, натуральные сиропы, Greenman логин, здоровое питание, аптека природы, улучшение здоровья, натуральные продукты, эко продукция для здоровья" />
+                <title>Войдите в личный кабинет Greenman</title>
+                <meta name="description" content="Войдите в свой личный кабинет Greenman, чтобы получить доступ к натуральным лекарственным настойкам, сокам и сиропам." />
             </Helmet>
-            <div className={s.header}>
-                <h1 className={s.title}>
-                    GreenMan
-                </h1>
-                <h2 className={s.sub}>
-                    Лечебные травы
-                </h2>
-            </div>
-
-            {step === 1 && <PhoneAuth onCodeSent={handleCodeSent} phoneNumber={phoneNumber} />}
-            {step === 2 && <CodeConfirm phoneNumber={phoneNumber} onPhoneNumberChange={handlePhoneNumberChange} />}
-        </div>
+            <Paper shadow="md" radius="xl" p="xl" w="100%" maw={400}>
+                <Stack gap="lg">
+                    <Stack gap={4} align="center">
+                        <Title order={1} c="greenman" fw={800} size="2rem">GreenMan</Title>
+                        <Text c="dimmed" size="sm">Лечебные травы</Text>
+                    </Stack>
+                    {step === 1
+                        ? <PhoneAuth onCodeSent={handleCodeSent} phoneNumber={phoneNumber} />
+                        : <CodeConfirm phoneNumber={phoneNumber} onPhoneNumberChange={() => setStep(1)} />
+                    }
+                </Stack>
+            </Paper>
+        </Box>
     );
 };
 

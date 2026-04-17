@@ -1,70 +1,46 @@
-import {useEffect, useState} from "react";
-import axios from "axios";
-import { apiUrl } from "../../config/api";
-import Product from "./Product";
-import {Helmet} from "react-helmet";
-import {useLocation, useNavigate} from "react-router-dom";
-import {Empty} from 'antd';
-import {TailSpin} from 'react-loader-spinner';
-
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { apiUrl } from '../../config/api';
+import Product from './Product';
+import { Center, Loader, Stack, Text } from '@mantine/core';
 
 const CatalogTop = () => {
-    const API_URL = apiUrl('/products');
-    const navigate = useNavigate();
-
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const location = useLocation();
-
-    const isCatalogPage = location.pathname === '/catalog';
 
     useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const response = await axios.get(API_URL);
-                const items = Array.isArray(response.data) ? response.data : [];
-                setProducts(items.slice(0, 10)); // Получаем только первые 10 товаров
+        axios.get(apiUrl('/products'))
+            .then(res => {
+                const items = Array.isArray(res.data) ? res.data : [];
+                setProducts(items.slice(0, 10));
                 setLoading(false);
-            } catch (err) {
+            })
+            .catch(err => {
                 setError(err.message);
                 setLoading(false);
-            }
-        };
-
-        fetchProducts();
+            });
     }, []);
 
-    if (loading) return <div className="loading"><TailSpin color="#00AB6D" height={80} width={80}/></div>;
-    if (error) return <p>Error: {error}</p>;
+    if (loading) return <Center py={40}><Loader color="greenman" size="md" /></Center>;
+    if (error) return <Center py={20}><Text c="red">{error}</Text></Center>;
+
+    if (products.length === 0) {
+        return (
+            <Center py={40}>
+                <Stack align="center" gap="xs">
+                    <Text size="2rem">🌿</Text>
+                    <Text c="greenman" fw={500}>В каталоге нет продуктов</Text>
+                </Stack>
+            </Center>
+        );
+    }
 
     return (
-        <div>
-            {isCatalogPage && (
-                <>
-                    <Helmet>
-                        <title>Каталог Greenman - Натуральные лекарственные настойки и соки</title>
-                        <meta name="description"
-                              content="Исследуйте наш каталог натуральных лекарственных настоек, соков и сиропов, изготовленных из чистых лечебных трав, корней и плодов. Найдите идеальные продукты для улучшения вашего здоровья и благополучия с Greenman."/>
-                    </Helmet>
-                </>
-            )}
-
-            {products.length > 0 ? (
-                <div className="product-list">
-                    {products.map(product => (
-                        <Product key={product.id} product={product}/>
-                    ))}
-                </div>
-            ) : (
-                <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    imageStyle={{
-                        height: 60
-                    }}
-                    description={<span style={{color: '#00AB6D'}}>В каталоге нет продуктов</span>}
-                />
-            )}
+        <div className="product-list">
+            {products.map(product => (
+                <Product key={product.id} product={product} />
+            ))}
         </div>
     );
 };

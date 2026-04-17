@@ -1,75 +1,79 @@
-import React, {useState} from 'react';
+import React from 'react';
+import { Accordion, Anchor, Text, Title } from '@mantine/core';
 import faqImage from '../../images/faq.png';
 
-const Faq = () => {
-    const [activeIndex, setActiveIndex] = useState(null);
+const faqData = [
+    {
+        question: 'В каком городе вы находитесь и как осуществляется доставка?',
+        answer: 'Мы находимся в городе Петропавловск. Доставка осуществляется Казпочтой. В города Щучинск, Кокшетау, Астана, Костанай можем отправить посылочку InDrive.'
+    },
+    {
+        question: 'Как узнать какой препарат мне подойдет?',
+        answer: 'Нужно пройти полное обследование и получить диагноз у лечащего врача. После отправьте точный диагноз нашему консультанту, и он предложит вам курс лечения в ',
+        linkText: 'WhatsApp',
+        linkUrl: 'https://wa.me/77770978675/'
+    },
+    {
+        question: 'Куда обратиться для личной консультации?',
+        answer: 'Консультация проводится по ',
+        linkText: 'WhatsApp',
+        linkUrl: 'https://wa.me/77770978675/'
+    },
+    {
+        question: 'Как оформить заказ на сайте?',
+        answer: 'Нажмите на значок поиска, введите название нужного вам продукта или болезнь. Выберите нужный продукт, ознакомьтесь с описанием и противопоказаниями, добавьте в корзину. Заполните данные для доставки, выберите способы оплаты и доставки, нажмите «Оформить заказ». Вы получите счет на оплату в Kaspi. После оплаты на WhatsApp придёт трек-номер посылки и видеообзор.'
+    },
+    {
+        question: 'Как происходит оплата?',
+        answer: 'Оплата через Kaspi — мы выставляем счёт перед отправкой собранной посылки. Перед отправкой предоставляем видеообзор.'
+    },
+    {
+        question: 'Сколько хранится ваша продукция?',
+        answer: 'Продукция хранится в холодильнике в течение года.'
+    }
+];
 
-    const faqData = [
-        {
-            question: "В каком городе вы находитесь и в как осуществляется доставка?",
-            answer: "Мы находимся в городе Петропавловск. Доставка осуществлятся казпочтой. В города Щучинск, Кокшетау, Астана, Костанай можем отправить посылочку индрайвером"
-        },
-        {
-            question: "Как узнать какой препарат мне подойдет?",
-            answer: "Нужно пройти полное обследование, и получить диагноз у лечащего врача. После, отправьте точный диагноз нашему консультанту, и он предложит вам курс лечения в ",
-            linkText: "WhatsApp",
-            linkUrl: "https://wa.me/77770978675/"
-        },
-        {
-            question: "Куда обратиться для личной консультации?",
-            answer: "Консультация проводится по ",
-            linkText: "WhatsApp",
-            linkUrl: "https://wa.me/77770978675/"
-        },
-        {
-            question: "Как оформить заказ на сайте?",
-            answer: "Можете нажать на значок поиска, ввести название нужного вам продукта, либо вашу болезнь. После этого вы перейдете в каталог. Выберите нужный вам продукт, внимательно ознакомьтесь с описанием, рекомендациями, противопоказаниями. После этого можете нажать в корзину, и выбрать вариант товара подходящий вам. После этого перейдите в корзину, заполните данные для доставки заказа, выберите способ оплаты, способ доставки, и нажмите 'Оформить заказ'. После этого вы получите счет на оплату в каспи. После оплаты вам на Ваш номер ватсап придет трек номер посылки и видеообзор."
-        },
-        {
-            question: "Как происходит оплата?",
-            answer: "Оплата происходит через Kaspi. Мы выставляем счет на оплату перед оправкой собранной посылки. Также перед отправкой предоставляем видеообзор собранной посылки. "
-        },
-        {
-            question: "Сколько хранится ваша продукция?",
-            answer: "Продукция хранится в холодильнике в течении года. "
-        },
-
-    ];
-
-    const handleClick = index => {
-        setActiveIndex(activeIndex === index ? null : index);
-    };
-
-    return (
-        <>
-            <div className="title__top">
-                <span>FAQ</span>
-            </div>
-            <div className="subtitle__top">
-                Часто задаваемые вопросы
-            </div>
-            <div className="faq">
-                {faqData.map((item, index) => (
-                    <div key={index} className="faq__item">
-                        <div className="faq__question" onClick={() => handleClick(index)}>
-                            <div className="faq__image">
-                                <img src={faqImage} alt="FAQ"/>
-                            </div>
-                            <div className="faq__title">{item.question}</div>
-                        </div>
-                        {activeIndex === index && (
-                            <div className="faq__answer">
-                                {item.answer}
-                                {item.linkUrl && (
-                                    <a href={item.linkUrl} target="_blank">{item.linkText}</a>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </>
-    );
-}
+const Faq = () => (
+    <div style={{ marginTop: 48 }}>
+        <Title order={3} ta="center" mb={4} style={{ color: '#00AB6D' }}>
+            <span style={{ color: '#00AB6D' }}>FAQ</span>
+        </Title>
+        <Text ta="center" c="dimmed" mb={24} size="sm">
+            Часто задаваемые вопросы
+        </Text>
+        <Accordion
+            radius="lg"
+            variant="separated"
+            styles={{
+                item: {
+                    border: '1px solid rgba(0,171,109,0.15)',
+                    background: '#fff'
+                },
+                control: { fontWeight: 600 },
+                label: { color: '#1c3328' }
+            }}
+        >
+            {faqData.map((item, index) => (
+                <Accordion.Item key={index} value={String(index)}>
+                    <Accordion.Control
+                        icon={<img src={faqImage} alt="" style={{ width: 22, height: 22 }} />}
+                    >
+                        {item.question}
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                        <Text size="sm" c="dimmed">
+                            {item.answer}
+                            {item.linkUrl && (
+                                <Anchor href={item.linkUrl} target="_blank" c="greenman">
+                                    {item.linkText}
+                                </Anchor>
+                            )}
+                        </Text>
+                    </Accordion.Panel>
+                </Accordion.Item>
+            ))}
+        </Accordion>
+    </div>
+);
 
 export default Faq;

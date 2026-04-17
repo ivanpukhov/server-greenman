@@ -1,0 +1,92 @@
+.switcher {
+    position: relative;
+    display: inline-flex;
+}
+
+.trigger {
+    appearance: none;
+    border: 1px solid rgba(0, 171, 109, 0.2);
+    background: #F6FBF8;
+    border-radius: 999px;
+    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: #202020;
+    transition: background 0.15s, border-color 0.15s;
+
+    &:hover {
+        background: #EDF4EF;
+        border-color: #00AB6D;
+    }
+}
+
+.flag {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.currency {
+    font-weight: 700;
+    color: #00AB6D;
+}
+
+.caret {
+    font-size: 10px;
+    color: #545454;
+}
+
+.menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    min-width: 200px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.option {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    width: 100%;
+    transition: background 0.1s;
+
+    &:hover {
+        background: #EDF4EF;
+    }
+}
+
+.optionActive {
+    background: #EDF4EF;
+    color: #00AB6D;
+    font-weight: 600;
+}
+
+.optionLabel {
+    flex: 1;
+}
+
+.optionCurrency {
+    color: #545454;
+    font-weight: 600;
+}

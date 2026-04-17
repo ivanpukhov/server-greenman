@@ -20,7 +20,7 @@ const Order = orderDB.define('order', {
     },
     addressIndex: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true // Для РФ СДЭК определяет индекс сам
     },
     city: {
         type: Sequelize.STRING,
@@ -28,15 +28,35 @@ const Order = orderDB.define('order', {
     },
     street: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true
     },
     houseNumber: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true
     },
     phoneNumber: {
-        type: Sequelize.STRING(10), // Без +7
+        type: Sequelize.STRING, // Для KZ — 10 цифр без +7, для РФ — E.164 (+7XXXXXXXXXX)
         allowNull: false
+    },
+    email: {
+        type: Sequelize.STRING,
+        allowNull: true // Обязателен только для РФ (требование СДЭК)
+    },
+    country: {
+        type: Sequelize.STRING(2),
+        allowNull: false,
+        defaultValue: 'KZ',
+        validate: {
+            isIn: [['KZ', 'RF']]
+        }
+    },
+    currency: {
+        type: Sequelize.STRING(3),
+        allowNull: false,
+        defaultValue: 'KZT',
+        validate: {
+            isIn: [['KZT', 'RUB']]
+        }
     },
     deliveryMethod: {
         type: Sequelize.STRING,
@@ -79,6 +99,42 @@ const Order = orderDB.define('order', {
     },
     paymentSellerName: {
         type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekUuid: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekNumber: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekStatus: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekTrackingNumber: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekIntakeUuid: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekCityCode: {
+        type: Sequelize.INTEGER,
+        allowNull: true
+    },
+    cdekAddress: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    cdekCalcPriceRub: {
+        type: Sequelize.INTEGER,
+        allowNull: true
+    },
+    cdekRawResponse: {
+        type: Sequelize.TEXT,
         allowNull: true
     }
 },

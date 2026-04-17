@@ -1,51 +1,31 @@
-import React, {useState} from 'react';
-import {useCart} from '../../CartContext.jsx';
-import {NavLink} from "react-router-dom";
-import AddToCartControl from "./AddToCartControl.jsx";
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+import { Badge, Card, Group, Text } from '@mantine/core';
+import AddToCartControl from './AddToCartControl.jsx';
 
-const Product = ({product}) => {
-    const {cart, addToCart, updateQuantity, removeFromCart} = useCart();
-    const [open, setOpen] = useState(false);
-    const [selectedTypeIndex, setSelectedTypeIndex] = useState(0);
-    const [quantity, setQuantity] = useState(1);
+const truncate = (str, num = 79) => str.length > num ? str.slice(0, num) + '...' : str;
 
-    const inCart = cart.find(item => item.id === product.id);
-
-    const handleAddToCart = () => {
-        addToCart({...product, type: product.types[selectedTypeIndex], quantity});
-        setOpen(false);
-    };
-
-    const incrementQuantity = () => {
-        updateQuantity(product.id, inCart.quantity + 1);
-    };
-
-    const decrementQuantity = () => {
-        if (inCart.quantity > 1) {
-            updateQuantity(product.id, inCart.quantity - 1);
-        } else {
-            handleRemoveFromCart();
-        }
-    };
-
-    const handleRemoveFromCart = () => {
-        removeFromCart(product.id);
-        setOpen(false);
-    };
-
-    const truncateString = (str, num = 79) => {
-        return str.length > num ? str.slice(0, num) + '...' : str;
-    };
-    return (<div className="product">
-        <NavLink to={`/product/${product.id}`} className="product__text">
-            <h2 className="product__name">{product.name}</h2>
-            <p className="product__desc">{truncateString(product.description)}</p>
-            <div className="product__price">Узнать подробнее</div>
+const Product = ({ product }) => (
+    <Card
+        shadow="sm"
+        padding="md"
+        radius="lg"
+        withBorder
+        className="product"
+        style={{
+            border: '1px solid rgba(0,171,109,0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+        }}
+    >
+        <NavLink to={`/product/${product.id}`} className="product__text" style={{ textDecoration: 'none' }}>
+            <Text fw={700} size="sm" c="dark.7" mb={4} className="product__name">{product.name}</Text>
+            <Text size="xs" c="dimmed" lineClamp={2} className="product__desc">{truncate(product.description)}</Text>
+            <Text size="xs" c="greenman" mt={6} fw={500}>Узнать подробнее →</Text>
         </NavLink>
-        <AddToCartControl product={product}/>
-
-
-    </div>);
-};
+        <AddToCartControl product={product} />
+    </Card>
+);
 
 export default Product;
