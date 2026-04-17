@@ -30,6 +30,7 @@ import WhatsAppTemplateTestPage from './WhatsAppTemplateTestPage';
 import WhatsAppConnectionPage from './WhatsAppConnectionPage';
 import KazpostRequestsPage from './KazpostRequestsPage';
 import OrderDraftRequestsPage from './OrderDraftRequestsPage';
+import CdekSettingsPage from './CdekSettingsPage';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { OrderRfEdit, OrderRfList, OrderRfShow } from './resources/ordersRf';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
@@ -131,6 +132,12 @@ const AdminApp = () => {
             list={OrderRfList}
             show={OrderRfShow}
             edit={OrderRfEdit}
+            icon={LocalShippingOutlinedIcon}
+        />
+        <Resource
+            name="cdek-settings"
+            options={{ label: 'Настройки СДЭК' }}
+            list={CdekSettingsPage}
             icon={LocalShippingOutlinedIcon}
         />
         <Resource

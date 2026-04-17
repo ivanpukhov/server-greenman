@@ -37,7 +37,7 @@
     "nav_title": "Navigation",
     "contacts_title": "Contacts",
     "hours": "Every day, 9:00 — 18:00",
-    "copyright": "© {{year}} GreenMan · All rights reserved"
+    "copyright": "© {{year}} TEND.KZ · All rights reserved"
   },
   "language": {
     "label": "Language",
@@ -68,8 +68,8 @@
         "text": "Just plants, water and cold pressing. No preservatives."
       },
       "delivery": {
-        "title": "Nationwide delivery",
-        "text": "KazPost, courier and InDrive to nearby cities."
+        "title": "Delivery to KZ and RF",
+        "text": "KazPost, CDEK, courier and InDrive — across Kazakhstan and Russia."
       },
       "consult": {
         "title": "Free consultation",
@@ -85,10 +85,17 @@
       "title": "What we do",
       "text": "We craft juices, tinctures and extracts from medicinal herbs, roots, seeds and fruits. We pick products for your diagnosis and consult for free on WhatsApp."
     },
+    "search_block": {
+      "title": "Find your remedy",
+      "subtitle": "Search by product name or condition",
+      "cta": "Search"
+    },
     "top": {
       "title": "Popular products",
       "subtitle": "Most-purchased and recommended",
-      "see_all": "See all"
+      "see_all": "See all",
+      "more_hint": "This is just a glimpse — our catalog has much more",
+      "see_all_cta": "Full catalog"
     },
     "faq": {
       "title": "Questions & answers",

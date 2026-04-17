@@ -1,14 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionIcon, SegmentedControl, Stack, TextInput } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconSearch, IconArrowRight } from '../../icons';
 
-const SearchBlock = ({ initialType = 'name', onSubmit }) => {
+const SearchBlock = ({ initialType = 'name', initialQuery = '', autoFocus = false, onSubmit }) => {
     const { t } = useTranslation();
     const [type, setType] = useState(initialType);
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(initialQuery);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        setType(initialType);
+    }, [initialType]);
+
+    useEffect(() => {
+        setQuery(initialQuery);
+    }, [initialQuery]);
 
     const handleSubmit = (e) => {
         e?.preventDefault();
@@ -56,7 +64,7 @@ const SearchBlock = ({ initialType = 'name', onSubmit }) => {
                         </ActionIcon>
                     }
                     rightSectionWidth={48}
-                    autoFocus
+                    autoFocus={autoFocus}
                 />
             </Stack>
         </form>

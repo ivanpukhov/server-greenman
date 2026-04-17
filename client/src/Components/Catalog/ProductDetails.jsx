@@ -4,32 +4,46 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
     ActionIcon,
     Badge,
-    Button,
+    Box,
     Center,
     Container,
+    Divider,
     Group,
     Loader,
     SimpleGrid,
     Stack,
-    Tabs,
     Text,
     Title,
 } from '@mantine/core';
 import { Helmet } from 'react-helmet';
 import { useTranslation } from 'react-i18next';
 import ScrollToTop from '../ScrollToTop';
-import FaqItem from '../FaqItem/FaqItem';
 import AddToCartControl from './AddToCartControl.jsx';
 import { useFormatPrice } from '../../contexts/CountryContext.jsx';
 import {
     IconArrowLeft,
+    IconAlertCircle,
     IconInfoCircle,
     IconLeaf,
-    IconAlertCircle,
-    IconUser,
     IconMoodKid,
+    IconShieldCheck,
+    IconUser,
 } from '../../icons';
 import s from './ProductDetails.module.scss';
+
+const InfoSection = ({ icon: Icon, title, children, tone = 'default' }) => (
+    <Box className={`${s.infoSection} ${tone === 'warning' ? s.infoSectionWarning : ''}`}>
+        <Group gap="xs" mb="sm" align="center">
+            {Icon && (
+                <Box className={`${s.sectionIcon} ${tone === 'warning' ? s.sectionIconWarning : ''}`}>
+                    <Icon size={18} stroke={1.7} />
+                </Box>
+            )}
+            <Title order={4} className={s.sectionTitle}>{title}</Title>
+        </Group>
+        {children}
+    </Box>
+);
 
 const ProductInfo = () => {
     const { t } = useTranslation();
@@ -81,88 +95,89 @@ const ProductInfo = () => {
                 </div>
 
                 <Stack gap="md">
-                    <Stack gap={4}>
+                    <Stack gap={6}>
                         <Title order={1} className={s.title}>{product.name}</Title>
-                        <Text size="md" c="dimmed" lh={1.6} lineClamp={4}>
-                            {product.description}
-                        </Text>
+                        {product.description && (
+                            <Text size="md" c="dimmed" lh={1.6}>
+                                {product.description.split('\n')[0]}
+                            </Text>
+                        )}
                     </Stack>
 
                     <Group align="baseline" gap="xs">
                         <Text fw={800} size="2rem" c="greenman" style={{ letterSpacing: '-0.02em' }}>
                             {formatPrice(minPrice)}
                         </Text>
+                        {product.types?.length > 1 && (
+                            <Text size="sm" c="dimmed">/ {product.types[0].type}</Text>
+                        )}
                     </Group>
 
                     <AddToCartControl product={product} />
 
                     {product.diseases?.length > 0 && (
-                        <Group gap={6} wrap="wrap" mt="xs">
-                            {product.diseases.slice(0, 6).map((d, i) => (
-                                <Badge key={i} variant="light" color="greenman" radius="sm" size="md">
-                                    {d}
-                                </Badge>
-                            ))}
-                        </Group>
+                        <Box mt="xs">
+                            <Text size="xs" c="dimmed" fw={600} mb={6} tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                                {t('product.indications')}
+                            </Text>
+                            <Group gap={6} wrap="wrap">
+                                {product.diseases.map((d, i) => (
+                                    <Badge key={i} variant="light" color="greenman" radius="sm" size="md">
+                                        {d}
+                                    </Badge>
+                                ))}
+                            </Group>
+                        </Box>
                     )}
                 </Stack>
             </SimpleGrid>
 
-            <Tabs defaultValue="description" mt={48} color="greenman" variant="pills" radius="xl">
-                <Tabs.List grow>
-                    <Tabs.Tab value="description" leftSection={<IconInfoCircle size={16} stroke={1.7} />}>
-                        {t('product.description')}
-                    </Tabs.Tab>
-                    <Tabs.Tab value="indications" leftSection={<IconLeaf size={16} stroke={1.7} />}>
-                        {t('product.indications')}
-                    </Tabs.Tab>
-                    <Tabs.Tab value="contraindications" leftSection={<IconAlertCircle size={16} stroke={1.7} />}>
-                        {t('product.contraindications')}
-                    </Tabs.Tab>
-                </Tabs.List>
+            <Divider my="xl" />
 
-                <Tabs.Panel value="description" pt="lg">
-                    <Text size="md" lh={1.7} style={{ whiteSpace: 'pre-line' }}>
-                        {product.description}
-                    </Text>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="indications" pt="lg">
-                    {product.diseases?.length > 0 ? (
-                        <Group gap={6} wrap="wrap">
-                            {product.diseases.map((d, i) => (
-                                <Badge key={i} variant="light" color="greenman" radius="sm" size="lg">
-                                    {d}
-                                </Badge>
-                            ))}
-                        </Group>
-                    ) : (
-                        <Text c="dimmed">—</Text>
-                    )}
-                </Tabs.Panel>
-
-                <Tabs.Panel value="contraindications" pt="lg">
-                    <Text size="md" c="dimmed" lh={1.7}>
-                        {product.contraindications || '—'}
-                    </Text>
-                </Tabs.Panel>
-            </Tabs>
-
-            <Stack gap="sm" mt={40}>
-                <Title order={3} style={{ letterSpacing: '-0.02em' }}>{t('product.usage')}</Title>
-                {product.applicationMethodAdults && (
-                    <FaqItem
-                        question={t('product.usage_adults')}
-                        answer={product.applicationMethodAdults}
-                        icon={IconUser}
-                    />
+            <Stack gap="md">
+                {product.description && (
+                    <InfoSection icon={IconInfoCircle} title={t('product.description')}>
+                        <Text size="md" lh={1.75} style={{ whiteSpace: 'pre-line' }}>
+                            {product.description}
+                        </Text>
+                    </InfoSection>
                 )}
-                {product.applicationMethodChildren && (
-                    <FaqItem
-                        question={t('product.usage_children')}
-                        answer={product.applicationMethodChildren}
-                        icon={IconMoodKid}
-                    />
+
+                {(product.applicationMethodAdults || product.applicationMethodChildren) && (
+                    <InfoSection icon={IconShieldCheck} title={t('product.usage')}>
+                        <SimpleGrid cols={{ base: 1, sm: product.applicationMethodAdults && product.applicationMethodChildren ? 2 : 1 }} spacing="md">
+                            {product.applicationMethodAdults && (
+                                <Box className={s.usageCard}>
+                                    <Group gap="xs" mb={6}>
+                                        <IconUser size={18} stroke={1.7} color="var(--mantine-color-greenman-7)" />
+                                        <Text fw={700} size="sm">{t('product.usage_adults')}</Text>
+                                    </Group>
+                                    <Text size="sm" c="dark" lh={1.7} style={{ whiteSpace: 'pre-line' }}>
+                                        {product.applicationMethodAdults}
+                                    </Text>
+                                </Box>
+                            )}
+                            {product.applicationMethodChildren && (
+                                <Box className={s.usageCard}>
+                                    <Group gap="xs" mb={6}>
+                                        <IconMoodKid size={18} stroke={1.7} color="var(--mantine-color-greenman-7)" />
+                                        <Text fw={700} size="sm">{t('product.usage_children')}</Text>
+                                    </Group>
+                                    <Text size="sm" c="dark" lh={1.7} style={{ whiteSpace: 'pre-line' }}>
+                                        {product.applicationMethodChildren}
+                                    </Text>
+                                </Box>
+                            )}
+                        </SimpleGrid>
+                    </InfoSection>
+                )}
+
+                {product.contraindications && (
+                    <InfoSection icon={IconAlertCircle} title={t('product.contraindications')} tone="warning">
+                        <Text size="md" lh={1.7} style={{ whiteSpace: 'pre-line' }}>
+                            {product.contraindications}
+                        </Text>
+                    </InfoSection>
                 )}
             </Stack>
         </Container>

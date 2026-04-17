@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import {
     ActionIcon,
-    Chip,
     Container,
     Group,
     SimpleGrid,
@@ -27,7 +26,6 @@ const Catalog = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [query, setQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState('all');
 
     useEffect(() => {
         axios
@@ -42,27 +40,15 @@ const Catalog = () => {
         [products]
     );
 
-    const availableTypes = useMemo(() => {
-        const set = new Set();
-        productsWithTypes.forEach((p) => p.types.forEach((t) => t.type && set.add(t.type)));
-        return Array.from(set);
-    }, [productsWithTypes]);
-
     const filtered = useMemo(() => {
-        let list = productsWithTypes;
-        if (activeFilter !== 'all') {
-            list = list.filter((p) => p.types.some((t) => t.type === activeFilter));
-        }
-        if (query.trim()) {
-            const q = query.toLowerCase();
-            list = list.filter(
-                (p) =>
-                    p.name.toLowerCase().includes(q) ||
-                    (p.description || '').toLowerCase().includes(q)
-            );
-        }
-        return list;
-    }, [productsWithTypes, activeFilter, query]);
+        if (!query.trim()) return productsWithTypes;
+        const q = query.toLowerCase();
+        return productsWithTypes.filter(
+            (p) =>
+                p.name.toLowerCase().includes(q) ||
+                (p.description || '').toLowerCase().includes(q)
+        );
+    }, [productsWithTypes, query]);
 
     return (
         <Container size="xl" px="md" py="md">
@@ -89,42 +75,15 @@ const Catalog = () => {
                 </Stack>
             </Group>
 
-            <Stack gap="md" mb="lg">
-                <TextInput
-                    placeholder={t('header.search_placeholder_name')}
-                    value={query}
-                    onChange={(e) => setQuery(e.currentTarget.value)}
-                    leftSection={<IconSearch size={18} stroke={1.7} />}
-                    radius="xl"
-                    size="md"
-                />
-
-                {availableTypes.length > 0 && (
-                    <Group gap={6} wrap="wrap">
-                        <Chip
-                            checked={activeFilter === 'all'}
-                            onChange={() => setActiveFilter('all')}
-                            color="greenman"
-                            radius="xl"
-                            variant="light"
-                        >
-                            {t('catalog.all')}
-                        </Chip>
-                        {availableTypes.map((type) => (
-                            <Chip
-                                key={type}
-                                checked={activeFilter === type}
-                                onChange={() => setActiveFilter(type)}
-                                color="greenman"
-                                radius="xl"
-                                variant="light"
-                            >
-                                {type}
-                            </Chip>
-                        ))}
-                    </Group>
-                )}
-            </Stack>
+            <TextInput
+                placeholder={t('header.search_placeholder_name')}
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                leftSection={<IconSearch size={18} stroke={1.7} />}
+                radius="xl"
+                size="md"
+                mb="lg"
+            />
 
             {loading ? (
                 <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">

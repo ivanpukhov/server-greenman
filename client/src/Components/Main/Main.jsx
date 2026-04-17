@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Button, Container, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Box, Button, Container, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import {
     IconLeaf,
@@ -14,6 +14,7 @@ import {
 import Faq from '../Faq/Faq';
 import Banner from '../Banner/Banner.jsx';
 import CatalogTop from '../Catalog/CatalogTop';
+import SearchBlock from '../Catalog/SearchBlock';
 import heroIllustration from '../../images/illustrations/hero.svg';
 import aboutIllustration from '../../images/illustrations/about-leaves.svg';
 import s from './Main.module.scss';
@@ -82,6 +83,20 @@ const Main = () => {
                 </div>
             </Container>
 
+            <Container size="xl" px="md" mt={48}>
+                <Box className={s.searchCard}>
+                    <Stack gap={6} mb="md" align="center">
+                        <Title order={3} ta="center" style={{ letterSpacing: '-0.02em' }}>
+                            {t('main.search_block.title')}
+                        </Title>
+                        <Text size="sm" c="dimmed" ta="center">
+                            {t('main.search_block.subtitle')}
+                        </Text>
+                    </Stack>
+                    <SearchBlock />
+                </Box>
+            </Container>
+
             <Container size="xl" px="md" mt={64}>
                 <SimpleGrid cols={{ base: 2, sm: 2, md: 4 }} spacing="md">
                     {TRUST.map(({ icon: Icon, key }) => (
@@ -121,6 +136,22 @@ const Main = () => {
                     </Button>
                 </Group>
                 <CatalogTop limit={8} />
+
+                <Box className={s.seeAllCard} mt="lg">
+                    <Stack gap={4}>
+                        <Text fw={700} size="md">{t('main.top.more_hint')}</Text>
+                        <Text size="sm" c="dimmed">{t('catalog.subtitle')}</Text>
+                    </Stack>
+                    <Button
+                        component={Link}
+                        to="/catalog"
+                        color="greenman"
+                        radius="xl"
+                        rightSection={<IconArrowRight size={16} stroke={1.8} />}
+                    >
+                        {t('main.top.see_all_cta')}
+                    </Button>
+                </Box>
             </Container>
 
             <Container size="xl" px="md" mt={72}>

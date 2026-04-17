@@ -1,8 +1,9 @@
+const { get: getSetting } = require('./settingsStore');
 const { buildCdekItems } = require('./itemsMapper');
 const { buildPackages } = require('./buildPackages');
 
-const DEFAULT_TARIFF_CODE = 482; // дверь-дверь, интернет-магазин
-const CONTRACT_TYPE = 1; // интернет-магазин
+const DEFAULT_TARIFF_CODE = 482;
+const CONTRACT_TYPE = 1;
 
 const normalizePhoneE164 = (phone) => {
     const digits = String(phone || '').replace(/\D/g, '');
@@ -13,17 +14,16 @@ const normalizePhoneE164 = (phone) => {
     return digits.startsWith('+') ? digits : `+${digits}`;
 };
 
-const buildOrderPayload = (order) => {
-    const tariffCode = Number(process.env.CDEK_TARIFF_CODE || DEFAULT_TARIFF_CODE);
-
-    const senderCityCode = Number(process.env.CDEK_SENDER_CITY_CODE);
-    const senderAddress = process.env.CDEK_SENDER_ADDRESS;
-    const senderName = process.env.CDEK_SENDER_NAME || 'Green Man';
-    const senderPhone = process.env.CDEK_SENDER_PHONE;
-    const senderCompany = process.env.CDEK_SENDER_COMPANY || 'Green Man';
+const buildOrderPayload = async (order) => {
+    const tariffCode = Number(await getSetting('CDEK_TARIFF_CODE') || DEFAULT_TARIFF_CODE);
+    const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
+    const senderAddress = await getSetting('CDEK_SENDER_ADDRESS');
+    const senderName = await getSetting('CDEK_SENDER_NAME') || 'Green Man';
+    const senderPhone = await getSetting('CDEK_SENDER_PHONE');
+    const senderCompany = await getSetting('CDEK_SENDER_COMPANY') || 'Green Man';
 
     if (!senderCityCode || !senderAddress || !senderPhone) {
-        throw new Error('CDEK sender is not configured (CDEK_SENDER_CITY_CODE, CDEK_SENDER_ADDRESS, CDEK_SENDER_PHONE)');
+        throw new Error('СДЭК не настроен — заполните раздел «Настройки СДЭК» в админке (код города отправителя, адрес, телефон)');
     }
 
     const items = buildCdekItems(order.products);

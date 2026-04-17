@@ -1,13 +1,10 @@
 const axios = require('axios');
 const { getToken, invalidateToken } = require('./tokenStore');
+const { get: getSetting } = require('./settingsStore');
 const { logError } = require('../../utilities/errorLogger');
 
-const createClient = () => {
-    const baseURL = (process.env.CDEK_BASE_URL || '').replace(/\/$/, '');
-    const instance = axios.create({
-        baseURL,
-        timeout: 30000
-    });
+const createClient = (baseURL) => {
+    const instance = axios.create({ baseURL, timeout: 30000 });
 
     instance.interceptors.request.use(async (config) => {
         if (config.skipAuth) return config;
@@ -44,12 +41,15 @@ const createClient = () => {
 };
 
 let clientInstance = null;
+let cachedBaseUrl = null;
 
-const getClient = () => {
-    if (!clientInstance) clientInstance = createClient();
+const getClient = async () => {
+    const baseURL = ((await getSetting('CDEK_BASE_URL')) || '').replace(/\/$/, '');
+    if (!clientInstance || cachedBaseUrl !== baseURL) {
+        clientInstance = createClient(baseURL);
+        cachedBaseUrl = baseURL;
+    }
     return clientInstance;
 };
 
-module.exports = {
-    getClient
-};
+module.exports = { getClient };

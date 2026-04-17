@@ -1,16 +1,16 @@
 import { createTheme, rem } from '@mantine/core';
 
 const greenman = [
-    '#edfbf4',
-    '#d4f4e2',
-    '#a5e7c2',
-    '#72daa0',
-    '#4acf84',
-    '#2fc871',
-    '#1fc469',
-    '#0eac59',
-    '#00984d',
-    '#00833f'
+    '#e8f6ee',
+    '#cde9d6',
+    '#9ad4ad',
+    '#63bf84',
+    '#3aad64',
+    '#1fa150',
+    '#0e9a47',
+    '#00853a',
+    '#007432',
+    '#00622a'
 ];
 
 const mantineTheme = createTheme({

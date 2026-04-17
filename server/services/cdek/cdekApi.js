@@ -1,17 +1,15 @@
 const { getClient } = require('./cdekClient');
+const { get: getSetting } = require('./settingsStore');
 const { logError } = require('../../utilities/errorLogger');
 const { buildCdekItems } = require('./itemsMapper');
 const { buildPackages } = require('./buildPackages');
 const { DEFAULT_TARIFF_CODE } = require('./buildOrderPayload');
 
-const TARIFF_CODE = Number(process.env.CDEK_TARIFF_CODE || DEFAULT_TARIFF_CODE);
-const CONTRACT_TYPE = 1;
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const suggestCities = async (query, { countryCode = 'RU' } = {}) => {
     if (!query || !query.trim()) return [];
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.get('/location/suggest/cities', {
             params: { name: query.trim(), country_code: countryCode }
@@ -30,15 +28,17 @@ const suggestCities = async (query, { countryCode = 'RU' } = {}) => {
 const calculateTariff = async ({ toCityCode, toAddress, products }) => {
     if (!toCityCode) throw new Error('toCityCode is required');
 
-    const senderCityCode = Number(process.env.CDEK_SENDER_CITY_CODE);
-    if (!senderCityCode) throw new Error('CDEK_SENDER_CITY_CODE is not configured');
+    const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
+    if (!senderCityCode) throw new Error('CDEK_SENDER_CITY_CODE не настроен — заполните настройки СДЭК в админке');
+
+    const tariffCode = Number(await getSetting('CDEK_TARIFF_CODE') || DEFAULT_TARIFF_CODE);
 
     const items = buildCdekItems(products || []);
     const packages = buildPackages({ orderNumber: 'calc', items });
 
     const payload = {
-        type: CONTRACT_TYPE,
-        tariff_code: TARIFF_CODE,
+        type: 1,
+        tariff_code: tariffCode,
         from_location: { code: senderCityCode },
         to_location: {
             code: Number(toCityCode),
@@ -52,7 +52,7 @@ const calculateTariff = async ({ toCityCode, toAddress, products }) => {
         }))
     };
 
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.post('/calculator/tariff', payload);
         const data = response.data || {};
@@ -61,7 +61,7 @@ const calculateTariff = async ({ toCityCode, toAddress, products }) => {
             total_sum: Number(data.total_sum ?? data.delivery_sum ?? 0),
             period_min: Number(data.period_min ?? data.calendar_min ?? 0),
             period_max: Number(data.period_max ?? data.calendar_max ?? 0),
-            tariff_code: TARIFF_CODE,
+            tariff_code: tariffCode,
             currency: data.currency || 'RUB'
         };
     } catch (error) {
@@ -75,7 +75,7 @@ const calculateTariff = async ({ toCityCode, toAddress, products }) => {
 };
 
 const createOrder = async (payload) => {
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.post('/orders', payload);
         return response.data;
@@ -90,7 +90,7 @@ const createOrder = async (payload) => {
 };
 
 const getOrderByUuid = async (uuid) => {
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.get(`/orders/${uuid}`);
         return response.data;
@@ -125,7 +125,7 @@ const pollOrderUntilRegistered = async (uuid, { timeoutMs = 20000, intervalMs = 
 };
 
 const requestPrint = async (orderUuid, kind) => {
-    const client = getClient();
+    const client = await getClient();
     const endpoint = kind === 'barcode' ? '/print/barcodes' : '/print/orders';
     try {
         const response = await client.post(endpoint, {
@@ -146,7 +146,7 @@ const requestPrint = async (orderUuid, kind) => {
 };
 
 const getPrintForm = async (formUuid, kind) => {
-    const client = getClient();
+    const client = await getClient();
     const endpoint = kind === 'barcode' ? `/print/barcodes/${formUuid}` : `/print/orders/${formUuid}`;
     try {
         const response = await client.get(endpoint);
@@ -180,7 +180,7 @@ const pollPrintReady = async (formUuid, kind, { timeoutMs = 60000, intervalMs = 
 };
 
 const downloadPrintPdfStream = async (pdfUrl) => {
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.get(pdfUrl, {
             responseType: 'stream',
@@ -197,7 +197,7 @@ const downloadPrintPdfStream = async (pdfUrl) => {
 };
 
 const createIntake = async (payload) => {
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.post('/intakes', payload);
         return response.data;
@@ -211,7 +211,7 @@ const createIntake = async (payload) => {
 };
 
 const subscribeWebhook = async ({ url, type = 'ORDER_STATUS' }) => {
-    const client = getClient();
+    const client = await getClient();
     try {
         const response = await client.post('/webhooks', { url, type });
         return response.data;

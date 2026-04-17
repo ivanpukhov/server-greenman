@@ -36,3 +36,43 @@
     color: var(--mantine-color-greenman-5);
     opacity: 0.6;
 }
+
+.infoSection {
+    padding: 24px;
+    border-radius: 20px;
+    border: 1px solid var(--mantine-color-gray-2);
+    background: #fff;
+}
+
+.infoSectionWarning {
+    background: #fffaf0;
+    border-color: #fde8c4;
+}
+
+.sectionTitle {
+    letter-spacing: -0.015em;
+    font-size: 18px;
+}
+
+.sectionIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--mantine-color-greenman-0);
+    color: var(--mantine-color-greenman-7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sectionIconWarning {
+    background: #fdecd0;
+    color: #b06800;
+}
+
+.usageCard {
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--mantine-color-gray-0);
+    border: 1px solid var(--mantine-color-gray-1);
+}

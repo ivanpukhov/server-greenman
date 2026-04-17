@@ -3,6 +3,7 @@ const multer = require('multer');
 const adminController = require('../controllers/adminController');
 const adminWhatsAppController = require('../controllers/adminWhatsAppController');
 const cdekAdminController = require('../controllers/admin/cdekAdminController');
+const cdekSettingsController = require('../controllers/admin/cdekSettingsController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 
 const router = express.Router();
@@ -72,6 +73,9 @@ router.get('/orders-rf/:id/cdek/refresh', cdekAdminController.refreshFromCdek);
 router.get('/orders-rf/:id/cdek/print/barcode.pdf', cdekAdminController.printBarcode);
 router.get('/orders-rf/:id/cdek/print/waybill.pdf', cdekAdminController.printWaybill);
 router.post('/orders-rf/:id/cdek/intake', cdekAdminController.createIntake);
+
+router.get('/settings/cdek', cdekSettingsController.getSettings);
+router.put('/settings/cdek', cdekSettingsController.updateSettings);
 
 router.get('/order-draft-requests', adminController.getOrderDraftRequests);
 router.post('/order-draft-requests/:id/retry', adminController.retryOrderDraftRequest);

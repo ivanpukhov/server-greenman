@@ -57,7 +57,7 @@ const Search = () => {
             </Group>
 
             <div style={{ marginBottom: 24 }}>
-                <SearchBlock initialType={type} />
+                <SearchBlock initialType={type} initialQuery={query || ''} />
             </div>
 
             {loading ? (

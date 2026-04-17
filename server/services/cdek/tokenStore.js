@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { logError } = require('../../utilities/errorLogger');
+const { get: getSetting } = require('./settingsStore');
 
 const REFRESH_LEAD_TIME_MS = 120 * 1000;
 
@@ -7,12 +8,12 @@ let tokenState = { value: null, expiresAt: 0 };
 let refreshPromise = null;
 
 const fetchNewToken = async () => {
-    const baseUrl = process.env.CDEK_BASE_URL;
-    const clientId = process.env.CDEK_CLIENT_ID;
-    const clientSecret = process.env.CDEK_CLIENT_SECRET;
+    const baseUrl = await getSetting('CDEK_BASE_URL');
+    const clientId = await getSetting('CDEK_CLIENT_ID');
+    const clientSecret = await getSetting('CDEK_CLIENT_SECRET');
 
     if (!baseUrl || !clientId || !clientSecret) {
-        throw new Error('CDEK credentials are not configured (CDEK_BASE_URL, CDEK_CLIENT_ID, CDEK_CLIENT_SECRET)');
+        throw new Error('CDEK credentials are not configured — заполните настройки СДЭК в разделе «Настройки СДЭК» в админке');
     }
 
     const url = `${baseUrl.replace(/\/$/, '')}/oauth/token`;

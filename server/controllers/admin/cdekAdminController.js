@@ -4,6 +4,7 @@ const Product = require('../../models/Product');
 const ProductType = require('../../models/ProductType');
 const cdekApi = require('../../services/cdek/cdekApi');
 const { buildOrderPayload } = require('../../services/cdek/buildOrderPayload');
+const { get: getSetting } = require('../../services/cdek/settingsStore');
 const { logError } = require('../../utilities/errorLogger');
 
 const parseJsonParam = (value, fallback) => {
@@ -160,7 +161,7 @@ const submitToCdek = async (req, res) => {
             quantity: p.quantity
         }));
 
-        const payload = buildOrderPayload({
+        const payload = await buildOrderPayload({
             id: order.id,
             customerName: order.customerName,
             email: order.email,
@@ -296,10 +297,10 @@ const createIntake = async (req, res) => {
             return res.status(400).json({ message: 'Требуются intake_date, start_time, end_time' });
         }
 
-        const senderCityCode = Number(process.env.CDEK_SENDER_CITY_CODE);
-        const senderAddress = process.env.CDEK_SENDER_ADDRESS;
-        const senderName = process.env.CDEK_SENDER_NAME || 'Green Man';
-        const senderPhone = process.env.CDEK_SENDER_PHONE;
+        const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
+        const senderAddress = await getSetting('CDEK_SENDER_ADDRESS');
+        const senderName = await getSetting('CDEK_SENDER_NAME') || 'Green Man';
+        const senderPhone = await getSetting('CDEK_SENDER_PHONE');
 
         const payload = {
             cdek_number: order.cdekNumber,

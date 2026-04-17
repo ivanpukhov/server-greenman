@@ -31,6 +31,7 @@ require('./models/orders/OrderDraftRequest');
 require('./models/orders/ChatwootMessageSync');
 require('./models/orders/ProcessedWebhookMessage');
 require('./models/orders/CdekWebhookEvent');
+require('./models/orders/CdekSettings');
 const AdminUser = require('./models/orders/AdminUser');
 require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
