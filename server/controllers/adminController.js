@@ -34,6 +34,7 @@ const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDet
 
 const { Op } = Sequelize;
 const IVAN_ADMIN_PHONE = '7073670497';
+const DASHA_ADMIN_IIN = '001010650383';
 const PAID_ORDER_STATUSES = ['Оплачено', 'Отправлено', 'Доставлено'];
 const WITHOUT_LINK_ACCOUNT_NAME = 'Без ссылки';
 const EXCLUDED_ACCOUNT_NAME_TOKENS = new Set(['иван', 'даша']);
@@ -84,21 +85,27 @@ const isIvanPhone = (phone) => normalizeAdminPhone(phone) === IVAN_ADMIN_PHONE;
 
 const canCurrentAdminManageIvanSiteOrdersToggle = (currentAdminPhone) => isIvanPhone(currentAdminPhone);
 
-const serializeAdminForResponse = (admin, currentAdminPhone) => {
+const isDashaByIin = (iin) => normalizeAdminIin(iin) === DASHA_ADMIN_IIN;
+
+const isAskhatAdmin = (adminLike) => String(adminLike?.fullName || '').trim().toLowerCase() === 'асхат';
+
+const serializeAdminForResponse = (admin, currentAdmin = null) => {
     const plainAdmin = admin && typeof admin.toJSON === 'function' ? admin.toJSON() : admin;
     if (!plainAdmin) {
         return null;
     }
 
+    const currentAdminPhone =
+        typeof currentAdmin === 'string' ? normalizeAdminPhone(currentAdmin) : normalizeAdminPhone(currentAdmin?.phoneNumber);
+    const currentAdminIin = typeof currentAdmin === 'string' ? null : normalizeAdminIin(currentAdmin?.iin);
     const canSeeIvanToggle = canCurrentAdminManageIvanSiteOrdersToggle(currentAdminPhone) && isIvanPhone(plainAdmin.phoneNumber);
-    const { siteOrdersToNataliaEnabled, ...rest } = plainAdmin;
-    if (!canSeeIvanToggle) {
-        return rest;
-    }
+    const canSeeAskhatAccountingToggle = currentAdminIin === DASHA_ADMIN_IIN && isAskhatAdmin(plainAdmin);
+    const { siteOrdersToNataliaEnabled, includeInAccounting, ...rest } = plainAdmin;
 
     return {
         ...rest,
-        siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled)
+        ...(canSeeIvanToggle ? { siteOrdersToNataliaEnabled: Boolean(siteOrdersToNataliaEnabled) } : {}),
+        ...(canSeeAskhatAccountingToggle ? { includeInAccounting: Boolean(includeInAccounting) } : {})
     };
 };
 
@@ -616,6 +623,14 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName, si
     return WITHOUT_LINK_ACCOUNT_NAME;
 };
 
+const buildExcludedAccountingAccountNames = (activeAdmins) =>
+    new Set(
+        (Array.isArray(activeAdmins) ? activeAdmins : [])
+            .filter((admin) => admin?.includeInAccounting === false)
+            .map((admin) => String(admin.fullName || '').trim())
+            .filter(Boolean)
+    );
+
 const buildAccountingContext = async () => {
     const activeAdmins = await getActiveAdmins();
     const nataliaAdmin = activeAdmins.find((item) => String(item.fullName || '').trim().toLowerCase() === 'наталья');
@@ -636,7 +651,8 @@ const buildAccountingContext = async () => {
         activeAdmins,
         defaultAccountName,
         linkToAccountMap,
-        siteOrdersToNataliaEnabled
+        siteOrdersToNataliaEnabled,
+        excludedAccountingAccountNames: buildExcludedAccountingAccountNames(activeAdmins)
     };
 };
 
@@ -653,8 +669,17 @@ const resolveOrderAccountNameByContext = (order, context) => {
     );
 };
 
-const isExcludedAccountingAccountName = (accountName) => {
-    const tokens = String(accountName || '')
+const isExcludedAccountingAccountName = (accountName, context = null) => {
+    const normalizedAccountName = String(accountName || '').trim();
+    if (!normalizedAccountName) {
+        return false;
+    }
+
+    if (context?.excludedAccountingAccountNames?.has(normalizedAccountName)) {
+        return true;
+    }
+
+    const tokens = normalizedAccountName
         .trim()
         .toLowerCase()
         .split(/[^a-zа-яё0-9]+/i)
@@ -669,7 +694,7 @@ const excludeOrdersByAccountingAccounts = (orders, context) => {
             return false;
         }
         const accountName = resolveOrderAccountNameByContext(order, context);
-        return !isExcludedAccountingAccountName(accountName);
+        return !isExcludedAccountingAccountName(accountName, context);
     });
 };
 
@@ -679,13 +704,13 @@ const excludeOrdersWithoutLinkAccount = (orders, context) => {
     );
 };
 
-const excludeExpensesByAccountingAccounts = (expenses) => {
+const excludeExpensesByAccountingAccounts = (expenses, context = null) => {
     return (Array.isArray(expenses) ? expenses : []).filter((expense) => {
         const spentByName = String(expense?.spentByName || '').trim();
         if (!spentByName) {
             return true;
         }
-        return !isExcludedAccountingAccountName(spentByName);
+        return !isExcludedAccountingAccountName(spentByName, context);
     });
 };
 
@@ -764,7 +789,7 @@ const buildAccountFinancialSummary = async ({
     const accountRowsMap = new Map();
     const registerAccount = (rawAccountName) => {
         const normalizedName = String(rawAccountName || '').trim() || WITHOUT_LINK_ACCOUNT_NAME;
-        if (isExcludedAccountingAccountName(normalizedName)) {
+        if (isExcludedAccountingAccountName(normalizedName, context)) {
             return null;
         }
         const accountName =
@@ -787,7 +812,7 @@ const buildAccountFinancialSummary = async ({
         if (!adminName) {
             return;
         }
-        if (isExcludedAccountingAccountName(adminName)) {
+        if (isExcludedAccountingAccountName(adminName, context)) {
             return;
         }
 
@@ -810,7 +835,7 @@ const buildAccountFinancialSummary = async ({
 
     (Array.isArray(expenses) ? expenses : []).forEach((expense) => {
         const spentByName = String(expense?.spentByName || '').trim();
-        if (spentByName && isExcludedAccountingAccountName(spentByName)) {
+        if (spentByName && isExcludedAccountingAccountName(spentByName, context)) {
             return;
         }
         const accountName =
@@ -1233,7 +1258,7 @@ const buildAccountingSummaryData = async ({ period, currentAdminPhone, includeAl
     const allPaidOrders = [...orders.map((order) => order.toJSON()), ...virtualPaidOrders];
     const filteredPaidOrders = excludeOrdersByAccountingAccounts(allPaidOrders, accountingContext);
     const linkedPaidOrders = excludeOrdersWithoutLinkAccount(filteredPaidOrders, accountingContext);
-    const filteredExpenses = excludeExpensesByAccountingAccounts(expenses);
+    const filteredExpenses = excludeExpensesByAccountingAccounts(expenses, accountingContext);
     const allocation = await buildAccountingAllocation(linkedPaidOrders, currentAdminPhone, accountingContext);
     const accountFinancials = await buildAccountFinancialSummary({
         orders: linkedPaidOrders,
@@ -2452,7 +2477,7 @@ ${productDetails}`;
             const orderRows = orders.map((order) => order.toJSON());
             const mergedPaidRows = excludeOrdersByAccountingAccounts([...orderRows, ...virtualPaidOrders], accountingContext);
             const linkedPaidRows = excludeOrdersWithoutLinkAccount(mergedPaidRows, accountingContext);
-            const expenseRows = excludeExpensesByAccountingAccounts(expenses.map((expense) => expense.toJSON()));
+            const expenseRows = excludeExpensesByAccountingAccounts(expenses.map((expense) => expense.toJSON()), accountingContext);
             const productNameById = new Map(products.map((item) => [item.id, item.name]));
             const { orderSeries, financeSeries } = buildDashboardSeries(linkedPaidRows, expenseRows, ranges);
 
@@ -2552,6 +2577,11 @@ ${productDetails}`;
                         ? {
                             siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
                         }
+                        : {}),
+                    ...(isDashaByIin(req.admin?.iin) && isAskhatAdmin(admin)
+                        ? {
+                            includeInAccounting: Boolean(admin.includeInAccounting)
+                        }
                         : {})
                 }))
             });
@@ -2567,7 +2597,7 @@ ${productDetails}`;
             const visibleAdmins = filterRestrictedAdmins(admins, currentAdminPhone, (item) => item.phoneNumber);
 
             return res.json({
-                data: visibleAdmins.map((admin) => serializeAdminForResponse(admin, currentAdminPhone)),
+                data: visibleAdmins.map((admin) => serializeAdminForResponse(admin, req.admin)),
                 total: visibleAdmins.length
             });
         } catch (error) {
@@ -2615,7 +2645,7 @@ ${productDetails}`;
                     isActive: true
                 });
 
-                return res.status(200).json({ data: serializeAdminForResponse(existing, req.admin?.phoneNumber) });
+                return res.status(200).json({ data: serializeAdminForResponse(existing, req.admin) });
             }
 
             const created = await AdminUser.create({
@@ -2625,7 +2655,7 @@ ${productDetails}`;
                 isActive: true
             });
 
-            return res.status(201).json({ data: serializeAdminForResponse(created, req.admin?.phoneNumber) });
+            return res.status(201).json({ data: serializeAdminForResponse(created, req.admin) });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось добавить администратора', error: error.message });
         }
@@ -2693,9 +2723,15 @@ ${productDetails}`;
                 }
             }
 
+            if (isAskhatAdmin(adminUser) && isDashaByIin(req.admin?.iin)) {
+                if (req.body.includeInAccounting !== undefined) {
+                    payload.includeInAccounting = Boolean(req.body.includeInAccounting);
+                }
+            }
+
             await adminUser.update(payload);
 
-            return res.json({ data: serializeAdminForResponse(adminUser, currentAdminPhone) });
+            return res.json({ data: serializeAdminForResponse(adminUser, req.admin) });
         } catch (error) {
             return res.status(500).json({ message: 'Не удалось обновить администратора', error: error.message });
         }

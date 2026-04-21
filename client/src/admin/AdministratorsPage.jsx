@@ -31,6 +31,7 @@ import { adminAuthStorage } from './authProvider';
 
 const IVAN_ADMIN_PHONE = '7073670497';
 const DASHA_ADMIN_PHONE = '7077632624';
+const DASHA_ADMIN_IIN = '001010650383';
 const normalizeAdminPhone = (rawPhone) => {
     const digits = String(rawPhone || '').replace(/\D/g, '');
     if (digits.length === 10) {
@@ -55,6 +56,13 @@ const canCurrentAdminSeeTargetAdmin = (currentAdminPhone, targetAdminPhone) => {
 
     return true;
 };
+
+const normalizeAdminIin = (rawIin) => {
+    const digits = String(rawIin || '').replace(/\D/g, '');
+    return digits.length === 12 ? digits : '';
+};
+
+const isAskhatAdmin = (admin) => String(admin?.fullName || '').trim().toLowerCase() === 'асхат';
 
 const AdministratorsPage = () => {
     const notify = useNotify();
@@ -81,7 +89,8 @@ const AdministratorsPage = () => {
         fullName: '',
         phoneNumber: '',
         iin: '',
-        siteOrdersToNataliaEnabled: true
+        siteOrdersToNataliaEnabled: true,
+        includeInAccounting: true
     });
     const [paymentLinkForm, setPaymentLinkForm] = useState({
         url: '',
@@ -89,13 +98,10 @@ const AdministratorsPage = () => {
     });
 
     const currentAdminPhone = useMemo(() => {
-        try {
-            const rawUser = localStorage.getItem('admin_user');
-            const user = rawUser ? JSON.parse(rawUser) : null;
-            return normalizeAdminPhone(user?.phoneNumber);
-        } catch (_error) {
-            return '';
-        }
+        return normalizeAdminPhone(adminAuthStorage.getUser()?.phoneNumber);
+    }, []);
+    const currentAdminIin = useMemo(() => {
+        return normalizeAdminIin(adminAuthStorage.getUser()?.iin);
     }, []);
     const visibleAdmins = useMemo(
         () => admins.filter((admin) => canCurrentAdminSeeTargetAdmin(currentAdminPhone, admin.phoneNumber)),
@@ -110,6 +116,10 @@ const AdministratorsPage = () => {
             normalizeAdminPhone(currentAdminPhone) === IVAN_ADMIN_PHONE &&
             normalizeAdminPhone(admin?.phoneNumber) === IVAN_ADMIN_PHONE,
         [currentAdminPhone]
+    );
+    const canEditAskhatAccountingToggle = useCallback(
+        (admin) => currentAdminIin === DASHA_ADMIN_IIN && isAskhatAdmin(admin),
+        [currentAdminIin]
     );
     const dispatchPlanPreview = useMemo(() => {
         if (!dispatchPlan.length) {
@@ -393,7 +403,8 @@ const AdministratorsPage = () => {
             fullName: String(admin.fullName || ''),
             phoneNumber: String(admin.phoneNumber || ''),
             iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12),
-            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled)
+            siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
+            includeInAccounting: admin.includeInAccounting !== false
         });
     };
 
@@ -406,7 +417,8 @@ const AdministratorsPage = () => {
             fullName: '',
             phoneNumber: '',
             iin: '',
-            siteOrdersToNataliaEnabled: true
+            siteOrdersToNataliaEnabled: true,
+            includeInAccounting: true
         });
     };
 
@@ -446,6 +458,11 @@ const AdministratorsPage = () => {
                     ...(canEditIvanSiteOrdersToggle(editingAdmin)
                         ? {
                             siteOrdersToNataliaEnabled: Boolean(editAdminForm.siteOrdersToNataliaEnabled)
+                        }
+                        : {}),
+                    ...(canEditAskhatAccountingToggle(editingAdmin)
+                        ? {
+                            includeInAccounting: Boolean(editAdminForm.includeInAccounting)
                         }
                         : {})
                 })
@@ -666,6 +683,22 @@ const AdministratorsPage = () => {
                                                             />
                                                         </>
                                                     )}
+                                                    {canEditAskhatAccountingToggle(admin) && (
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={Boolean(editAdminForm.includeInAccounting)}
+                                                                    onChange={(event) =>
+                                                                        setEditAdminForm((prev) => ({
+                                                                            ...prev,
+                                                                            includeInAccounting: event.target.checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                            }
+                                                            label="Учитывать заказы этого администратора в бухгалтерии"
+                                                        />
+                                                    )}
                                                 </>
                                             ) : (
                                                 <>
@@ -783,6 +816,23 @@ const AdministratorsPage = () => {
                                                                     label="Заказы с сайта учитывать в приход Наталье"
                                                                 />
                                                             </>
+                                                        )}
+                                                        {canEditAskhatAccountingToggle(admin) && (
+                                                            <FormControlLabel
+                                                                sx={{ ml: 0 }}
+                                                                control={
+                                                                    <Switch
+                                                                        checked={Boolean(editAdminForm.includeInAccounting)}
+                                                                        onChange={(event) =>
+                                                                            setEditAdminForm((prev) => ({
+                                                                                ...prev,
+                                                                                includeInAccounting: event.target.checked
+                                                                            }))
+                                                                        }
+                                                                    />
+                                                                }
+                                                                label="Учитывать заказы этого администратора в бухгалтерии"
+                                                            />
                                                         )}
                                                     </Stack>
                                                 ) : (

@@ -591,6 +591,14 @@ const ensureAdminUsersSchema = async () => {
             });
         }
 
+        if (!tableDefinition.includeInAccounting) {
+            await queryInterface.addColumn('admin_users', 'includeInAccounting', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: true
+            });
+        }
+
         if (!tableDefinition.whatsappAgreeTemplateEnabled) {
             await queryInterface.addColumn('admin_users', 'whatsappAgreeTemplateEnabled', {
                 type: Sequelize.BOOLEAN,
@@ -613,6 +621,9 @@ const ensureAdminUsersSchema = async () => {
                 }
                 if (typeof admin.siteOrdersToNataliaEnabled !== 'boolean') {
                     patch.siteOrdersToNataliaEnabled = true;
+                }
+                if (typeof admin.includeInAccounting !== 'boolean') {
+                    patch.includeInAccounting = true;
                 }
                 if (typeof admin.whatsappAgreeTemplateEnabled !== 'boolean') {
                     patch.whatsappAgreeTemplateEnabled = true;
