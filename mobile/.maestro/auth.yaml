@@ -1,0 +1,13 @@
+appId: kz.greenman.app
+---
+- launchApp:
+    clearState: true
+- tapOn: "Казахстан"
+- tapOn: "Продолжить"
+- tapOn: "Профиль"
+- tapOn: "Войти"
+- inputText: "7001234567"
+- tapOn: "Получить код"
+- inputText: "1234"
+- assertVisible: "Профиль"
+- assertVisible: "Пользователь #"

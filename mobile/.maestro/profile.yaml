@@ -1,0 +1,11 @@
+appId: kz.greenman.app
+---
+- launchApp
+- tapOn: "Профиль"
+- assertVisible: "Профиль"
+- tapOn: "Заказы"
+- tapOn: "Адреса"
+- scroll
+- tapOn: "Выйти"
+- tapOn: "Выйти"
+- assertVisible: "Войдите в аккаунт"

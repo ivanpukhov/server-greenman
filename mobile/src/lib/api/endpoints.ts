@@ -1,0 +1,63 @@
+export const endpoints = {
+  auth: {
+    registerLogin: '/auth/register-login',
+    confirmCode: '/auth/confirm-code',
+    resendCode: '/auth/resend-confirmation-code',
+  },
+  profile: {
+    me: '/profile',
+  },
+  orderProfiles: {
+    create: '/order-profiles',
+    byUser: (userId: number) => `/order-profiles/user/${userId}`,
+    update: (id: number) => `/order-profiles/${id}`,
+    remove: (id: number) => `/order-profiles/${id}`,
+    byPhone: (phone: string) => `/order-profiles/findByPhoneNumber/${phone}`,
+  },
+  orders: {
+    create: '/orders/add',
+    byUser: (userId: number) => `/orders/user/${userId}`,
+    byId: (id: number) => `/orders/${id}`,
+    mine: '/orders/user-orders',
+  },
+  products: {
+    list: '/products',
+    byId: (id: number) => `/products/${id}`,
+    search: (name: string) => `/products/search/${encodeURIComponent(name)}`,
+    byIdsAndTypes: '/products/getProductsByIdsAndTypes',
+  },
+  cdek: {
+    cities: '/cdek/cities/suggest',
+    pickupPoints: '/cdek/pickup-points',
+    calculate: '/cdek/calculate',
+  },
+  adminAuth: {
+    requestCode: '/admin/auth/request-code',
+    confirmCode: '/admin/auth/confirm-code',
+  },
+  adminSocial: {
+    media: '/admin/social/media',
+    mediaById: (id: number) => `/admin/social/media/${id}`,
+    posts: '/admin/social/posts',
+    postById: (id: number) => `/admin/social/posts/${id}`,
+    reels: '/admin/social/reels',
+    reelById: (id: number) => `/admin/social/reels/${id}`,
+    stories: '/admin/social/stories',
+    storyById: (id: number) => `/admin/social/stories/${id}`,
+    articles: '/admin/social/articles',
+    articleById: (id: number) => `/admin/social/articles/${id}`,
+    webinars: '/admin/social/webinars',
+    webinarById: (id: number) => `/admin/social/webinars/${id}`,
+    courses: '/admin/social/courses',
+    courseById: (id: number) => `/admin/social/courses/${id}`,
+    courseDays: (courseId: number) => `/admin/social/courses/${courseId}/days`,
+    courseDayById: (courseId: number, dayId: number) =>
+      `/admin/social/courses/${courseId}/days/${dayId}`,
+    comments: '/admin/social/comments',
+    commentById: (id: number) => `/admin/social/comments/${id}`,
+  },
+  adminProducts: {
+    list: '/admin/products',
+    byId: (id: number) => `/admin/products/${id}`,
+  },
+} as const;

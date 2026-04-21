@@ -1,0 +1,34 @@
+appId: kz.greenman.app
+---
+- launchApp
+- tapOn: "Профиль"
+- tapOn: "Россия"
+- tapOn: "Каталог"
+- tapOn:
+    index: 0
+    below: "Каталог"
+- tapOn: "В корзину"
+- tapOn: "Корзина"
+- tapOn: "Оформить заказ"
+- inputText: "Тест Тестов"
+- tapOn:
+    id: "phone-input"
+- inputText: "9161234567"
+- tapOn:
+    id: "email-input"
+- inputText: "test@example.com"
+- tapOn:
+    id: "city-input"
+- inputText: "Москва"
+- tapOn: "Москва"
+- tapOn: "До двери"
+- tapOn:
+    id: "address-input"
+- inputText: "ул. Тверская 1"
+- assertVisible:
+    text: "₽"
+    timeout: 10000
+- tapOn: "Оформить заказ"
+- assertVisible:
+    text: "Заказ #"
+    timeout: 15000

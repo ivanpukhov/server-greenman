@@ -1,0 +1,37 @@
+appId: kz.greenman.app
+---
+- launchApp
+- tapOn: "Каталог"
+- tapOn:
+    index: 0
+    below: "Каталог"
+- tapOn: "В корзину"
+- tapOn: "Корзина"
+- assertVisible: "Оформить заказ"
+- tapOn: "Оформить заказ"
+- inputText: "Тест Тестов"
+- tapOn:
+    id: "phone-input"
+- inputText: "7001234567"
+- tapOn:
+    id: "kaspi-input"
+- inputText: "7001234567"
+- tapOn:
+    id: "city-input"
+- inputText: "Астана"
+- tapOn: "Астана"
+- tapOn:
+    id: "street-input"
+- inputText: "ул. Абая 1"
+- tapOn:
+    id: "house-input"
+- inputText: "42"
+- tapOn:
+    id: "index-input"
+- inputText: "010000"
+- tapOn: "inDrive"
+- tapOn: "Kaspi"
+- tapOn: "Оформить заказ"
+- assertVisible:
+    text: "Заказ #"
+    timeout: 15000
