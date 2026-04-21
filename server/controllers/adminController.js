@@ -623,11 +623,11 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName, si
     return WITHOUT_LINK_ACCOUNT_NAME;
 };
 
-const buildExcludedAccountingAccountNames = (activeAdmins) =>
+const buildExcludedIncomeSellerIins = (activeAdmins) =>
     new Set(
         (Array.isArray(activeAdmins) ? activeAdmins : [])
-            .filter((admin) => admin?.includeInAccounting === false)
-            .map((admin) => String(admin.fullName || '').trim())
+            .filter((admin) => admin?.includeInAccounting === true)
+            .map((admin) => normalizeAdminIin(admin?.iin))
             .filter(Boolean)
     );
 
@@ -652,7 +652,7 @@ const buildAccountingContext = async () => {
         defaultAccountName,
         linkToAccountMap,
         siteOrdersToNataliaEnabled,
-        excludedAccountingAccountNames: buildExcludedAccountingAccountNames(activeAdmins)
+        excludedIncomeSellerIins: buildExcludedIncomeSellerIins(activeAdmins)
     };
 };
 
@@ -675,10 +675,6 @@ const isExcludedAccountingAccountName = (accountName, context = null) => {
         return false;
     }
 
-    if (context?.excludedAccountingAccountNames?.has(normalizedAccountName)) {
-        return true;
-    }
-
     const tokens = normalizedAccountName
         .trim()
         .toLowerCase()
@@ -693,6 +689,12 @@ const excludeOrdersByAccountingAccounts = (orders, context) => {
         if (isWebsiteOrder(order) && !context?.siteOrdersToNataliaEnabled) {
             return false;
         }
+
+        const paymentSellerIin = normalizeAdminIin(order?.paymentSellerIin);
+        if (paymentSellerIin && context?.excludedIncomeSellerIins?.has(paymentSellerIin)) {
+            return false;
+        }
+
         const accountName = resolveOrderAccountNameByContext(order, context);
         return !isExcludedAccountingAccountName(accountName, context);
     });
@@ -710,7 +712,7 @@ const excludeExpensesByAccountingAccounts = (expenses, context = null) => {
         if (!spentByName) {
             return true;
         }
-        return !isExcludedAccountingAccountName(spentByName, context);
+        return !isExcludedAccountingAccountName(spentByName);
     });
 };
 
@@ -789,7 +791,7 @@ const buildAccountFinancialSummary = async ({
     const accountRowsMap = new Map();
     const registerAccount = (rawAccountName) => {
         const normalizedName = String(rawAccountName || '').trim() || WITHOUT_LINK_ACCOUNT_NAME;
-        if (isExcludedAccountingAccountName(normalizedName, context)) {
+        if (isExcludedAccountingAccountName(normalizedName)) {
             return null;
         }
         const accountName =
@@ -812,7 +814,7 @@ const buildAccountFinancialSummary = async ({
         if (!adminName) {
             return;
         }
-        if (isExcludedAccountingAccountName(adminName, context)) {
+        if (isExcludedAccountingAccountName(adminName)) {
             return;
         }
 
@@ -835,7 +837,7 @@ const buildAccountFinancialSummary = async ({
 
     (Array.isArray(expenses) ? expenses : []).forEach((expense) => {
         const spentByName = String(expense?.spentByName || '').trim();
-        if (spentByName && isExcludedAccountingAccountName(spentByName, context)) {
+        if (spentByName && isExcludedAccountingAccountName(spentByName)) {
             return;
         }
         const accountName =

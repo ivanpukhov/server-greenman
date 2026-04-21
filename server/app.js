@@ -595,7 +595,7 @@ const ensureAdminUsersSchema = async () => {
             await queryInterface.addColumn('admin_users', 'includeInAccounting', {
                 type: Sequelize.BOOLEAN,
                 allowNull: false,
-                defaultValue: true
+                defaultValue: false
             });
         }
 
@@ -623,7 +623,7 @@ const ensureAdminUsersSchema = async () => {
                     patch.siteOrdersToNataliaEnabled = true;
                 }
                 if (typeof admin.includeInAccounting !== 'boolean') {
-                    patch.includeInAccounting = true;
+                    patch.includeInAccounting = false;
                 }
                 if (typeof admin.whatsappAgreeTemplateEnabled !== 'boolean') {
                     patch.whatsappAgreeTemplateEnabled = true;

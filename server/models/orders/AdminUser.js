@@ -36,7 +36,7 @@ const AdminUser = orderDB.define(
         includeInAccounting: {
             type: Sequelize.BOOLEAN,
             allowNull: false,
-            defaultValue: true
+            defaultValue: false
         },
         whatsappAgreeTemplateEnabled: {
             type: Sequelize.BOOLEAN,

@@ -90,7 +90,7 @@ const AdministratorsPage = () => {
         phoneNumber: '',
         iin: '',
         siteOrdersToNataliaEnabled: true,
-        includeInAccounting: true
+        includeInAccounting: false
     });
     const [paymentLinkForm, setPaymentLinkForm] = useState({
         url: '',
@@ -404,7 +404,7 @@ const AdministratorsPage = () => {
             phoneNumber: String(admin.phoneNumber || ''),
             iin: String(admin.iin || '').replace(/\D/g, '').slice(0, 12),
             siteOrdersToNataliaEnabled: Boolean(admin.siteOrdersToNataliaEnabled),
-            includeInAccounting: admin.includeInAccounting !== false
+            includeInAccounting: Boolean(admin.includeInAccounting)
         });
     };
 
@@ -418,7 +418,7 @@ const AdministratorsPage = () => {
             phoneNumber: '',
             iin: '',
             siteOrdersToNataliaEnabled: true,
-            includeInAccounting: true
+            includeInAccounting: false
         });
     };
 
@@ -696,7 +696,7 @@ const AdministratorsPage = () => {
                                                                     }
                                                                 />
                                                             }
-                                                            label="Учитывать заказы этого администратора в бухгалтерии"
+                                                            label="Не учитывать доходы на ИИН этого администратора в бухгалтерии"
                                                         />
                                                     )}
                                                 </>
@@ -831,7 +831,7 @@ const AdministratorsPage = () => {
                                                                         }
                                                                     />
                                                                 }
-                                                                label="Учитывать заказы этого администратора в бухгалтерии"
+                                                                label="Не учитывать доходы на ИИН этого администратора в бухгалтерии"
                                                             />
                                                         )}
                                                     </Stack>
