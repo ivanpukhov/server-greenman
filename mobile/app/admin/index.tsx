@@ -76,6 +76,9 @@ export default function AdminDashboard() {
           </Card>
         ) : null}
 
+        <Text className="mb-3 text-xs font-semibold uppercase text-ink-dim">
+          Разделы
+        </Text>
         <View className="flex-row flex-wrap gap-3">
           {TILES.map((tile) => (
             <Card
@@ -83,15 +86,29 @@ export default function AdminDashboard() {
               variant="outline"
               pressable
               onPress={() => router.push(tile.href as any)}
-              className="flex-1 basis-[47%]"
+              className="basis-[48%] grow"
             >
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-greenman-0">
-                <Ionicons name={tile.icon} size={20} color={greenman[7]} />
+              <View className="flex-row items-center gap-3">
+                <View className="h-12 w-12 items-center justify-center rounded-xl bg-greenman-0">
+                  <Ionicons name={tile.icon} size={22} color={greenman[7]} />
+                </View>
+                <View className="flex-1">
+                  <Text
+                    className="text-base font-semibold text-ink"
+                    numberOfLines={1}
+                  >
+                    {tile.label}
+                  </Text>
+                  {tile.subtitle ? (
+                    <Text
+                      className="mt-0.5 text-xs text-ink-dim"
+                      numberOfLines={2}
+                    >
+                      {tile.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-              <Text className="mt-3 text-base font-semibold text-ink">{tile.label}</Text>
-              {tile.subtitle ? (
-                <Text className="mt-0.5 text-xs text-ink-dim">{tile.subtitle}</Text>
-              ) : null}
             </Card>
           ))}
         </View>

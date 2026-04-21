@@ -7,7 +7,7 @@ import { useCountryStore } from '@/stores/country.store';
 export default function CheckoutScreen() {
   const country = useCountryStore((s) => s.country);
   return (
-    <Screen edges={['left', 'right']}>
+    <Screen avoidKeyboard>
       <Header title="Оформление заказа" />
       {country === 'RF' ? <CheckoutRf /> : <CheckoutKz />}
     </Screen>

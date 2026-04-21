@@ -38,6 +38,11 @@ const AdminUser = orderDB.define(
             allowNull: false,
             defaultValue: false
         },
+        incomeExclusionPeriodsJson: {
+            type: Sequelize.TEXT,
+            allowNull: false,
+            defaultValue: '[]'
+        },
         whatsappAgreeTemplateEnabled: {
             type: Sequelize.BOOLEAN,
             allowNull: false,

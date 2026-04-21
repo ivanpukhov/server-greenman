@@ -24,6 +24,13 @@ type Props = {
   transparent?: boolean;
   scrollOffset?: SharedValue<number>;
   dark?: boolean;
+  /**
+   * When true, Header applies its own top safe-area inset. Set this if the
+   * parent Screen does NOT include the 'top' edge (e.g. screens where content
+   * sits under the status bar and the Header sits over it). Transparent mode
+   * implies floating.
+   */
+  floating?: boolean;
 };
 
 export function Header({
@@ -36,9 +43,11 @@ export function Header({
   transparent,
   scrollOffset,
   dark,
+  floating,
 }: Props) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const padsTop = transparent || floating;
 
   const bgStyle = useAnimatedStyle(() => {
     if (!transparent || !scrollOffset) return { opacity: 1 };
@@ -75,7 +84,7 @@ export function Header({
     <View
       pointerEvents="box-none"
       style={{
-        paddingTop: insets.top,
+        paddingTop: padsTop ? insets.top : 0,
       }}
       className={`${transparent ? 'absolute left-0 right-0 top-0 z-10' : 'relative'}`}
     >

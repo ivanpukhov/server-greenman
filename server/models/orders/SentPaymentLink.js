@@ -75,6 +75,14 @@ const SentPaymentLink = orderDB.define(
         usedAt: {
             type: Sequelize.DATE,
             allowNull: true
+        },
+        courseId: {
+            type: Sequelize.INTEGER,
+            allowNull: true
+        },
+        userId: {
+            type: Sequelize.INTEGER,
+            allowNull: true
         }
     },
     {
@@ -86,8 +94,22 @@ const SentPaymentLink = orderDB.define(
             {
                 fields: ['receivedAt']
             }
-        ]
+        ],
+        hooks: {
+            afterCreate: async (row) => maybeActivateCourseEnrollment(row),
+            afterUpdate: async (row) => maybeActivateCourseEnrollment(row)
+        }
     }
 );
+
+async function maybeActivateCourseEnrollment(row) {
+    if (!row || !row.isPaid || !row.courseId) return;
+    try {
+        const { activateEnrollmentForSentPaymentLink } = require('../../services/social/coursePayment');
+        await activateEnrollmentForSentPaymentLink(row);
+    } catch (err) {
+        console.error('Ошибка активации курса после оплаты:', err);
+    }
+}
 
 module.exports = SentPaymentLink;

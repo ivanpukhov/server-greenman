@@ -14,6 +14,15 @@ import ScrollToTop from "./Components/ScrollToTop";
 import Search from "./Components/Catalog/Search";
 import AdminApp from "./admin/AdminApp";
 import CountryModal from "./Components/CountrySelect/CountryModal";
+import Feed from "./Components/social/Feed";
+import ReelsFeed from "./Components/social/ReelsFeed";
+import ArticleList from "./Components/social/ArticleList";
+import ArticlePage from "./Components/social/ArticlePage";
+import WebinarPage from "./Components/social/WebinarPage";
+import CoursesList from "./Components/social/CoursesList";
+import CoursePage from "./Components/social/CoursePage";
+import CourseDayView from "./Components/social/CourseDayView";
+import MyCourses from "./Components/social/MyCourses";
 
 function App() {
     return (
@@ -49,6 +58,15 @@ function AppRoutes() {
                     <Route path="/search/:type/:query" element={<Search/>}/>
                     <Route path="/auth" element={<Auth/>}/>
                     <Route path="/profile" element={<Profile/>}/>
+                    <Route path="/feed" element={<Feed/>}/>
+                    <Route path="/reels" element={<ReelsFeed/>}/>
+                    <Route path="/articles" element={<ArticleList/>}/>
+                    <Route path="/articles/:slug" element={<ArticlePage/>}/>
+                    <Route path="/webinars/:slug" element={<WebinarPage/>}/>
+                    <Route path="/courses" element={<CoursesList/>}/>
+                    <Route path="/courses/:slug" element={<CoursePage/>}/>
+                    <Route path="/courses/:slug/day/:dayNumber" element={<CourseDayView/>}/>
+                    <Route path="/my-courses" element={<MyCourses/>}/>
                     <Route
                         path="/*"
                         element={

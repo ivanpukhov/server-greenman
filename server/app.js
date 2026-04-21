@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env'), override: false });
 
 const sequelize = require('./utilities/database');
 const orderDB = require('./utilities/orderDatabase');
+const socialDB = require('./utilities/socialDatabase');
 
 const productRoutes = require('./routes/productRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -21,6 +22,9 @@ const adminRoutes = require('./routes/adminRoutes');
 const whatsappWebhookRoutes = require('./routes/whatsappWebhookRoutes');
 const chatwootWebhookRoutes = require('./routes/chatwootWebhookRoutes');
 const cdekRoutes = require('./routes/cdekRoutes');
+const adminSocialRoutes = require('./routes/social/adminSocialRoutes');
+const publicSocialRoutes = require('./routes/social/publicSocialRoutes');
+require('./models/social');
 const Product = require('./models/Product');
 const ProductType = require('./models/ProductType');
 require('./models/orders/PaymentLink');
@@ -60,6 +64,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 app.use('/api/chatwoot-webhook', chatwootWebhookRoutes);
 app.use('/api/cdek', cdekRoutes);
+app.use('/api/admin/social', adminSocialRoutes);
+app.use('/api/social', publicSocialRoutes);
 
 app.use((error, req, res, next) => {
     logError('express.errorMiddleware', error, {
@@ -599,6 +605,14 @@ const ensureAdminUsersSchema = async () => {
             });
         }
 
+        if (!tableDefinition.incomeExclusionPeriodsJson) {
+            await queryInterface.addColumn('admin_users', 'incomeExclusionPeriodsJson', {
+                type: Sequelize.TEXT,
+                allowNull: false,
+                defaultValue: '[]'
+            });
+        }
+
         if (!tableDefinition.whatsappAgreeTemplateEnabled) {
             await queryInterface.addColumn('admin_users', 'whatsappAgreeTemplateEnabled', {
                 type: Sequelize.BOOLEAN,
@@ -624,6 +638,47 @@ const ensureAdminUsersSchema = async () => {
                 }
                 if (typeof admin.includeInAccounting !== 'boolean') {
                     patch.includeInAccounting = false;
+                }
+                if (typeof admin.incomeExclusionPeriodsJson !== 'string') {
+                    patch.incomeExclusionPeriodsJson = '[]';
+                }
+                const parsedIncomeExclusionPeriods =
+                    typeof patch.incomeExclusionPeriodsJson === 'string'
+                        ? (() => {
+                              try {
+                                  const parsed = JSON.parse(patch.incomeExclusionPeriodsJson);
+                                  return Array.isArray(parsed) ? parsed : [];
+                              } catch (_error) {
+                                  return [];
+                              }
+                          })()
+                        : (() => {
+                              try {
+                                  const parsed = JSON.parse(admin.incomeExclusionPeriodsJson || '[]');
+                                  return Array.isArray(parsed) ? parsed : [];
+                              } catch (_error) {
+                                  return [];
+                              }
+                          })();
+                const lastIncomeExclusionPeriod =
+                    parsedIncomeExclusionPeriods[parsedIncomeExclusionPeriods.length - 1] || null;
+                const hasOpenIncomeExclusionPeriod = Boolean(
+                    lastIncomeExclusionPeriod?.startAt && !lastIncomeExclusionPeriod?.endAt
+                );
+                if (admin.includeInAccounting === true && !hasOpenIncomeExclusionPeriod) {
+                    patch.incomeExclusionPeriodsJson = JSON.stringify([
+                        ...parsedIncomeExclusionPeriods,
+                        { startAt: new Date().toISOString(), endAt: null }
+                    ]);
+                }
+                if (admin.includeInAccounting === false && hasOpenIncomeExclusionPeriod) {
+                    patch.incomeExclusionPeriodsJson = JSON.stringify(
+                        parsedIncomeExclusionPeriods.map((period, index) =>
+                            index === parsedIncomeExclusionPeriods.length - 1
+                                ? { ...period, endAt: new Date().toISOString() }
+                                : period
+                        )
+                    );
                 }
                 if (typeof admin.whatsappAgreeTemplateEnabled !== 'boolean') {
                     patch.whatsappAgreeTemplateEnabled = true;
@@ -691,6 +746,35 @@ const ensureUsersSchema = async () => {
     }
 };
 
+const ensureSocialDatabase = async () => {
+    try {
+        await socialDB.sync();
+    } catch (err) {
+        console.error('Ошибка синхронизации базы данных соцсети:', err);
+    }
+};
+
+const ensureSentPaymentLinksCourseColumns = async () => {
+    const queryInterface = orderDB.getQueryInterface();
+    try {
+        const tableDefinition = await queryInterface.describeTable('sent_payment_links');
+        if (!tableDefinition.courseId) {
+            await queryInterface.addColumn('sent_payment_links', 'courseId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+        if (!tableDefinition.userId) {
+            await queryInterface.addColumn('sent_payment_links', 'userId', {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            });
+        }
+    } catch (err) {
+        console.error('Ошибка при добавлении courseId/userId в sent_payment_links:', err);
+    }
+};
+
 sequelize.sync().then(async () => {
     await ensureProductSchema();
     await ensureProductTypeSchema();
@@ -701,9 +785,12 @@ sequelize.sync().then(async () => {
         await ensureOrderSchema();
         await ensureRfOrderSchema();
         await ensureSentPaymentLinksSchema();
+        await ensureSentPaymentLinksCourseColumns();
         await ensureKazpostRequestsSchema();
         await ensureOrderDraftRequestsSchema();
         console.log('База данных заказов синхронизирована.');
+        await ensureSocialDatabase();
+        console.log('База данных соцсети синхронизирована.');
     }).catch(err => {
         console.error('Ошибка синхронизации базы данных заказов:', err);
     });

@@ -1,12 +1,12 @@
 import { ReactNode } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
-import { greenman } from '@/theme/colors';
 
 type Props = {
   title: string;
@@ -28,6 +28,8 @@ export function AdminFormScreen({
   deleteConfirmText = 'Удалить безвозвратно?',
 }: Props) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 12);
 
   const confirmDelete = () => {
     if (!onDelete) return;
@@ -38,7 +40,7 @@ export function AdminFormScreen({
   };
 
   return (
-    <Screen>
+    <Screen edges={['top', 'left', 'right']}>
       <Header
         title={title}
         onBack={() => router.back()}
@@ -57,12 +59,16 @@ export function AdminFormScreen({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 120 + bottomPad }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           <View className="gap-4">{children}</View>
         </ScrollView>
-        <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-white p-3">
+        <View
+          className="absolute bottom-0 left-0 right-0 border-t border-border bg-white px-3 pt-3"
+          style={{ paddingBottom: bottomPad }}
+        >
           <Button
             label="Сохранить"
             size="lg"

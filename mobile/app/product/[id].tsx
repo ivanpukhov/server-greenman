@@ -43,7 +43,7 @@ export default function ProductScreen() {
     return (
       <Screen edges={['left', 'right']}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Header title="" />
+        <Header title="" floating />
         <View className="px-5">
           <Skeleton className="aspect-square w-full rounded-xl" />
           <Skeleton className="mt-6 h-8 w-3/4 rounded" />
@@ -97,6 +97,7 @@ export default function ProductScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Header
         title={product.name}
+        floating
         rightAction={
           <IconButton
             icon={<Ionicons name="share-outline" size={20} color="#0f1a12" />}

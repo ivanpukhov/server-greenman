@@ -50,7 +50,7 @@ export function Card({
   }
 
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View style={animatedStyle} className={base}>
       <Pressable
         onPressIn={() => {
           scale.value = withSpring(0.98, { damping: 18, stiffness: 300 });
@@ -62,7 +62,6 @@ export function Card({
           if (haptic) Haptics.selectionAsync().catch(() => {});
           onPress?.();
         }}
-        className={base}
       >
         {children}
       </Pressable>

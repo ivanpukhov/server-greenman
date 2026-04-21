@@ -89,6 +89,81 @@ const isDashaByIin = (iin) => normalizeAdminIin(iin) === DASHA_ADMIN_IIN;
 
 const isAskhatAdmin = (adminLike) => String(adminLike?.fullName || '').trim().toLowerCase() === 'асхат';
 
+const parseIncomeExclusionPeriods = (value) => {
+    if (!value) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .map((item) => {
+                const startAt = String(item?.startAt || '').trim();
+                const endAt = String(item?.endAt || '').trim();
+                return startAt ? { startAt, endAt: endAt || null } : null;
+            })
+            .filter(Boolean);
+    } catch (_error) {
+        return [];
+    }
+};
+
+const stringifyIncomeExclusionPeriods = (periods) => JSON.stringify(parseIncomeExclusionPeriods(JSON.stringify(periods)));
+
+const updateIncomeExclusionPeriods = (periods, shouldExcludeIncomeNow) => {
+    const normalizedPeriods = Array.isArray(periods) ? periods.map((item) => ({ ...item })) : [];
+    const lastPeriod = normalizedPeriods[normalizedPeriods.length - 1] || null;
+    const hasOpenPeriod = Boolean(lastPeriod && lastPeriod.startAt && !lastPeriod.endAt);
+    const nowIso = new Date().toISOString();
+
+    if (shouldExcludeIncomeNow) {
+        if (!hasOpenPeriod) {
+            normalizedPeriods.push({ startAt: nowIso, endAt: null });
+        }
+        return normalizedPeriods;
+    }
+
+    if (hasOpenPeriod) {
+        lastPeriod.endAt = nowIso;
+    }
+
+    return normalizedPeriods;
+};
+
+const toComparableTimestamp = (value) => {
+    const ts = new Date(value).getTime();
+    return Number.isFinite(ts) ? ts : null;
+};
+
+const isTimestampInIncomeExclusionPeriods = (timestamp, periods) => {
+    if (!Number.isFinite(timestamp)) {
+        return false;
+    }
+
+    return (Array.isArray(periods) ? periods : []).some((period) => {
+        const startTs = toComparableTimestamp(period?.startAt);
+        const endTs = period?.endAt ? toComparableTimestamp(period.endAt) : null;
+
+        if (!Number.isFinite(startTs)) {
+            return false;
+        }
+
+        if (timestamp < startTs) {
+            return false;
+        }
+
+        if (endTs !== null && timestamp > endTs) {
+            return false;
+        }
+
+        return true;
+    });
+};
+
 const serializeAdminForResponse = (admin, currentAdmin = null) => {
     const plainAdmin = admin && typeof admin.toJSON === 'function' ? admin.toJSON() : admin;
     if (!plainAdmin) {
@@ -481,6 +556,7 @@ const buildProductPayload = (body) => {
 
     return {
         name: String(body.name || '').trim(),
+        alias: body.alias === undefined ? undefined : (body.alias ? String(body.alias).trim() : null),
         description: body.description || '',
         applicationMethodChildren: body.applicationMethodChildren || '',
         applicationMethodAdults: body.applicationMethodAdults || '',
@@ -623,13 +699,25 @@ const resolveOrderAccountName = (order, linkToAccountMap, defaultAccountName, si
     return WITHOUT_LINK_ACCOUNT_NAME;
 };
 
-const buildExcludedIncomeSellerIins = (activeAdmins) =>
-    new Set(
-        (Array.isArray(activeAdmins) ? activeAdmins : [])
-            .filter((admin) => admin?.includeInAccounting === true)
-            .map((admin) => normalizeAdminIin(admin?.iin))
-            .filter(Boolean)
-    );
+const buildIncomeExclusionPeriodsBySellerIin = (activeAdmins) => {
+    const periodsBySellerIin = new Map();
+
+    (Array.isArray(activeAdmins) ? activeAdmins : []).forEach((admin) => {
+        const sellerIin = normalizeAdminIin(admin?.iin);
+        if (!sellerIin) {
+            return;
+        }
+
+        const periods = parseIncomeExclusionPeriods(admin?.incomeExclusionPeriodsJson);
+        if (!periods.length) {
+            return;
+        }
+
+        periodsBySellerIin.set(sellerIin, periods);
+    });
+
+    return periodsBySellerIin;
+};
 
 const buildAccountingContext = async () => {
     const activeAdmins = await getActiveAdmins();
@@ -652,7 +740,7 @@ const buildAccountingContext = async () => {
         defaultAccountName,
         linkToAccountMap,
         siteOrdersToNataliaEnabled,
-        excludedIncomeSellerIins: buildExcludedIncomeSellerIins(activeAdmins)
+        incomeExclusionPeriodsBySellerIin: buildIncomeExclusionPeriodsBySellerIin(activeAdmins)
     };
 };
 
@@ -691,8 +779,12 @@ const excludeOrdersByAccountingAccounts = (orders, context) => {
         }
 
         const paymentSellerIin = normalizeAdminIin(order?.paymentSellerIin);
-        if (paymentSellerIin && context?.excludedIncomeSellerIins?.has(paymentSellerIin)) {
-            return false;
+        if (paymentSellerIin) {
+            const incomeExclusionPeriods = context?.incomeExclusionPeriodsBySellerIin?.get(paymentSellerIin) || [];
+            const incomeTimestamp = toComparableTimestamp(order?.paidAt || order?.receivedAt || order?.createdAt);
+            if (isTimestampInIncomeExclusionPeriods(incomeTimestamp, incomeExclusionPeriods)) {
+                return false;
+            }
         }
 
         const accountName = resolveOrderAccountNameByContext(order, context);
@@ -1366,6 +1458,7 @@ const adminController = {
             const product = await Product.create(
                 {
                     name: payload.name,
+                    alias: payload.alias ?? null,
                     description: payload.description,
                     applicationMethodChildren: payload.applicationMethodChildren,
                     applicationMethodAdults: payload.applicationMethodAdults,
@@ -1415,18 +1508,19 @@ const adminController = {
                 return res.status(400).json({ message: 'Заполните обязательные поля товара' });
             }
 
-            await product.update(
-                {
-                    name: payload.name,
-                    description: payload.description,
-                    applicationMethodChildren: payload.applicationMethodChildren,
-                    applicationMethodAdults: payload.applicationMethodAdults,
-                    diseases: payload.diseases,
-                    contraindications: payload.contraindications,
-                    videoUrl: payload.videoUrl
-                },
-                { transaction }
-            );
+            const updateFields = {
+                name: payload.name,
+                description: payload.description,
+                applicationMethodChildren: payload.applicationMethodChildren,
+                applicationMethodAdults: payload.applicationMethodAdults,
+                diseases: payload.diseases,
+                contraindications: payload.contraindications,
+                videoUrl: payload.videoUrl
+            };
+            if (payload.alias !== undefined) {
+                updateFields.alias = payload.alias;
+            }
+            await product.update(updateFields, { transaction });
 
             const existingTypes = await ProductType.findAll({
                 where: { productId: product.id },
@@ -2727,7 +2821,14 @@ ${productDetails}`;
 
             if (isAskhatAdmin(adminUser) && isDashaByIin(req.admin?.iin)) {
                 if (req.body.includeInAccounting !== undefined) {
-                    payload.includeInAccounting = Boolean(req.body.includeInAccounting);
+                    const shouldExcludeIncomeNow = Boolean(req.body.includeInAccounting);
+                    payload.includeInAccounting = shouldExcludeIncomeNow;
+                    payload.incomeExclusionPeriodsJson = stringifyIncomeExclusionPeriods(
+                        updateIncomeExclusionPeriods(
+                            parseIncomeExclusionPeriods(adminUser.incomeExclusionPeriodsJson),
+                            shouldExcludeIncomeNow
+                        )
+                    );
                 }
             }
 

@@ -31,6 +31,8 @@ import WhatsAppConnectionPage from './WhatsAppConnectionPage';
 import KazpostRequestsPage from './KazpostRequestsPage';
 import OrderDraftRequestsPage from './OrderDraftRequestsPage';
 import CdekSettingsPage from './CdekSettingsPage';
+import SocialAdminPage from './social/SocialAdminPage';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import { OrderCreate, OrderEdit, OrderList, OrderShow } from './resources/orders';
 import { OrderRfEdit, OrderRfList, OrderRfShow } from './resources/ordersRf';
 import { ProductCreate, ProductEdit, ProductList, ProductShow } from './resources/products';
@@ -213,6 +215,12 @@ const AdminApp = () => {
             options={{ label: 'Ваш заказ' }}
             list={OrderDraftRequestsPage}
             icon={AssignmentOutlinedIcon}
+        />
+        <Resource
+            name="social"
+            options={{ label: 'Соцсеть' }}
+            list={SocialAdminPage}
+            icon={GroupsOutlinedIcon}
         />
         </Admin>
     );
