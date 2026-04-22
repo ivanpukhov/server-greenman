@@ -374,9 +374,21 @@ const createIntake = async (req, res) => {
             return res.status(400).json({ message: 'У заказа ещё нет cdek_number (подождите регистрацию в СДЭК)' });
         }
 
-        const { intake_date, start_time, end_time, comment } = req.body || {};
-        if (!intake_date || !start_time || !end_time) {
-            return res.status(400).json({ message: 'Требуются intake_date, start_time, end_time' });
+        const {
+            intake_date,
+            intake_time_from,
+            intake_time_to,
+            start_time,
+            end_time,
+            comment
+        } = req.body || {};
+        const normalizedIntakeTimeFrom = intake_time_from || start_time;
+        const normalizedIntakeTimeTo = intake_time_to || end_time;
+
+        if (!intake_date || !normalizedIntakeTimeFrom || !normalizedIntakeTimeTo) {
+            return res.status(400).json({
+                message: 'Требуются intake_date, intake_time_from, intake_time_to'
+            });
         }
 
         const senderCityCode = Number(await getSetting('CDEK_SENDER_CITY_CODE'));
@@ -387,8 +399,8 @@ const createIntake = async (req, res) => {
         const payload = {
             cdek_number: order.cdekNumber,
             intake_date,
-            start_time,
-            end_time,
+            intake_time_from: normalizedIntakeTimeFrom,
+            intake_time_to: normalizedIntakeTimeTo,
             comment: comment || undefined,
             sender: {
                 name: senderName,
