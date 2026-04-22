@@ -37,7 +37,7 @@ const { buildErrorDetails, formatErrorMessage } = require('../utilities/errorDet
 const router = express.Router();
 const { Op } = Sequelize;
 
-const PDF_PROOF_DEBUG_PHONE = '77073670497';
+const PDF_PROOF_DEBUG_PHONE = String(process.env.PDF_PROOF_DEBUG_PHONE || '').trim();
 
 const DEFAULT_CAPTION =
     'Посылка собрана. Видео обязательно к просмотру. Пожалуйста, сверьте свой заказ с содержимым коробки.';
@@ -2972,9 +2972,16 @@ const sanitizeLogToken = (value, maxLength = 80) => {
 };
 
 const sendPdfProofDebugLog = async (message) => {
+    if (!PDF_PROOF_DEBUG_PHONE) {
+        return;
+    }
+
     const text = sanitizeLogToken(message, 900);
     try {
-        await sendNotification(PDF_PROOF_DEBUG_PHONE, text);
+        await sendNotification(PDF_PROOF_DEBUG_PHONE, text, {
+            enforce24h: false,
+            queueIfNeeded: false
+        });
     } catch (error) {
         console.error('[WhatsApp webhook] Failed to send PDF debug log:', error.message);
     }
