@@ -159,8 +159,8 @@ const IntakeDialog = ({ open, onClose, orderId, onSuccess }) => {
                 method: 'POST',
                 body: JSON.stringify({
                     intake_date: intakeDate,
-                    start_time: startTime,
-                    end_time: endTime,
+                    intake_time_from: startTime,
+                    intake_time_to: endTime,
                     comment
                 })
             });
