@@ -13,6 +13,7 @@ const AUTH_TEMPLATE_NAME = 'auth';
 const ERROR_TEMPLATE_NAME = 'error';
 const DEFAULT_LANGUAGE_CODE = 'ru';
 const FILTERED_ADMIN_PHONE = '7775464450';
+const pendingFlushByPhone = new Map();
 
 const logOutgoing = (event, details = {}) => {
     console.log(`[WhatsApp outgoing] ${event}: ${JSON.stringify(details)}`);
@@ -1074,13 +1075,29 @@ const flushPendingMessagesByPhone = async (phoneNumber) => {
         };
     }
 
-    const user = await User.findOne({
-        where: {
-            phoneNumber: tenDigitsPhone
-        }
-    });
+    if (pendingFlushByPhone.has(tenDigitsPhone)) {
+        return pendingFlushByPhone.get(tenDigitsPhone);
+    }
 
-    return flushPendingMessagesForUser(user);
+    const flushPromise = (async () => {
+        const user = await User.findOne({
+            where: {
+                phoneNumber: tenDigitsPhone
+            }
+        });
+
+        return flushPendingMessagesForUser(user);
+    })();
+
+    pendingFlushByPhone.set(tenDigitsPhone, flushPromise);
+
+    try {
+        return await flushPromise;
+    } finally {
+        if (pendingFlushByPhone.get(tenDigitsPhone) === flushPromise) {
+            pendingFlushByPhone.delete(tenDigitsPhone);
+        }
+    }
 };
 
 const flushPendingMessagesByChatId = async (chatId) => {
