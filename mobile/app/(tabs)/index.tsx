@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, View, RefreshControl, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -27,6 +28,8 @@ import { shadows } from '@/theme/shadows';
 import { formatPrice } from '@/lib/format/price';
 import { CountryMark } from '@/components/ui/CountryMark';
 import type { HomeBanner } from '@/lib/api/types';
+import { FeedStoriesRow, type StoryGroupItem } from '@/components/social/FeedStoriesRow';
+import { socialApi } from '@/features/social/api';
 
 const WHATSAPP_URL = 'https://wa.me/77001234567';
 const QUICK_GAP = 12;
@@ -58,6 +61,14 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { data: products, isLoading, refetch, isRefetching } = useProducts();
   const banners = useHomeBanners();
+  const storiesQuery = useQuery({
+    queryKey: ['social', 'stories', 'active'],
+    queryFn: async () => {
+      const data = await socialApi.stories.active();
+      return (Array.isArray(data) ? data : []) as StoryGroupItem[];
+    },
+    staleTime: 30_000,
+  });
   const country = useCountryStore((s) => s.country);
   const currency = useCountryStore((s) => s.currency);
   const isAuth = useAuthStore((s) => s.isAuthenticated);
@@ -73,6 +84,7 @@ export default function HomeScreen() {
   const searchPresets = (t('main.search_presets.items', { returnObjects: true }) as string[]) ?? [];
 
   const homeBanners = banners.data?.length ? banners.data : DEFAULT_BANNERS;
+  const stories = storiesQuery.data ?? [];
 
   const openWA = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -85,7 +97,15 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={greenman[9]} />
+            <RefreshControl
+              refreshing={isRefetching || storiesQuery.isRefetching || banners.isRefetching}
+              onRefresh={() => {
+                refetch();
+                storiesQuery.refetch();
+                banners.refetch();
+              }}
+              tintColor={greenman[9]}
+            />
         }
         removeClippedSubviews
       >
@@ -160,6 +180,8 @@ export default function HomeScreen() {
           openWA={openWA}
           router={router}
         />
+
+        <HomeStoriesSection stories={stories} router={router} />
 
         {/* =========== ACTIVE ORDER RAIL =========== */}
         {isAuth && activeOrder ? (
@@ -433,6 +455,44 @@ function QuickTile({
         {sub}
       </Text>
     </AnimatedPressable>
+  );
+}
+
+function HomeStoriesSection({
+  stories,
+  router,
+}: {
+  stories: StoryGroupItem[];
+  router: ReturnType<typeof useRouter>;
+}) {
+  if (!stories.length) return null;
+  return (
+    <View className="mt-7">
+      <View className="flex-row items-end justify-between px-5">
+        <View>
+          <Text
+            className="text-[10px] font-bold uppercase text-greenman-8"
+            tracking="widest"
+          >
+            Сториз
+          </Text>
+          <Text className="mt-1 font-serif text-[22px] leading-[26px] text-ink">
+            Новое от Greenman
+          </Text>
+        </View>
+        <AnimatedPressable onPress={() => router.push('/(tabs)/feed' as any)} haptic="selection">
+          <View className="flex-row items-center">
+            <Text className="text-[13px] font-bold text-ink" tracking="tight">
+              Лента
+            </Text>
+            <Ionicons name="arrow-forward" size={14} color={greenman.ink} style={{ marginLeft: 4 }} />
+          </View>
+        </AnimatedPressable>
+      </View>
+      <View className="mt-2">
+        <FeedStoriesRow groups={stories} />
+      </View>
+    </View>
   );
 }
 
