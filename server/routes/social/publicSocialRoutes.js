@@ -10,8 +10,11 @@ const pollController = require('../../controllers/social/pollController');
 const courseController = require('../../controllers/social/courseController');
 const commentController = require('../../controllers/social/commentController');
 const reactionController = require('../../controllers/social/reactionController');
+const bookmarkController = require('../../controllers/social/bookmarkController');
 const feedController = require('../../controllers/social/feedController');
+const searchController = require('../../controllers/social/searchController');
 const notificationController = require('../../controllers/social/notificationController');
+const profileController = require('../../controllers/social/profileController');
 
 const router = express.Router();
 
@@ -32,6 +35,9 @@ function optionalAuth(req, _res, next) {
 
 // Feed
 router.get('/feed', optionalAuth, feedController.unifiedFeed);
+
+// Search
+router.get('/search', optionalAuth, searchController.search);
 
 // Posts
 router.get('/posts', optionalAuth, postController.publicList);
@@ -64,6 +70,7 @@ router.get('/courses/:slug', optionalAuth, courseController.publicGetBySlug);
 router.post('/courses/:id/enroll', authMiddleware, courseController.enroll);
 router.get('/courses/:slug/days', optionalAuth, courseController.publicDaysList);
 router.get('/courses/:slug/days/:dayNumber', authMiddleware, courseController.publicDayGet);
+router.post('/courses/:slug/days/:dayNumber/complete', authMiddleware, courseController.completeDay);
 router.post('/courses/enrollments/:enrollmentId/reports', authMiddleware, courseController.submitReport);
 router.get('/courses/enrollments/:enrollmentId/support', authMiddleware, courseController.supportList);
 router.post('/courses/enrollments/:enrollmentId/support', authMiddleware, courseController.supportSend);
@@ -77,6 +84,14 @@ router.delete('/comments/:id', authMiddleware, commentController.remove);
 // Reactions
 router.get('/reactions', optionalAuth, reactionController.counts);
 router.post('/reactions/toggle', authMiddleware, reactionController.toggle);
+
+// Bookmarks
+router.get('/bookmarks', authMiddleware, bookmarkController.list);
+router.post('/bookmarks/toggle', authMiddleware, bookmarkController.toggle);
+
+// Profile
+router.get('/profile/activity', authMiddleware, profileController.activity);
+router.get('/profile/homework', authMiddleware, profileController.homework);
 
 // Notifications
 router.get('/notifications', authMiddleware, notificationController.list);

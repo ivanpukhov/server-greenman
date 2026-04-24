@@ -13,10 +13,12 @@ const Course = require('./Course');
 const CourseDay = require('./CourseDay');
 const CourseEnrollment = require('./CourseEnrollment');
 const CourseDayReport = require('./CourseDayReport');
+const CourseDayProgress = require('./CourseDayProgress');
 const CourseSupportMessage = require('./CourseSupportMessage');
 const Article = require('./Article');
 const Comment = require('./Comment');
 const Reaction = require('./Reaction');
+const Bookmark = require('./Bookmark');
 const SocialNotification = require('./SocialNotification');
 
 // Associations — стараемся держать плоско: полиморфные связи обрабатываются в контроллерах.
@@ -31,6 +33,11 @@ CourseSupportMessage.belongsTo(CourseEnrollment, { foreignKey: 'enrollmentId', a
 
 CourseEnrollment.hasMany(CourseDayReport, { foreignKey: 'enrollmentId', as: 'reports' });
 CourseDayReport.belongsTo(CourseEnrollment, { foreignKey: 'enrollmentId', as: 'enrollment' });
+
+CourseEnrollment.hasMany(CourseDayProgress, { foreignKey: 'enrollmentId', as: 'progress' });
+CourseDayProgress.belongsTo(CourseEnrollment, { foreignKey: 'enrollmentId', as: 'enrollment' });
+CourseDay.hasMany(CourseDayProgress, { foreignKey: 'courseDayId', as: 'progressMarks' });
+CourseDayProgress.belongsTo(CourseDay, { foreignKey: 'courseDayId', as: 'day' });
 
 Poll.hasMany(PollOption, { foreignKey: 'pollId', as: 'options' });
 PollOption.belongsTo(Poll, { foreignKey: 'pollId', as: 'poll' });
@@ -55,9 +62,11 @@ module.exports = {
     CourseDay,
     CourseEnrollment,
     CourseDayReport,
+    CourseDayProgress,
     CourseSupportMessage,
     Article,
     Comment,
     Reaction,
+    Bookmark,
     SocialNotification
 };

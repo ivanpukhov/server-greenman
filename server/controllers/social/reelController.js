@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Reel, ReelView, Media } = require('../../models/social');
 const { parseLimit, parseCursor } = require('../../services/social/paginate');
+const { hydrateEngagement, attachEngagement } = require('../../services/social/engagement');
 
 async function hydrate(reel) {
     const obj = reel.toJSON();
@@ -69,6 +70,13 @@ exports.publicList = async (req, res) => {
         if (before) where.id = { [Op.lt]: before };
         const items = await Reel.findAll({ where, order: [['publishedAt', 'DESC'], ['id', 'DESC']], limit });
         const out = await Promise.all(items.map(hydrate));
+        const userId = req.user?.userId || null;
+        const eng = await hydrateEngagement(out.map((r) => ({ kind: 'reel', entityId: r.id })), userId);
+        for (const r of out) {
+            const e = eng.get(`reel:${r.id}`) || { likes: 0, comments: 0, bookmarks: 0, liked: false, bookmarked: false };
+            r.engagement = { likes: e.likes, comments: e.comments, bookmarks: e.bookmarks, views: r.viewCount ?? 0 };
+            r.me = { liked: e.liked, bookmarked: e.bookmarked };
+        }
         res.json(out);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -78,7 +86,9 @@ exports.publicList = async (req, res) => {
 exports.publicGet = async (req, res) => {
     const reel = await Reel.findByPk(req.params.id);
     if (!reel || reel.isDraft || !reel.publishedAt) return res.status(404).json({ message: 'Reel не найден' });
-    res.json(await hydrate(reel));
+    const obj = await hydrate(reel);
+    await attachEngagement(obj, 'reel', req.user?.userId || null);
+    res.json(obj);
 };
 
 exports.view = async (req, res) => {

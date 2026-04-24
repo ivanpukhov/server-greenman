@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Article, Media } = require('../../models/social');
 const { uniqueSlug } = require('../../services/social/slugs');
 const { parseLimit, parseCursor } = require('../../services/social/paginate');
+const { attachEngagement } = require('../../services/social/engagement');
 
 async function hydrate(article) {
     const obj = article.toJSON();
@@ -97,5 +98,7 @@ exports.publicList = async (req, res) => {
 exports.publicGetBySlug = async (req, res) => {
     const a = await Article.findOne({ where: { slug: req.params.slug, isDraft: false, publishedAt: { [Op.not]: null } } });
     if (!a) return res.status(404).json({ message: 'Статья не найдена' });
-    res.json(await hydrate(a));
+    const obj = await hydrate(a);
+    await attachEngagement(obj, 'article', req.user?.userId || null);
+    res.json(obj);
 };

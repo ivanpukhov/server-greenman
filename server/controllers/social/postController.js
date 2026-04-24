@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Post } = require('../../models/social');
 const { setAttachments, attachMap } = require('../../services/social/attachments');
 const { parseLimit, parseCursor } = require('../../services/social/paginate');
+const { attachEngagement } = require('../../services/social/engagement');
 
 const ATTACH_TYPE = 'post';
 
@@ -85,7 +86,9 @@ exports.publicGet = async (req, res) => {
             return res.status(404).json({ message: 'Пост не найден' });
         }
         const media = await attachMap(ATTACH_TYPE, [post.id]);
-        res.json({ ...post.toJSON(), media: media.get(post.id) || [] });
+        const obj = { ...post.toJSON(), media: media.get(post.id) || [] };
+        await attachEngagement(obj, 'post', req.user?.userId || null);
+        res.json(obj);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

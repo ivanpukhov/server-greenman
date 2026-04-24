@@ -4,6 +4,7 @@ const {
     CourseDay,
     CourseEnrollment,
     CourseDayReport,
+    CourseDayProgress,
     CourseSupportMessage,
     Media
 } = require('../../models/social');
@@ -33,6 +34,26 @@ async function hydrateDay(d) {
     const files = await attachMap(DAY_ATTACH_TYPE, [d.id]);
     obj.files = files.get(d.id) || [];
     return obj;
+}
+
+async function enrollmentProgress(enrollment, course) {
+    if (!enrollment) return { completedDayIds: [], completedDayNumbers: [], percent: 0 };
+    const marks = await CourseDayProgress.findAll({
+        where: { enrollmentId: enrollment.id },
+        attributes: ['courseDayId']
+    });
+    const ids = marks.map((m) => m.courseDayId);
+    let numbers = [];
+    if (ids.length) {
+        const days = await CourseDay.findAll({
+            where: { id: ids },
+            attributes: ['id', 'dayNumber']
+        });
+        numbers = days.map((d) => d.dayNumber).sort((a, b) => a - b);
+    }
+    const total = Math.max(1, Number(course?.durationDays) || 1);
+    const percent = Math.min(100, Math.round((numbers.length / total) * 100));
+    return { completedDayIds: ids, completedDayNumbers: numbers, percent };
 }
 
 // ===== Admin — courses =====
@@ -228,6 +249,9 @@ exports.publicGetBySlug = async (req, res) => {
     if (userId) {
         const enrollment = await CourseEnrollment.findOne({ where: { courseId: c.id, userId } });
         out.enrollment = enrollment ? enrollment.toJSON() : null;
+        out.progress = await enrollmentProgress(enrollment, c);
+    } else {
+        out.progress = { completedDayIds: [], completedDayNumbers: [], percent: 0 };
     }
     res.json(out);
 };
@@ -286,7 +310,12 @@ exports.publicDaysList = async (req, res) => {
             }
             return { ...(await hydrateDay(d)), locked: false };
         }));
-        res.json({ course: await hydrateCourse(c), unlockedUpTo, days: out });
+        const progress = await enrollmentProgress(enrollment, c);
+        const completedSet = new Set(progress.completedDayIds);
+        for (const item of out) {
+            if (item && !item.locked) item.completed = completedSet.has(item.id);
+        }
+        res.json({ course: await hydrateCourse(c), unlockedUpTo, days: out, progress });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -307,7 +336,18 @@ exports.publicDayGet = async (req, res) => {
         if (!isDayUnlocked(enrollment, c, dayNumber)) return res.status(403).json({ message: 'День ещё не открыт' });
         const day = await CourseDay.findOne({ where: { courseId: c.id, dayNumber } });
         if (!day || day.isDraft || !day.publishedAt) return res.status(404).json({ message: 'День не опубликован' });
-        res.json({ course: await hydrateCourse(c), enrollment, day: await hydrateDay(day) });
+        const dayObj = await hydrateDay(day);
+        const completed = !!(await CourseDayProgress.findOne({
+            where: { enrollmentId: enrollment.id, courseDayId: day.id }
+        }));
+        dayObj.completed = completed;
+        const reports = await CourseDayReport.findAll({
+            where: { enrollmentId: enrollment.id, courseDayId: day.id },
+            order: [['id', 'DESC']]
+        });
+        dayObj.reports = reports.map((r) => r.toJSON());
+        const progress = await enrollmentProgress(enrollment, c);
+        res.json({ course: await hydrateCourse(c), enrollment, day: dayObj, progress });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -373,10 +413,46 @@ exports.myEnrollments = async (req, res) => {
     const items = await CourseEnrollment.findAll({ where: { userId }, order: [['id', 'DESC']] });
     const courses = await Course.findAll({ where: { id: items.map((e) => e.courseId) } });
     const byId = new Map(courses.map((c) => [c.id, c]));
-    const out = await Promise.all(items.map(async (e) => ({
-        ...e.toJSON(),
-        course: byId.get(e.courseId) ? await hydrateCourse(byId.get(e.courseId)) : null,
-        unlockedUpTo: byId.get(e.courseId) ? currentUnlockedDay(e, byId.get(e.courseId)) : 0
-    })));
+    const out = await Promise.all(items.map(async (e) => {
+        const course = byId.get(e.courseId) || null;
+        return {
+            ...e.toJSON(),
+            course: course ? await hydrateCourse(course) : null,
+            unlockedUpTo: course ? currentUnlockedDay(e, course) : 0,
+            progress: await enrollmentProgress(e, course)
+        };
+    }));
     res.json(out);
+};
+
+exports.completeDay = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) return res.status(401).json({ message: 'Нужна авторизация' });
+        const c = await Course.findOne({
+            where: { slug: req.params.slug, isDraft: false, publishedAt: { [Op.not]: null } }
+        });
+        if (!c) return res.status(404).json({ message: 'Курс не найден' });
+        const enrollment = await CourseEnrollment.findOne({ where: { courseId: c.id, userId } });
+        if (!enrollment || !enrollment.startedAt) {
+            return res.status(403).json({ message: 'Нужна регистрация на курс' });
+        }
+        const dayNumber = Number(req.params.dayNumber);
+        if (!isDayUnlocked(enrollment, c, dayNumber)) return res.status(403).json({ message: 'День ещё не открыт' });
+        const day = await CourseDay.findOne({ where: { courseId: c.id, dayNumber } });
+        if (!day) return res.status(404).json({ message: 'День не найден' });
+        const [, created] = await CourseDayProgress.findOrCreate({
+            where: { enrollmentId: enrollment.id, courseDayId: day.id },
+            defaults: { enrollmentId: enrollment.id, courseDayId: day.id, completedAt: new Date() }
+        });
+        const progress = await enrollmentProgress(enrollment, c);
+        if (progress.completedDayNumbers.length >= (Number(c.durationDays) || 0) && !enrollment.completedAt) {
+            enrollment.completedAt = new Date();
+            enrollment.status = 'completed';
+            await enrollment.save();
+        }
+        res.json({ ok: true, created, progress });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 };

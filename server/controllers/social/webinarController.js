@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Webinar, Media, Poll, PollOption, PollVote } = require('../../models/social');
 const { setAttachments, attachMap } = require('../../services/social/attachments');
 const { uniqueSlug } = require('../../services/social/slugs');
+const { attachEngagement } = require('../../services/social/engagement');
 
 const ATTACH_TYPE = 'webinar';
 const POLLABLE_TYPE = 'webinar';
@@ -105,5 +106,7 @@ exports.publicList = async (_req, res) => {
 exports.publicGetBySlug = async (req, res) => {
     const w = await Webinar.findOne({ where: { slug: req.params.slug, isDraft: false, publishedAt: { [Op.not]: null } } });
     if (!w) return res.status(404).json({ message: 'Вебинар не найден' });
-    res.json(await hydrate(w));
+    const obj = await hydrate(w);
+    await attachEngagement(obj, 'webinar', req.user?.userId || null);
+    res.json(obj);
 };
