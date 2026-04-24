@@ -78,7 +78,7 @@ export function Header({
   };
 
   const iconTint = dark ? '#fff' : colors.ink;
-  const backBg = dark ? 'bg-white/15' : 'bg-greenman-0';
+  const backBg = dark ? 'bg-white/15' : 'bg-sand-1';
 
   return (
     <View

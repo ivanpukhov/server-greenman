@@ -25,15 +25,21 @@ export default function AdminStoryEdit() {
 
   const [media, setMedia] = useState<Media[]>([]);
   const [caption, setCaption] = useState('');
+  const [categoryTitle, setCategoryTitle] = useState('Отзывы');
+  const [categoryOrder, setCategoryOrder] = useState('0');
+  const [storyOrder, setStoryOrder] = useState('0');
   const [durationSec, setDurationSec] = useState('7');
   const [ttlHours, setTtlHours] = useState('24');
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {
     if (!isNew && existing && !loaded) {
       setMedia(existing.media ? [existing.media] : []);
       setCaption(existing.caption ?? '');
+      setCategoryTitle(existing.categoryTitle ?? 'Greenman');
+      setCategoryOrder(String(existing.categoryOrder ?? 0));
+      setStoryOrder(String(existing.storyOrder ?? 0));
       setDurationSec(String(existing.durationSec ?? 7));
       setIsDraft(existing.isDraft);
       setLoaded(true);
@@ -47,6 +53,9 @@ export default function AdminStoryEdit() {
     }
     const base = {
       caption: caption.trim() || null,
+      categoryTitle: categoryTitle.trim() || 'Greenman',
+      categoryOrder: Number(categoryOrder) || 0,
+      storyOrder: Number(storyOrder) || 0,
       durationSec: Number(durationSec) || 7,
       isDraft,
     };
@@ -96,6 +105,42 @@ export default function AdminStoryEdit() {
         value={media}
         onChange={setMedia}
       />
+
+      <View>
+        <Text className="mb-1.5 text-xs font-semibold text-ink-dim">Категория</Text>
+        <TextInput
+          value={categoryTitle}
+          onChangeText={setCategoryTitle}
+          placeholder="Отзывы, О нас, До / после"
+          placeholderTextColor="#9ca3af"
+          className="h-12 rounded-xl border border-border bg-white px-3 text-base text-ink"
+        />
+      </View>
+
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          <Text className="mb-1.5 text-xs font-semibold text-ink-dim">
+            Порядок категории
+          </Text>
+          <TextInput
+            value={categoryOrder}
+            onChangeText={(v) => setCategoryOrder(v.replace(/[^\d-]/g, ''))}
+            keyboardType="number-pad"
+            className="h-12 rounded-xl border border-border bg-white px-3 text-base text-ink"
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1.5 text-xs font-semibold text-ink-dim">
+            Порядок сториз
+          </Text>
+          <TextInput
+            value={storyOrder}
+            onChangeText={(v) => setStoryOrder(v.replace(/[^\d-]/g, ''))}
+            keyboardType="number-pad"
+            className="h-12 rounded-xl border border-border bg-white px-3 text-base text-ink"
+          />
+        </View>
+      </View>
 
       <View>
         <Text className="mb-1.5 text-xs font-semibold text-ink-dim">Подпись</Text>

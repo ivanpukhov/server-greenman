@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Media } = require('../../models/social');
 const mediaStorage = require('../../utilities/mediaStorage');
 const { mediaTypeOf } = require('../../middleware/mediaUpload');
@@ -34,10 +35,12 @@ exports.upload = async (req, res) => {
 
 exports.list = async (req, res) => {
     try {
-        const limit = Math.min(100, Number(req.query.limit) || 50);
+        const limit = Math.min(200, Number(req.query.limit) || 50);
         const type = req.query.type;
+        const q = (req.query.q || '').toString().trim();
         const where = {};
         if (type) where.type = type;
+        if (q) where.originalName = { [Op.like]: `%${q}%` };
         const items = await Media.findAll({ where, order: [['id', 'DESC']], limit });
         res.json(items);
     } catch (err) {
@@ -52,6 +55,25 @@ exports.remove = async (req, res) => {
         await mediaStorage.delete(media.storageKey);
         await media.destroy();
         res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.bulkRemove = async (req, res) => {
+    try {
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+        if (!ids.length) return res.status(400).json({ message: 'Не переданы ID' });
+        const items = await Media.findAll({ where: { id: ids } });
+        for (const m of items) {
+            try {
+                await mediaStorage.delete(m.storageKey);
+            } catch (e) {
+                console.error('bulkRemove storage:', e?.message);
+            }
+            await m.destroy();
+        }
+        res.json({ ok: true, deleted: items.length });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -1,4 +1,5 @@
 import { View, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -30,22 +31,45 @@ export default function CountryModal() {
         </Text>
 
         <View className="mt-8 gap-3">
-          <CountryCard label="Казахстан" sub="KZT · Kaspi · Казпочта · inDrive" onPress={() => choose('KZ')} />
-          <CountryCard label="Россия" sub="RUB · СДЭК · Наложенный платёж" onPress={() => choose('RF')} />
+          <CountryCard flag="🇰🇿" label="Казахстан" currency="KZT" sub="Kaspi · Казпочта · inDrive" onPress={() => choose('KZ')} />
+          <CountryCard flag="🇷🇺" label="Россия" currency="RUB" sub="СДЭК · Наложенный платёж" onPress={() => choose('RF')} />
         </View>
       </View>
     </Screen>
   );
 }
 
-function CountryCard({ label, sub, onPress }: { label: string; sub: string; onPress: () => void }) {
+function CountryCard({
+  flag,
+  label,
+  currency,
+  sub,
+  onPress,
+}: {
+  flag: string;
+  label: string;
+  currency: string;
+  sub: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-xl border border-border bg-white p-5 active:bg-greenman-0"
+      className="flex-row items-center gap-4 rounded-xl border border-border bg-white p-5 active:bg-greenman-0"
     >
-      <Text className="text-lg font-bold text-ink">{label}</Text>
-      <Text className="mt-1 text-sm text-ink-dim">{sub}</Text>
+      <View className="h-12 w-12 items-center justify-center rounded-lg bg-sand-1">
+        <Text className="text-[24px]">{flag}</Text>
+      </View>
+      <View className="min-w-0 flex-1">
+        <View className="flex-row items-center gap-2">
+          <Text className="text-lg font-bold text-ink">{label}</Text>
+          <Text className="rounded-md bg-greenman-0 px-2 py-0.5 text-[11px] font-bold text-greenman-8">
+            {currency}
+          </Text>
+        </View>
+        <Text className="mt-1 text-sm text-ink-dim" numberOfLines={1}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#5b6360" />
     </Pressable>
   );
 }

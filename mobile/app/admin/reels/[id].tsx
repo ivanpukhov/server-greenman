@@ -26,7 +26,7 @@ export default function AdminReelEdit() {
   const [video, setVideo] = useState<Media[]>([]);
   const [thumb, setThumb] = useState<Media[]>([]);
   const [description, setDescription] = useState('');
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {

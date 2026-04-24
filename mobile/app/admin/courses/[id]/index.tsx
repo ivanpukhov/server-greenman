@@ -7,7 +7,7 @@ import { AdminFormScreen } from '@/components/admin/FormScreen';
 import { AdminListItem } from '@/components/admin/AdminListItem';
 import { DraftToggle } from '@/components/admin/DraftToggle';
 import { MediaPicker } from '@/components/admin/MediaPicker';
-import { BlockEditor } from '@/components/admin/BlockEditor';
+import { BlockEditorWebView } from '@/components/admin/BlockEditorWebView';
 import { SlugInput, slugify } from '@/components/admin/SlugInput';
 import { Text } from '@/components/ui/Text';
 import { courses, useAdminCourseDays } from '@/hooks/admin/useAdminSocial';
@@ -35,7 +35,7 @@ export default function AdminCourseEdit() {
   const [cover, setCover] = useState<Media[]>([]);
   const [priceCents, setPriceCents] = useState('0');
   const [durationDays, setDurationDays] = useState('7');
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {
@@ -156,7 +156,7 @@ export default function AdminCourseEdit() {
       <MediaPicker label="Обложка" accept="image" value={cover} onChange={setCover} />
       <MediaPicker label="Трейлер" accept="video" value={trailer} onChange={setTrailer} />
 
-      <BlockEditor label="Описание" value={blocks} onChange={setBlocks} />
+      <BlockEditorWebView label="Описание" value={blocks} onChange={setBlocks} />
 
       <View className="flex-row gap-3">
         <View className="flex-1">

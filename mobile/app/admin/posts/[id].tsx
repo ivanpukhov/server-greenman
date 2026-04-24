@@ -25,7 +25,7 @@ export default function AdminPostEdit() {
 
   const [text, setText] = useState('');
   const [media, setMedia] = useState<Media[]>([]);
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {

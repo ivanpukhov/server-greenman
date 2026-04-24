@@ -5,7 +5,7 @@ import Toast from 'react-native-toast-message';
 import { AdminFormScreen } from '@/components/admin/FormScreen';
 import { DraftToggle } from '@/components/admin/DraftToggle';
 import { MediaPicker } from '@/components/admin/MediaPicker';
-import { BlockEditor } from '@/components/admin/BlockEditor';
+import { BlockEditorWebView } from '@/components/admin/BlockEditorWebView';
 import { SlugInput, slugify } from '@/components/admin/SlugInput';
 import { Text } from '@/components/ui/Text';
 import { articles } from '@/hooks/admin/useAdminSocial';
@@ -28,7 +28,7 @@ export default function AdminArticleEdit() {
   const [excerpt, setExcerpt] = useState('');
   const [cover, setCover] = useState<Media[]>([]);
   const [blocks, setBlocks] = useState<EditorDoc | null>({ blocks: [] });
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function AdminArticleEdit() {
         onChange={setCover}
       />
 
-      <BlockEditor label="Содержание" value={blocks} onChange={setBlocks} />
+      <BlockEditorWebView label="Содержание" value={blocks} onChange={setBlocks} />
 
       <DraftToggle
         isDraft={isDraft}

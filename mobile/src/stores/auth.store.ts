@@ -19,6 +19,10 @@ type AuthState = {
   isReady: boolean;
   token: string | null;
   userId: number | null;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  requiresProfile: boolean;
   isAuthenticated: boolean;
 
   adminToken: string | null;
@@ -27,7 +31,8 @@ type AuthState = {
   isAdmin: boolean;
 
   bootstrap: () => Promise<void>;
-  login: (session: { token: string; userId: number }) => Promise<void>;
+  login: (session: { token: string; userId: number; firstName?: string | null; lastName?: string | null }) => Promise<void>;
+  updateUserProfile: (profile: { firstName: string; lastName: string }) => Promise<void>;
   logout: () => Promise<void>;
 
   adminLogin: (payload: { token: string; userId: number; profile: AdminProfile }) => Promise<void>;
@@ -38,6 +43,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isReady: false,
   token: null,
   userId: null,
+  firstName: null,
+  lastName: null,
+  displayName: null,
+  requiresProfile: false,
   isAuthenticated: false,
 
   adminToken: null,
@@ -58,6 +67,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       isReady: true,
       token: userValid ? userSession!.token : null,
       userId: userValid ? userSession!.userId : null,
+      firstName: userValid ? userSession!.firstName ?? null : null,
+      lastName: userValid ? userSession!.lastName ?? null : null,
+      displayName: userValid
+        ? [userSession!.firstName, userSession!.lastName].filter(Boolean).join(' ') || null
+        : null,
+      requiresProfile: userValid ? !userSession!.firstName || !userSession!.lastName : false,
       isAuthenticated: userValid,
       adminToken: adminValid ? adminSession!.token : null,
       adminUserId: adminValid ? adminSession!.userId : null,
@@ -66,15 +81,44 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  login: async ({ token, userId }) => {
-    const record: SecureSession = { token, userId, authAt: Date.now() };
+  login: async ({ token, userId, firstName = null, lastName = null }) => {
+    const record: SecureSession = { token, userId, firstName, lastName, authAt: Date.now() };
     await writeSession(record);
-    set({ token, userId, isAuthenticated: true });
+    set({
+      token,
+      userId,
+      firstName,
+      lastName,
+      displayName: [firstName, lastName].filter(Boolean).join(' ') || null,
+      requiresProfile: !firstName || !lastName,
+      isAuthenticated: true,
+    });
+  },
+
+  updateUserProfile: async ({ firstName, lastName }) => {
+    const current = await readSession();
+    if (current) {
+      await writeSession({ ...current, firstName, lastName });
+    }
+    set({
+      firstName,
+      lastName,
+      displayName: [firstName, lastName].filter(Boolean).join(' '),
+      requiresProfile: false,
+    });
   },
 
   logout: async () => {
     await clearSession();
-    set({ token: null, userId: null, isAuthenticated: false });
+    set({
+      token: null,
+      userId: null,
+      firstName: null,
+      lastName: null,
+      displayName: null,
+      requiresProfile: false,
+      isAuthenticated: false,
+    });
   },
 
   adminLogin: async ({ token, userId, profile }) => {

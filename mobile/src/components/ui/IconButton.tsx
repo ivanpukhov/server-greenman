@@ -1,20 +1,31 @@
-import { Pressable, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { View } from 'react-native';
 import { ReactNode } from 'react';
+import { AnimatedPressable } from './AnimatedPressable';
+import { shadows } from '@/theme/shadows';
 
-type Variant = 'ghost' | 'filled' | 'tonal' | 'outline';
+type Tone =
+  | 'ghost'
+  | 'filled'
+  | 'tonal'
+  | 'sand'
+  | 'outline'
+  | 'inverse'
+  | 'glass'
+  | 'ink';
 type Size = 'sm' | 'md' | 'lg';
 
 type Props = {
   icon: ReactNode;
   onPress?: () => void;
-  variant?: Variant;
+  tone?: Tone;
+  /** @deprecated use `tone` */
+  variant?: Tone;
   size?: Size;
   haptic?: boolean;
   disabled?: boolean;
   className?: string;
   accessibilityLabel?: string;
+  elevated?: boolean;
 };
 
 const sizes: Record<Size, string> = {
@@ -23,46 +34,43 @@ const sizes: Record<Size, string> = {
   lg: 'h-14 w-14',
 };
 
-const variants: Record<Variant, string> = {
+const tones: Record<Tone, string> = {
   ghost: 'bg-transparent',
-  filled: 'bg-greenman-7',
+  filled: 'bg-greenman-8',
   tonal: 'bg-greenman-0',
-  outline: 'bg-white border border-border',
+  sand: 'bg-sand-1',
+  outline: 'bg-transparent border border-sand-3',
+  inverse: 'bg-white',
+  glass: 'bg-white/15 border border-white/20',
+  ink: 'bg-ink',
 };
 
 export function IconButton({
   icon,
   onPress,
-  variant = 'ghost',
+  tone,
+  variant,
   size = 'md',
   haptic = true,
   disabled,
   className,
   accessibilityLabel,
+  elevated,
 }: Props) {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
+  const t = tone ?? variant ?? 'sand';
   return (
-    <Animated.View style={animatedStyle}>
-      <Pressable
-        accessibilityLabel={accessibilityLabel}
-        accessibilityRole="button"
-        disabled={disabled}
-        onPressIn={() => {
-          scale.value = withSpring(0.92, { damping: 16, stiffness: 320 });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, { damping: 16, stiffness: 320 });
-        }}
-        onPress={() => {
-          if (haptic) Haptics.selectionAsync().catch(() => {});
-          onPress?.();
-        }}
-        className={`items-center justify-center rounded-full ${sizes[size]} ${variants[variant]} ${disabled ? 'opacity-40' : ''} ${className ?? ''}`}
-      >
-        <View pointerEvents="none">{icon}</View>
-      </Pressable>
-    </Animated.View>
+    <AnimatedPressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      disabled={disabled}
+      haptic={haptic ? 'selection' : 'none'}
+      scale={0.9}
+      onPress={onPress}
+      wrapperStyle={elevated ? shadows.float : undefined}
+      wrapperClassName={className}
+      className={`items-center justify-center rounded-pill ${sizes[size]} ${tones[t]} ${disabled ? 'opacity-40' : ''}`}
+    >
+      <View pointerEvents="none">{icon}</View>
+    </AnimatedPressable>
   );
 }

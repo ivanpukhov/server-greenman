@@ -11,13 +11,19 @@ const webinarController = require('../../controllers/social/webinarController');
 const pollController = require('../../controllers/social/pollController');
 const courseController = require('../../controllers/social/courseController');
 const commentController = require('../../controllers/social/commentController');
+const dashboardController = require('../../controllers/social/dashboardController');
 
 const router = express.Router();
 router.use(adminAuthMiddleware);
 
+// Dashboard
+router.get('/stats', dashboardController.stats);
+router.get('/drafts', dashboardController.drafts);
+
 // Media
 router.post('/media', single('file'), mediaController.upload);
 router.get('/media', mediaController.list);
+router.post('/media/bulk-remove', mediaController.bulkRemove);
 router.delete('/media/:id', mediaController.remove);
 
 // Posts

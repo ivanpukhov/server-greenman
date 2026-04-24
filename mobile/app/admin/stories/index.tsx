@@ -37,8 +37,8 @@ export default function AdminStoriesIndex() {
               title={item.caption || '(без подписи)'}
               subtitle={
                 item.expiresAt
-                  ? `До ${new Date(item.expiresAt).toLocaleString('ru-RU')}`
-                  : `${item.durationSec}с`
+                  ? `${item.categoryTitle ?? 'Greenman'} · до ${new Date(item.expiresAt).toLocaleString('ru-RU')}`
+                  : `${item.categoryTitle ?? 'Greenman'} · ${item.durationSec}с`
               }
               isDraft={item.isDraft}
               leading={

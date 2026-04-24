@@ -27,7 +27,12 @@ export function useConfirmCode() {
       return data;
     },
     onSuccess: async (data) => {
-      await login({ token: data.token, userId: data.userId });
+      await login({
+        token: data.token,
+        userId: data.userId,
+        firstName: data.user?.firstName ?? null,
+        lastName: data.user?.lastName ?? null,
+      });
     },
   });
 }

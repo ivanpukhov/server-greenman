@@ -1,6 +1,7 @@
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
@@ -11,6 +12,29 @@ import { greenman } from '@/theme/colors';
 export default function AdminPostsIndex() {
   const router = useRouter();
   const { data, isLoading, refetch, isRefetching } = posts.useList();
+  const remove = posts.useRemove();
+
+  const confirmDelete = (id: number, label: string) => {
+    Alert.alert('Удалить пост?', label, [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await remove.mutateAsync(id);
+            Toast.show({ type: 'success', text1: 'Удалено' });
+          } catch (e: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Ошибка удаления',
+              text2: e?.response?.data?.message ?? e?.message,
+            });
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <Screen>
@@ -41,6 +65,9 @@ export default function AdminPostsIndex() {
               }
               isDraft={item.isDraft}
               onPress={() => router.push(`/admin/posts/${item.id}`)}
+              onLongPress={() =>
+                confirmDelete(item.id, item.text?.slice(0, 60) ?? 'Пост без текста')
+              }
             />
           )}
         />

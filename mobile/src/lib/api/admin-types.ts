@@ -28,8 +28,18 @@ export type BlockImage = {
   type: 'image';
   data: { mediaId: number; url: string; caption?: string };
 };
+export type BlockQuote = { type: 'quote'; data: { text: string; caption?: string } };
+export type BlockCode = { type: 'code'; data: { code: string } };
+export type BlockDelimiter = { type: 'delimiter'; data: Record<string, never> };
 
-export type EditorBlock = BlockParagraph | BlockHeader | BlockList | BlockImage;
+export type EditorBlock =
+  | BlockParagraph
+  | BlockHeader
+  | BlockList
+  | BlockImage
+  | BlockQuote
+  | BlockCode
+  | BlockDelimiter;
 
 export type EditorDoc = { blocks: EditorBlock[] };
 
@@ -48,6 +58,10 @@ export type Story = {
   id: number;
   adminUserId: number;
   mediaId: number;
+  categoryTitle: string;
+  categorySlug: string;
+  categoryOrder: number;
+  storyOrder: number;
   caption: string | null;
   durationSec: number;
   publishedAt: string | null;

@@ -6,6 +6,8 @@ export const endpoints = {
   },
   profile: {
     me: '/profile',
+    update: '/profile',
+    remove: '/profile',
   },
   orderProfiles: {
     create: '/order-profiles',
@@ -23,6 +25,7 @@ export const endpoints = {
   products: {
     list: '/products',
     byId: (id: number) => `/products/${id}`,
+    reviews: (id: number) => `/products/${id}/reviews`,
     search: (name: string) => `/products/search/${encodeURIComponent(name)}`,
     byIdsAndTypes: '/products/getProductsByIdsAndTypes',
   },
@@ -36,8 +39,11 @@ export const endpoints = {
     confirmCode: '/admin/auth/confirm-code',
   },
   adminSocial: {
+    stats: '/admin/social/stats',
+    drafts: '/admin/social/drafts',
     media: '/admin/social/media',
     mediaById: (id: number) => `/admin/social/media/${id}`,
+    mediaBulkRemove: '/admin/social/media/bulk-remove',
     posts: '/admin/social/posts',
     postById: (id: number) => `/admin/social/posts/${id}`,
     reels: '/admin/social/reels',

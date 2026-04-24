@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { AdminFormScreen } from '@/components/admin/FormScreen';
 import { DraftToggle } from '@/components/admin/DraftToggle';
-import { BlockEditor } from '@/components/admin/BlockEditor';
+import { BlockEditorWebView } from '@/components/admin/BlockEditorWebView';
 import { Text } from '@/components/ui/Text';
 import {
   useAdminCourseDays,
@@ -37,7 +37,7 @@ export default function AdminCourseDayEdit() {
   const [dayNumber, setDayNumber] = useState(String(nextDayNumber));
   const [title, setTitle] = useState('');
   const [blocks, setBlocks] = useState<EditorDoc | null>({ blocks: [] });
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function AdminCourseDayEdit() {
         </View>
       </View>
 
-      <BlockEditor label="Содержание" value={blocks} onChange={setBlocks} />
+      <BlockEditorWebView label="Содержание" value={blocks} onChange={setBlocks} />
 
       <DraftToggle isDraft={isDraft} onChange={setIsDraft} />
     </AdminFormScreen>

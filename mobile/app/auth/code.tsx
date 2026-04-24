@@ -60,8 +60,12 @@ export default function CodeAuthScreen() {
     }
     if (!phone) return;
     try {
-      await confirm.mutateAsync({ phoneNumber: phone, code });
+      const data = await confirm.mutateAsync({ phoneNumber: phone, code });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (data.requiresProfile || !data.user?.firstName || !data.user?.lastName) {
+        router.replace('/auth/profile');
+        return;
+      }
       if (router.canGoBack()) {
         router.back();
       } else {
