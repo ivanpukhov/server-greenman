@@ -327,14 +327,23 @@ res.status(err.statusCode || 500).json({error: err.message});
             const productsInfo = await Promise.all(order.products.map(async product => {
                 const productResponse = await productController.getProductByIdServer(product.productId);
                 if (!productResponse) {
-                    return { error: "Продукт не найден" };
+                    return {
+                        productId: product.productId,
+                        productName: 'Продукт не найден',
+                        typeId: product.typeId,
+                        type: 'Тип не найден',
+                        price: product.price || 0,
+                        quantity: product.quantity || 1
+                    };
                 }
 
                 const productType = productResponse.types.find(type => type.id === product.typeId);
                 return {
                     productId: product.productId,
-                    name: productResponse.name,
+                    productName: productResponse.name,
+                    typeId: product.typeId,
                     type: productType ? productType.type : 'Тип не найден',
+                    price: productType ? productType.price : (product.price || 0),
                     quantity: product.quantity
                 };
             }));
@@ -469,7 +478,8 @@ res.status(err.statusCode || 500).json({error: err.message});
 
     getUserOrders: async (req, res) => {
         try {
-            const userId = req.user.id;
+            const userId = req.user?.id || req.user?.userId;
+            if (!userId) return res.status(401).json({error: 'Нужна авторизация'});
             const profiles = await OrderProfile.findAll({where: {userId}});
             const phoneNumbers = profiles.map(profile => profile.phoneNumber);
 

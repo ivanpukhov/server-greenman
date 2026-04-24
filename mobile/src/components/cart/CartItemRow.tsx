@@ -23,60 +23,60 @@ export function CartItemRow({ item }: Props) {
   };
 
   return (
-      <View className="flex-row gap-3 rounded-lg border border-border bg-white p-3">
-        <ProductPlaceholder
-          name={item.productName}
-          size="thumb"
-          className="h-16 w-16 rounded-md"
-        />
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
-            {item.productName}
+    <View className="flex-row gap-3 rounded-xl border border-border bg-white p-3">
+      <ProductPlaceholder
+        name={item.productName}
+        size="thumb"
+        className="h-16 w-16 rounded-md"
+      />
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
+          {item.productName}
+        </Text>
+        <Text className="mt-1 text-xs text-ink-dim" numberOfLines={1}>
+          {item.type.type}
+        </Text>
+        <View className="mt-3 flex-row items-center justify-between gap-3">
+          <Text
+            className="flex-1 text-[15px] font-bold text-greenman-8"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {formatPrice(item.type.price * item.quantity, currency)}
           </Text>
-          <Text className="mt-1 text-xs text-ink-dim" numberOfLines={1}>
-            {item.type.type}
-          </Text>
-          <View className="mt-3 flex-row items-center justify-between gap-2">
-            <Text
-              className="flex-1 text-[15px] font-bold text-greenman-8"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {formatPrice(item.type.price * item.quantity, currency)}
+          <View className="flex-row items-center gap-1 rounded-lg bg-greenman-0 px-1">
+            <StepBtn
+              icon="remove"
+              accessibilityLabel="Уменьшить количество"
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                if (item.quantity > 1) updateQty(item.productId, item.type.id, item.quantity - 1);
+              }}
+              disabled={item.quantity <= 1}
+            />
+            <Text className="w-6 text-center text-sm font-semibold text-ink">
+              {item.quantity}
             </Text>
-            <View className="flex-row items-center gap-1 rounded-lg bg-greenman-0 px-1">
-              <StepBtn
-                icon="remove"
-                accessibilityLabel="Уменьшить количество"
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  if (item.quantity > 1) updateQty(item.productId, item.type.id, item.quantity - 1);
-                }}
-                disabled={item.quantity <= 1}
-              />
-              <Text className="w-6 text-center text-sm font-semibold text-ink">
-                {item.quantity}
-              </Text>
-              <StepBtn
-                icon="add"
-                accessibilityLabel="Увеличить количество"
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  updateQty(item.productId, item.type.id, item.quantity + 1);
-                }}
-              />
-            </View>
+            <StepBtn
+              icon="add"
+              accessibilityLabel="Увеличить количество"
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                updateQty(item.productId, item.type.id, item.quantity + 1);
+              }}
+            />
           </View>
         </View>
-        <Pressable
-          onPress={confirmRemove}
-          accessibilityRole="button"
-          accessibilityLabel="Удалить товар"
-          className="h-9 w-9 items-center justify-center rounded-lg bg-sand-1 active:bg-red-50"
-        >
-          <Ionicons name="trash-outline" size={17} color="#8f2f2f" />
-        </Pressable>
       </View>
+      <Pressable
+        onPress={confirmRemove}
+        accessibilityRole="button"
+        accessibilityLabel="Удалить товар"
+        className="h-9 w-9 items-center justify-center rounded-lg bg-sand-1 active:bg-red-50"
+      >
+        <Ionicons name="trash-outline" size={17} color="#8f2f2f" />
+      </Pressable>
+    </View>
   );
 }
 
