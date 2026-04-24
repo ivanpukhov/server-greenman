@@ -46,30 +46,6 @@ export type ProductReviewsResponse = {
   reviews: ProductReview[];
 };
 
-export type HomeBannerType = 'text' | 'image' | 'image_link';
-
-export type HomeBanner = {
-  id: number;
-  type: HomeBannerType;
-  title: string | null;
-  text: string | null;
-  buttonText: string | null;
-  buttonUrl: string | null;
-  linkUrl: string | null;
-  backgroundColor: string;
-  textColor: string;
-  mediaId: number | null;
-  order: number;
-  publishedAt: string | null;
-  isDraft: boolean;
-  media?: {
-    id: number;
-    type: 'image' | 'video' | 'audio' | 'file';
-    url: string;
-    thumbnailUrl?: string | null;
-  } | null;
-};
-
 export type User = {
   id: number;
   phoneNumber: string;

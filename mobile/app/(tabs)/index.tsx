@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -19,7 +18,6 @@ import { Section } from '@/components/ui/Section';
 import { Chip } from '@/components/ui/Chip';
 import { ProductRail } from '@/components/product/ProductRail';
 import { useProducts } from '@/hooks/useProducts';
-import { useHomeBanners } from '@/hooks/useBanners';
 import { useCountryStore } from '@/stores/country.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMyOrders } from '@/hooks/useOrders';
@@ -27,40 +25,33 @@ import { greenman, clay, sand, sun } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { formatPrice } from '@/lib/format/price';
 import { CountryMark } from '@/components/ui/CountryMark';
-import type { HomeBanner } from '@/lib/api/types';
 import { FeedStoriesRow, type StoryGroupItem } from '@/components/social/FeedStoriesRow';
 import { socialApi } from '@/features/social/api';
 
 const WHATSAPP_URL = 'https://wa.me/77001234567';
 const QUICK_GAP = 12;
 const QUICK_TILE_W = 156;
-const BANNER_W = 318;
 
-const DEFAULT_BANNERS: HomeBanner[] = [
-  {
-    id: -1,
-    type: 'text',
-    title: 'Забота о здоровье без суеты',
-    text: 'Подберите средства, курсы и консультацию Greenman под вашу задачу.',
-    buttonText: 'Открыть каталог',
-    buttonUrl: '/catalog',
-    linkUrl: null,
-    backgroundColor: '#05210f',
-    textColor: '#ffffff',
-    mediaId: null,
-    order: 0,
-    publishedAt: null,
-    isDraft: false,
-    media: null,
-  },
-];
+function greetingKey(): 'morning' | 'day' | 'evening' | 'night' {
+  const h = new Date().getHours();
+  if (h < 6) return 'night';
+  if (h < 12) return 'morning';
+  if (h < 18) return 'day';
+  return 'evening';
+}
+
+const GREETING_TEXT: Record<string, string> = {
+  morning: 'Доброе утро',
+  day: 'Добрый день',
+  evening: 'Добрый вечер',
+  night: 'Доброй ночи',
+};
 
 export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: products, isLoading, refetch, isRefetching } = useProducts();
-  const banners = useHomeBanners();
   const storiesQuery = useQuery({
     queryKey: ['social', 'stories', 'active'],
     queryFn: async () => {
@@ -83,7 +74,7 @@ export default function HomeScreen() {
 
   const searchPresets = (t('main.search_presets.items', { returnObjects: true }) as string[]) ?? [];
 
-  const homeBanners = banners.data?.length ? banners.data : DEFAULT_BANNERS;
+  const greetingText = GREETING_TEXT[greetingKey()];
   const stories = storiesQuery.data ?? [];
 
   const openWA = () => {
@@ -98,11 +89,10 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={
             <RefreshControl
-              refreshing={isRefetching || storiesQuery.isRefetching || banners.isRefetching}
+              refreshing={isRefetching || storiesQuery.isRefetching}
               onRefresh={() => {
                 refetch();
                 storiesQuery.refetch();
-                banners.refetch();
               }}
               tintColor={greenman[9]}
             />
@@ -157,7 +147,24 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <HomeBannerCarousel banners={homeBanners} router={router} />
+          <Animated.View entering={FadeInDown.delay(80).springify()} className="mt-7">
+            <Text
+              className="font-serif text-[14px] italic text-white/70"
+              tracking="wide"
+            >
+              {greetingText}
+            </Text>
+            <Text
+              className="mt-1 font-serif text-[38px] leading-[42px] text-white"
+              tracking="tight"
+            >
+              Забота о здоровье.{'\n'}
+              <Text className="font-serif-italic text-white/60">Сегодня.</Text>
+            </Text>
+            <Text className="mt-3 max-w-[285px] text-[13px] leading-[19px] text-white/62">
+              Натуральные средства, курсы и консультации Greenman в одном месте.
+            </Text>
+          </Animated.View>
 
           {/* search pill */}
           <AnimatedPressable
@@ -165,7 +172,7 @@ export default function HomeScreen() {
             haptic="selection"
             scale={0.98}
             wrapperStyle={shadows.float}
-            className="mt-5 flex-row items-center gap-3 rounded-pill bg-white px-5 py-4"
+            className="mt-8 flex-row items-center gap-3 rounded-pill bg-white px-5 py-4"
           >
             <Ionicons name="search" size={18} color={greenman[9]} />
             <Text className="flex-1 text-[14px] text-ink-dim">Ромашка, кашель, иммунитет…</Text>
@@ -546,97 +553,5 @@ function QuickActionsRail({
         accentBg="#ffe68a80"
       />
     </ScrollView>
-  );
-}
-
-function HomeBannerCarousel({
-  banners,
-  router,
-}: {
-  banners: HomeBanner[];
-  router: ReturnType<typeof useRouter>;
-}) {
-  const openLink = (url?: string | null) => {
-    if (!url) return;
-    Haptics.selectionAsync().catch(() => {});
-    if (/^https?:\/\//i.test(url)) {
-      Linking.openURL(url).catch(() => {});
-      return;
-    }
-    router.push(url as any);
-  };
-
-  return (
-    <Animated.View entering={FadeInDown.delay(80).springify()} className="mt-6">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={BANNER_W + 12}
-        decelerationRate="fast"
-        contentContainerStyle={{ gap: 12, paddingRight: 4 }}
-      >
-        {banners.map((banner) => {
-          const imageUrl = banner.media?.thumbnailUrl || banner.media?.url;
-          const isImage = banner.type === 'image' || banner.type === 'image_link';
-          const pressUrl = banner.type === 'image_link' ? banner.linkUrl : banner.buttonUrl;
-          return (
-            <AnimatedPressable
-              key={banner.id}
-              onPress={() => openLink(pressUrl)}
-              disabled={!pressUrl}
-              scale={pressUrl ? 0.98 : 1}
-              haptic="none"
-              wrapperStyle={{ width: BANNER_W }}
-              className="h-[176px] overflow-hidden rounded-xl"
-            >
-              <View className="flex-1" style={{ backgroundColor: banner.backgroundColor || '#05210f' }}>
-                {isImage && imageUrl ? (
-                  <Image source={{ uri: imageUrl }} style={{ flex: 1 }} contentFit="cover" />
-                ) : (
-                  <View className="flex-1 justify-between p-5">
-                    <View>
-                      <Text
-                        className="text-[10px] font-bold uppercase"
-                        tracking="widest"
-                        style={{ color: banner.textColor || '#fff', opacity: 0.65 }}
-                      >
-                        Greenman
-                      </Text>
-                      <Text
-                        className="mt-2 font-serif text-[27px] leading-[30px]"
-                        tracking="tight"
-                        numberOfLines={2}
-                        style={{ color: banner.textColor || '#fff' }}
-                      >
-                        {banner.title}
-                      </Text>
-                      {banner.text ? (
-                        <Text
-                          className="mt-2 text-[13px] leading-[18px]"
-                          numberOfLines={2}
-                          style={{ color: banner.textColor || '#fff', opacity: 0.78 }}
-                        >
-                          {banner.text}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {banner.buttonText ? (
-                      <View className="self-start rounded-pill bg-white px-4 py-2">
-                        <Text className="text-[12px] font-bold text-ink">{banner.buttonText}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                )}
-              </View>
-              {banner.type === 'image_link' ? (
-                <View className="absolute bottom-3 right-3 h-9 w-9 items-center justify-center rounded-pill bg-white">
-                  <Ionicons name="arrow-forward" size={16} color={greenman[9]} />
-                </View>
-              ) : null}
-            </AnimatedPressable>
-          );
-        })}
-      </ScrollView>
-    </Animated.View>
   );
 }

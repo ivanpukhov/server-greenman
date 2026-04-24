@@ -5,7 +5,6 @@ const Reel = require('./Reel');
 const ReelView = require('./ReelView');
 const Story = require('./Story');
 const StoryView = require('./StoryView');
-const Banner = require('./Banner');
 const Webinar = require('./Webinar');
 const Poll = require('./Poll');
 const PollOption = require('./PollOption');
@@ -56,7 +55,6 @@ module.exports = {
     ReelView,
     Story,
     StoryView,
-    Banner,
     Webinar,
     Poll,
     PollOption,

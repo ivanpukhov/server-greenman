@@ -70,26 +70,6 @@ export type Story = {
   media?: Media;
 };
 
-export type BannerType = 'text' | 'image' | 'image_link';
-
-export type Banner = {
-  id: number;
-  adminUserId: number;
-  type: BannerType;
-  title: string | null;
-  text: string | null;
-  buttonText: string | null;
-  buttonUrl: string | null;
-  linkUrl: string | null;
-  backgroundColor: string;
-  textColor: string;
-  mediaId: number | null;
-  order: number;
-  publishedAt: string | null;
-  isDraft: boolean;
-  media?: Media | null;
-};
-
 export type Reel = {
   id: number;
   adminUserId: number;

@@ -6,7 +6,6 @@ const mediaController = require('../../controllers/social/mediaController');
 const postController = require('../../controllers/social/postController');
 const reelController = require('../../controllers/social/reelController');
 const storyController = require('../../controllers/social/storyController');
-const bannerController = require('../../controllers/social/bannerController');
 const articleController = require('../../controllers/social/articleController');
 const webinarController = require('../../controllers/social/webinarController');
 const pollController = require('../../controllers/social/pollController');
@@ -47,13 +46,6 @@ router.post('/stories', storyController.adminCreate);
 router.patch('/stories/:id', storyController.adminUpdate);
 router.put('/stories/:id', storyController.adminUpdate);
 router.delete('/stories/:id', storyController.adminRemove);
-
-// Home banners
-router.get('/banners', bannerController.adminList);
-router.post('/banners', bannerController.adminCreate);
-router.patch('/banners/:id', bannerController.adminUpdate);
-router.put('/banners/:id', bannerController.adminUpdate);
-router.delete('/banners/:id', bannerController.adminRemove);
 
 // Articles
 router.get('/articles', articleController.adminList);

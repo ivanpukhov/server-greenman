@@ -50,8 +50,6 @@ export const endpoints = {
     reelById: (id: number) => `/admin/social/reels/${id}`,
     stories: '/admin/social/stories',
     storyById: (id: number) => `/admin/social/stories/${id}`,
-    banners: '/admin/social/banners',
-    bannerById: (id: number) => `/admin/social/banners/${id}`,
     articles: '/admin/social/articles',
     articleById: (id: number) => `/admin/social/articles/${id}`,
     webinars: '/admin/social/webinars',
@@ -63,9 +61,6 @@ export const endpoints = {
       `/admin/social/courses/${courseId}/days/${dayId}`,
     comments: '/admin/social/comments',
     commentById: (id: number) => `/admin/social/comments/${id}`,
-  },
-  social: {
-    banners: '/social/banners',
   },
   adminProducts: {
     list: '/admin/products',

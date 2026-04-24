@@ -27,9 +27,9 @@ type QuickAction = {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Новый пост', icon: 'add-circle-outline', href: '/admin/posts/new' },
-  { label: 'Новый баннер', icon: 'albums-outline', href: '/admin/banners/new' },
   { label: 'Новая статья', icon: 'create-outline', href: '/admin/articles/new' },
   { label: 'Новая сторис', icon: 'ellipse-outline', href: '/admin/stories/new' },
+  { label: 'Новый Reel', icon: 'videocam-outline', href: '/admin/reels/new' },
 ];
 
 type SectionTile = {
@@ -120,12 +120,6 @@ export default function AdminDashboard() {
       icon: 'ellipse-outline',
       href: '/admin/stories',
       count: s?.stories?.total,
-    },
-    {
-      label: 'Баннеры',
-      icon: 'albums-outline',
-      href: '/admin/banners',
-      count: s?.banners?.total,
     },
     {
       label: 'Вебинары',
