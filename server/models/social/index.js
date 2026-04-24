@@ -19,6 +19,7 @@ const Article = require('./Article');
 const Comment = require('./Comment');
 const Reaction = require('./Reaction');
 const Bookmark = require('./Bookmark');
+const Repost = require('./Repost');
 const SocialNotification = require('./SocialNotification');
 
 // Associations — стараемся держать плоско: полиморфные связи обрабатываются в контроллерах.
@@ -68,5 +69,6 @@ module.exports = {
     Comment,
     Reaction,
     Bookmark,
+    Repost,
     SocialNotification
 };

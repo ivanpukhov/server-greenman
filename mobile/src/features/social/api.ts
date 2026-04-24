@@ -72,4 +72,10 @@ export const socialApi = {
     toggle: (type: string, id: number) =>
       api.post('/social/bookmarks/toggle', { type, id }).then((r) => r.data),
   },
+  reposts: {
+    list: (params?: { kind?: string; limit?: number; before?: string }) =>
+      api.get('/social/reposts', { params }).then((r) => r.data),
+    toggle: (type: string, id: number) =>
+      api.post('/social/reposts/toggle', { type, id }).then((r) => r.data),
+  },
 };

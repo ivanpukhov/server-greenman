@@ -11,6 +11,7 @@ const courseController = require('../../controllers/social/courseController');
 const commentController = require('../../controllers/social/commentController');
 const reactionController = require('../../controllers/social/reactionController');
 const bookmarkController = require('../../controllers/social/bookmarkController');
+const repostController = require('../../controllers/social/repostController');
 const feedController = require('../../controllers/social/feedController');
 const searchController = require('../../controllers/social/searchController');
 const notificationController = require('../../controllers/social/notificationController');
@@ -88,6 +89,11 @@ router.post('/reactions/toggle', authMiddleware, reactionController.toggle);
 // Bookmarks
 router.get('/bookmarks', authMiddleware, bookmarkController.list);
 router.post('/bookmarks/toggle', authMiddleware, bookmarkController.toggle);
+
+// Reposts
+router.get('/reposts', authMiddleware, repostController.list);
+router.get('/reposts/counts', optionalAuth, repostController.counts);
+router.post('/reposts/toggle', authMiddleware, repostController.toggle);
 
 // Profile
 router.get('/profile/activity', authMiddleware, profileController.activity);

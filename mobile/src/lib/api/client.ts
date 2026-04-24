@@ -13,26 +13,34 @@ function mediaHost(): string {
   return resolveBaseUrl().replace(/\/api\/?$/, '').replace(/\/$/, '');
 }
 
-function rewriteRelativeMediaUrls(data: unknown, host: string): unknown {
-  if (data == null) return data;
+function rewriteRelativeMediaUrls(data: unknown, host: string, depth = 0): unknown {
+  if (data == null || depth > 10) return data;
   if (typeof data === 'string') {
     return data.startsWith('/uploads/') ? `${host}${data}` : data;
   }
   if (Array.isArray(data)) {
-    for (let i = 0; i < data.length; i += 1) data[i] = rewriteRelativeMediaUrls(data[i], host);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = rewriteRelativeMediaUrls(data[i], host, depth + 1);
+    }
     return data;
   }
-  if (typeof data === 'object') {
+  if (typeof data === 'object' && Object.getPrototypeOf(data) === Object.prototype) {
     const o = data as Record<string, unknown>;
-    for (const k of Object.keys(o)) o[k] = rewriteRelativeMediaUrls(o[k], host);
+    for (const k of Object.keys(o)) {
+      o[k] = rewriteRelativeMediaUrls(o[k], host, depth + 1);
+    }
     return o;
   }
   return data;
 }
 
 function absolutizeMedia(res: AxiosResponse): AxiosResponse {
-  const host = mediaHost();
-  if (host) rewriteRelativeMediaUrls(res.data, host);
+  try {
+    const host = mediaHost();
+    if (host) rewriteRelativeMediaUrls(res.data, host);
+  } catch (e) {
+    console.warn('absolutizeMedia failed:', (e as Error)?.message);
+  }
   return res;
 }
 

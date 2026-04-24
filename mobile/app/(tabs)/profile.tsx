@@ -83,6 +83,13 @@ export default function ProfileScreen() {
           />
           <Divider />
           <NavRow
+            icon="repeat-outline"
+            title="Мои репосты"
+            subtitle="То, чем вы поделились"
+            onPress={() => router.push('/profile/reposts')}
+          />
+          <Divider />
+          <NavRow
             icon="school-outline"
             title="Мои курсы"
             subtitle="Прогресс и следующий день"

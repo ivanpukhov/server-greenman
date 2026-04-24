@@ -1,17 +1,29 @@
-import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, View, RefreshControl, ActivityIndicator } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FlatList, Pressable, View, RefreshControl, ActivityIndicator, Share } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { socialApi } from '@/features/social/api';
-import type { FeedItem, FeedKind } from '@/features/social/types';
+import type { FeedItem, FeedKind, RepostableType } from '@/features/social/types';
 import { greenman, semantic } from '@/theme/colors';
 import { FeedCard } from '@/components/social/FeedCard';
 import { FeedStoriesRow, type StoryGroupItem } from '@/components/social/FeedStoriesRow';
 import { FeedSkeleton } from '@/components/social/FeedSkeleton';
-import { useInfiniteFeed, useToggleBookmark, useToggleReaction } from '@/hooks/useFeed';
+import {
+  useInfiniteFeed,
+  useToggleBookmark,
+  useToggleReaction,
+  useToggleRepost,
+  patchFeedItem,
+} from '@/hooks/useFeed';
+import {
+  CommentsSheet,
+  type CommentsSheetRef,
+  type CommentableType,
+} from '@/components/social/CommentsSheet';
+import { useAuthStore } from '@/stores/auth.store';
 
 type KindFilter = 'all' | FeedKind;
 
@@ -23,12 +35,44 @@ const FILTERS: { key: KindFilter; label: string }[] = [
   { key: 'webinar', label: 'Вебинары' },
 ];
 
+const WEB_BASE = 'https://greenman.kz';
+
+function shareLinkFor(it: FeedItem): string {
+  switch (it.kind) {
+    case 'article':
+      return it.slug ? `${WEB_BASE}/articles/${it.slug}` : `${WEB_BASE}/feed`;
+    case 'webinar':
+      return it.slug ? `${WEB_BASE}/webinars/${it.slug}` : `${WEB_BASE}/feed`;
+    case 'reel':
+      return `${WEB_BASE}/reels`;
+    case 'post':
+    default:
+      return `${WEB_BASE}/feed`;
+  }
+}
+
+function shareMessageFor(it: FeedItem): string {
+  if (it.title) return it.title;
+  if (it.text) return it.text.length > 160 ? `${it.text.slice(0, 157)}…` : it.text;
+  if (it.description) return it.description;
+  return 'Greenman';
+}
+
 export default function FeedScreen() {
   const [filter, setFilter] = useState<KindFilter>('all');
+  const isAuthed = useAuthStore((s) => s.isAuthenticated);
+  const qc = useQueryClient();
 
   const feedQuery = useInfiniteFeed('latest');
   const toggleLike = useToggleReaction();
   const toggleBookmark = useToggleBookmark();
+  const toggleRepost = useToggleRepost();
+
+  const sheetRef = useRef<CommentsSheetRef>(null);
+  const [activeTarget, setActiveTarget] = useState<{
+    type: CommentableType;
+    id: number;
+  } | null>(null);
 
   const storiesQuery = useQuery({
     queryKey: ['social', 'stories', 'active'],
@@ -72,23 +116,71 @@ export default function FeedScreen() {
     else if (it.kind === 'post') router.push(`/social/post/${it.entityId}`);
   }, []);
 
+  const requireAuth = useCallback((): boolean => {
+    if (!isAuthed) {
+      router.push('/auth/phone');
+      return false;
+    }
+    return true;
+  }, [isAuthed]);
+
   const onLike = useCallback(
     (it: FeedItem) => {
       if (it.kind === 'course' || it.kind === 'story') return;
+      if (!requireAuth()) return;
       toggleLike.mutate({ type: it.kind, id: it.entityId });
     },
-    [toggleLike]
+    [toggleLike, requireAuth]
   );
 
   const onBookmark = useCallback(
     (it: FeedItem) => {
       if (it.kind === 'story') return;
+      if (!requireAuth()) return;
       toggleBookmark.mutate({ type: it.kind, id: it.entityId });
     },
-    [toggleBookmark]
+    [toggleBookmark, requireAuth]
   );
 
-  const onComment = useCallback((it: FeedItem) => openItem(it), [openItem]);
+  const onRepost = useCallback(
+    (it: FeedItem) => {
+      if (it.kind === 'course' || it.kind === 'story') return;
+      if (!requireAuth()) return;
+      toggleRepost.mutate({ type: it.kind as RepostableType, id: it.entityId });
+    },
+    [toggleRepost, requireAuth]
+  );
+
+  const onShare = useCallback(async (it: FeedItem) => {
+    const url = shareLinkFor(it);
+    const message = shareMessageFor(it);
+    try {
+      await Share.share({ url, message: `${message}\n${url}` });
+    } catch {
+      // игнорируем отмену/ошибку — native share sheet
+    }
+  }, []);
+
+  const onComment = useCallback((it: FeedItem) => {
+    if (it.kind === 'course' || it.kind === 'story') return;
+    setActiveTarget({ type: it.kind as CommentableType, id: it.entityId });
+    sheetRef.current?.present();
+  }, []);
+
+  const onCommentCountChange = useCallback(
+    (count: number) => {
+      if (!activeTarget) return;
+      patchFeedItem(
+        qc,
+        (it) => it.kind === activeTarget.type && it.entityId === activeTarget.id,
+        (it) => ({
+          ...it,
+          engagement: { ...it.engagement, comments: count },
+        })
+      );
+    },
+    [activeTarget, qc]
+  );
 
   const Header = useMemo(
     () => (
@@ -165,6 +257,8 @@ export default function FeedScreen() {
               onLike={() => onLike(item)}
               onComment={() => onComment(item)}
               onBookmark={() => onBookmark(item)}
+              onRepost={() => onRepost(item)}
+              onShare={() => onShare(item)}
             />
           )}
           ListFooterComponent={
@@ -207,6 +301,12 @@ export default function FeedScreen() {
           }
         />
       )}
+      <CommentsSheet
+        ref={sheetRef}
+        type={activeTarget?.type ?? 'post'}
+        id={activeTarget?.id ?? null}
+        onCountChange={onCommentCountChange}
+      />
     </Screen>
   );
 }

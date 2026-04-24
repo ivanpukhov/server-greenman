@@ -1,12 +1,13 @@
-const { Reaction, Comment, Bookmark } = require('../../models/social');
+const { Reaction, Comment, Bookmark, Repost } = require('../../models/social');
 
 function makeKey(kind, id) {
     return `${kind}:${id}`;
 }
 
 /**
- * Для списка айтемов { kind, entityId } возвращает Map key→{ likes, comments, bookmarks, liked, bookmarked }.
- * userId — опциональный, если есть, заполняет liked/bookmarked.
+ * Для списка айтемов { kind, entityId } возвращает Map
+ * key→{ likes, comments, bookmarks, reposts, liked, bookmarked, reposted }.
+ * userId — опциональный, если есть, заполняет liked/bookmarked/reposted.
  */
 async function hydrateEngagement(items, userId = null) {
     const result = new Map();
@@ -25,8 +26,10 @@ async function hydrateEngagement(items, userId = null) {
                 likes: 0,
                 comments: 0,
                 bookmarks: 0,
+                reposts: 0,
                 liked: false,
-                bookmarked: false
+                bookmarked: false,
+                reposted: false
             });
         }
     }
@@ -35,7 +38,7 @@ async function hydrateEngagement(items, userId = null) {
         const uniq = [...new Set(ids)];
         if (uniq.length === 0) return;
 
-        const [likes, comments, bookmarks, myLikes, myBookmarks] = await Promise.all([
+        const [likes, comments, bookmarks, reposts, myLikes, myBookmarks, myReposts] = await Promise.all([
             Reaction.findAll({
                 where: { reactableType: kind, reactableId: uniq, type: 'like' },
                 attributes: ['reactableId']
@@ -48,6 +51,10 @@ async function hydrateEngagement(items, userId = null) {
                 where: { bookmarkableType: kind, bookmarkableId: uniq },
                 attributes: ['bookmarkableId']
             }),
+            Repost.findAll({
+                where: { repostableType: kind, repostableId: uniq },
+                attributes: ['repostableId']
+            }),
             userId ? Reaction.findAll({
                 where: { reactableType: kind, reactableId: uniq, type: 'like', userId },
                 attributes: ['reactableId']
@@ -55,6 +62,10 @@ async function hydrateEngagement(items, userId = null) {
             userId ? Bookmark.findAll({
                 where: { bookmarkableType: kind, bookmarkableId: uniq, userId },
                 attributes: ['bookmarkableId']
+            }) : Promise.resolve([]),
+            userId ? Repost.findAll({
+                where: { repostableType: kind, repostableId: uniq, userId },
+                attributes: ['repostableId']
             }) : Promise.resolve([])
         ]);
 
@@ -73,6 +84,11 @@ async function hydrateEngagement(items, userId = null) {
             const cur = result.get(k);
             if (cur) cur.bookmarks += 1;
         }
+        for (const r of reposts) {
+            const k = makeKey(kind, r.repostableId);
+            const cur = result.get(k);
+            if (cur) cur.reposts += 1;
+        }
         for (const r of myLikes) {
             const cur = result.get(makeKey(kind, r.reactableId));
             if (cur) cur.liked = true;
@@ -80,6 +96,10 @@ async function hydrateEngagement(items, userId = null) {
         for (const b of myBookmarks) {
             const cur = result.get(makeKey(kind, b.bookmarkableId));
             if (cur) cur.bookmarked = true;
+        }
+        for (const r of myReposts) {
+            const cur = result.get(makeKey(kind, r.repostableId));
+            if (cur) cur.reposted = true;
         }
     }));
 
@@ -93,9 +113,22 @@ async function attachEngagement(item, kind, userId = null) {
     if (!item) return item;
     const id = item.id;
     const map = await hydrateEngagement([{ kind, entityId: id }], userId);
-    const e = map.get(makeKey(kind, id)) || { likes: 0, comments: 0, bookmarks: 0, liked: false, bookmarked: false };
-    item.engagement = { likes: e.likes, comments: e.comments, bookmarks: e.bookmarks };
-    item.me = { liked: e.liked, bookmarked: e.bookmarked };
+    const e = map.get(makeKey(kind, id)) || {
+        likes: 0,
+        comments: 0,
+        bookmarks: 0,
+        reposts: 0,
+        liked: false,
+        bookmarked: false,
+        reposted: false
+    };
+    item.engagement = {
+        likes: e.likes,
+        comments: e.comments,
+        bookmarks: e.bookmarks,
+        reposts: e.reposts
+    };
+    item.me = { liked: e.liked, bookmarked: e.bookmarked, reposted: e.reposted };
     return item;
 }
 

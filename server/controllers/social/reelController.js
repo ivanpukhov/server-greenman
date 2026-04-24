@@ -73,9 +73,9 @@ exports.publicList = async (req, res) => {
         const userId = req.user?.userId || null;
         const eng = await hydrateEngagement(out.map((r) => ({ kind: 'reel', entityId: r.id })), userId);
         for (const r of out) {
-            const e = eng.get(`reel:${r.id}`) || { likes: 0, comments: 0, bookmarks: 0, liked: false, bookmarked: false };
-            r.engagement = { likes: e.likes, comments: e.comments, bookmarks: e.bookmarks, views: r.viewCount ?? 0 };
-            r.me = { liked: e.liked, bookmarked: e.bookmarked };
+            const e = eng.get(`reel:${r.id}`) || { likes: 0, comments: 0, bookmarks: 0, reposts: 0, liked: false, bookmarked: false, reposted: false };
+            r.engagement = { likes: e.likes, comments: e.comments, bookmarks: e.bookmarks, reposts: e.reposts, views: r.viewCount ?? 0 };
+            r.me = { liked: e.liked, bookmarked: e.bookmarked, reposted: e.reposted };
         }
         res.json(out);
     } catch (err) {

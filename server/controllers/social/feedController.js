@@ -142,8 +142,10 @@ exports.unifiedFeed = async (req, res) => {
                 likes: 0,
                 comments: 0,
                 bookmarks: 0,
+                reposts: 0,
                 liked: false,
-                bookmarked: false
+                bookmarked: false,
+                reposted: false
             };
             return {
                 ...it,
@@ -151,11 +153,12 @@ exports.unifiedFeed = async (req, res) => {
                     likes: eng.likes,
                     comments: eng.comments,
                     bookmarks: eng.bookmarks,
+                    reposts: eng.reposts,
                     views: it.kind === 'reel' ? it.raw.viewCount || 0 : undefined
                 },
                 me: userId
-                    ? { liked: eng.liked, bookmarked: eng.bookmarked }
-                    : { liked: false, bookmarked: false }
+                    ? { liked: eng.liked, bookmarked: eng.bookmarked, reposted: eng.reposted }
+                    : { liked: false, bookmarked: false, reposted: false }
             };
         });
 

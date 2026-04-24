@@ -119,12 +119,15 @@ type EngagementProps = {
   likes: number;
   comments: number;
   bookmarks: number;
+  reposts: number;
   liked: boolean;
   bookmarked: boolean;
+  reposted: boolean;
   onLike: () => void;
   onComment: () => void;
   onBookmark: () => void;
-  onShare?: () => void;
+  onRepost: () => void;
+  onShare: () => void;
 };
 
 function ActionButton({
@@ -174,11 +177,14 @@ export function CardEngagement({
   likes,
   comments,
   bookmarks,
+  reposts,
   liked,
   bookmarked,
+  reposted,
   onLike,
   onComment,
   onBookmark,
+  onRepost,
   onShare,
 }: EngagementProps) {
   return (
@@ -202,15 +208,22 @@ export function CardEngagement({
         onPress={onComment}
         accessibilityLabel="Комментарии"
       />
+      <ActionButton
+        icon="repeat-outline"
+        iconFilled="repeat"
+        active={reposted}
+        count={reposts}
+        onPress={onRepost}
+        accessibilityLabel={reposted ? 'Убрать репост' : 'Репостнуть'}
+        activeColor={greenman[7]}
+      />
       <View style={{ flex: 1 }} />
-      {onShare ? (
-        <ActionButton
-          icon="paper-plane-outline"
-          active={false}
-          onPress={onShare}
-          accessibilityLabel="Поделиться"
-        />
-      ) : null}
+      <ActionButton
+        icon="paper-plane-outline"
+        active={false}
+        onPress={onShare}
+        accessibilityLabel="Поделиться"
+      />
       <ActionButton
         icon="bookmark-outline"
         iconFilled="bookmark"

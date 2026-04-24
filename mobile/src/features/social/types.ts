@@ -18,12 +18,14 @@ export type FeedEngagement = {
   likes: number;
   comments: number;
   bookmarks: number;
+  reposts: number;
   views?: number;
 };
 
 export type FeedMe = {
   liked: boolean;
   bookmarked: boolean;
+  reposted: boolean;
 };
 
 export type FeedItem = {
@@ -52,3 +54,4 @@ export type FeedPage = {
 
 export type ReactableType = 'post' | 'article' | 'reel' | 'webinar' | 'course_day' | 'comment';
 export type BookmarkableType = 'post' | 'article' | 'reel' | 'webinar' | 'course';
+export type RepostableType = 'post' | 'article' | 'reel' | 'webinar';

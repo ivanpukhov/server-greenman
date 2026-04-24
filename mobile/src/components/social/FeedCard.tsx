@@ -48,9 +48,10 @@ export function normalizeFeedItem(raw: any): FeedItem {
       likes: 0,
       comments: 0,
       bookmarks: 0,
+      reposts: 0,
       views: typeof d.viewCount === 'number' ? d.viewCount : undefined,
     },
-    me: { liked: false, bookmarked: false },
+    me: { liked: false, bookmarked: false, reposted: false },
   };
 }
 
@@ -60,7 +61,8 @@ type Props = {
   onLike: () => void;
   onComment: () => void;
   onBookmark: () => void;
-  onShare?: () => void;
+  onRepost: () => void;
+  onShare: () => void;
 };
 
 export const FeedCard = memo(function FeedCard(props: Props) {
@@ -79,20 +81,23 @@ export const FeedCard = memo(function FeedCard(props: Props) {
 });
 
 function Engagement(
-  props: Pick<Props, 'item' | 'onLike' | 'onComment' | 'onBookmark' | 'onShare'>
+  props: Pick<Props, 'item' | 'onLike' | 'onComment' | 'onBookmark' | 'onRepost' | 'onShare'>
 ) {
-  const eng = props.item.engagement ?? { likes: 0, comments: 0, bookmarks: 0 };
-  const me = props.item.me ?? { liked: false, bookmarked: false };
+  const eng = props.item.engagement ?? { likes: 0, comments: 0, bookmarks: 0, reposts: 0 };
+  const me = props.item.me ?? { liked: false, bookmarked: false, reposted: false };
   return (
     <CardEngagement
       likes={eng.likes ?? 0}
       comments={eng.comments ?? 0}
       bookmarks={eng.bookmarks ?? 0}
+      reposts={eng.reposts ?? 0}
       liked={me.liked ?? false}
       bookmarked={me.bookmarked ?? false}
+      reposted={me.reposted ?? false}
       onLike={props.onLike}
       onComment={props.onComment}
       onBookmark={props.onBookmark}
+      onRepost={props.onRepost}
       onShare={props.onShare}
     />
   );
