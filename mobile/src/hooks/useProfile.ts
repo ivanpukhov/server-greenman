@@ -42,7 +42,7 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async (payload: { firstName: string; lastName: string }) => {
-      const { data } = await api.patch<ProfileUser>(endpoints.profile.update, payload);
+      const { data } = await api.put<ProfileUser>(endpoints.profile.update, payload);
       return data;
     },
     onSuccess: async (data) => {

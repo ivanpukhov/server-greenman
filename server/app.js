@@ -41,6 +41,7 @@ require('./models/orders/PaymentLinkDispatchPlan');
 const { buildProductTypeCode } = require('./utilities/productTypeCode');
 const { ensureDefaultAdmins, normalizeAdminIin, DEFAULT_ADMIN_IIN } = require('./utilities/adminUsers');
 const { logError } = require('./utilities/errorLogger');
+const ensureUserProfileSchema = require('./utilities/ensureUserProfileSchema');
 
 const app = express();
 
@@ -699,19 +700,7 @@ const ensureUsersSchema = async () => {
     try {
         const tableDefinition = await queryInterface.describeTable('users');
 
-        if (!tableDefinition.firstName) {
-            await queryInterface.addColumn('users', 'firstName', {
-                type: Sequelize.STRING,
-                allowNull: true
-            });
-        }
-
-        if (!tableDefinition.lastName) {
-            await queryInterface.addColumn('users', 'lastName', {
-                type: Sequelize.STRING,
-                allowNull: true
-            });
-        }
+        await ensureUserProfileSchema();
 
         if (!tableDefinition.lastIncomingMessageAt) {
             await queryInterface.addColumn('users', 'lastIncomingMessageAt', {

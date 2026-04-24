@@ -4,6 +4,7 @@ const Order = require('../../models/orders/Order');
 const Product = require("../../models/Product");
 const ProductType = require("../../models/ProductType");
 const ProductReview = require('../../models/ProductReview');
+const ensureUserProfileSchema = require('../../utilities/ensureUserProfileSchema');
 const {
     Bookmark,
     Comment,
@@ -126,6 +127,7 @@ const OrderProfileController = {
 
     async  getUserDetails(req, res) {
         try {
+            await ensureUserProfileSchema();
             const userId = req.user.userId;
             const user = await User.findByPk(userId);
             if (!user) {
@@ -173,6 +175,7 @@ const OrderProfileController = {
 
     async updateUserProfile(req, res) {
         try {
+            await ensureUserProfileSchema();
             const userId = req.user.userId;
             const user = await User.findByPk(userId);
             if (!user) {
@@ -192,12 +195,17 @@ const OrderProfileController = {
 
             res.json(serializeUser(user));
         } catch (error) {
-            res.status(500).json({message: 'Ошибка при обновлении профиля', error});
+            console.error('Ошибка при обновлении профиля пользователя:', error);
+            res.status(500).json({
+                message: 'Ошибка при обновлении профиля',
+                detail: error.message
+            });
         }
     },
 
     async deleteAccount(req, res) {
         try {
+            await ensureUserProfileSchema();
             const userId = req.user.userId;
             const user = await User.findByPk(userId);
             if (!user) {

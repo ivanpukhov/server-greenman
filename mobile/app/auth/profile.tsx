@@ -39,7 +39,7 @@ export default function AuthProfileScreen() {
       Toast.show({
         type: 'error',
         text1: 'Не удалось сохранить',
-        text2: e?.response?.data?.message ?? 'Попробуйте ещё раз',
+        text2: e?.response?.data?.detail ?? e?.response?.data?.message ?? e?.message ?? 'Попробуйте ещё раз',
       });
     }
   };

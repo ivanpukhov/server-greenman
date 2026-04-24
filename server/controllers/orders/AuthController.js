@@ -3,11 +3,13 @@ const User = require('../../models/orders/User');
 const jwtUtility = require('../../utilities/jwtUtility');
 const sendNotification = require('../../utilities/notificationService');
 const Sequelize = require('sequelize');
+const ensureUserProfileSchema = require('../../utilities/ensureUserProfileSchema');
 
 const AuthController = {
     // Регистрация или вход пользователя
     async registerOrLogin(req, res) {
         try {
+            await ensureUserProfileSchema();
             const { phoneNumber } = req.body;
 
             let user = await User.findOne({ where: { phoneNumber } });
@@ -40,6 +42,7 @@ const AuthController = {
     // Подтверждение кода для аутентификации
     async confirmCode(req, res) {
         try {
+            await ensureUserProfileSchema();
             const { phoneNumber, confirmationCode } = req.body;
             const user = await User.findOne({ where: { phoneNumber } });
 
@@ -76,6 +79,7 @@ const AuthController = {
     // Повторная отправка кода подтверждения
     async resendConfirmationCode(req, res) {
         try {
+            await ensureUserProfileSchema();
             const { phoneNumber } = req.body;
             let user = await User.findOne({ where: { phoneNumber } });
 
