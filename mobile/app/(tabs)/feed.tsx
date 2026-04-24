@@ -41,7 +41,15 @@ export default function FeedScreen() {
   const stories = storiesQuery.data ?? [];
   const items = useMemo<FeedItem[]>(() => {
     const flat = feedQuery.data?.pages.flatMap((p) => p.items) ?? [];
-    return filter === 'all' ? flat : flat.filter((it) => it.kind === filter);
+    const seen = new Set<string>();
+    const unique: FeedItem[] = [];
+    for (const it of flat) {
+      const key = it.id ?? `${it.kind}-${it.entityId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(it);
+    }
+    return filter === 'all' ? unique : unique.filter((it) => it.kind === filter);
   }, [feedQuery.data, filter]);
 
   const refreshing = feedQuery.isRefetching || storiesQuery.isRefetching;
@@ -138,7 +146,7 @@ export default function FeedScreen() {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(it) => it.id}
+          keyExtractor={(it) => it.id ?? `${it.kind}-${it.entityId}`}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={greenman[7]} />
           }

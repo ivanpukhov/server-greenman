@@ -81,13 +81,15 @@ export const FeedCard = memo(function FeedCard(props: Props) {
 function Engagement(
   props: Pick<Props, 'item' | 'onLike' | 'onComment' | 'onBookmark' | 'onShare'>
 ) {
+  const eng = props.item.engagement ?? { likes: 0, comments: 0, bookmarks: 0 };
+  const me = props.item.me ?? { liked: false, bookmarked: false };
   return (
     <CardEngagement
-      likes={props.item.engagement.likes}
-      comments={props.item.engagement.comments}
-      bookmarks={props.item.engagement.bookmarks}
-      liked={props.item.me.liked}
-      bookmarked={props.item.me.bookmarked}
+      likes={eng.likes ?? 0}
+      comments={eng.comments ?? 0}
+      bookmarks={eng.bookmarks ?? 0}
+      liked={me.liked ?? false}
+      bookmarked={me.bookmarked ?? false}
       onLike={props.onLike}
       onComment={props.onComment}
       onBookmark={props.onBookmark}
