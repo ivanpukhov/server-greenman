@@ -27,7 +27,7 @@ export default function AdminStoryEdit() {
   const [caption, setCaption] = useState('');
   const [durationSec, setDurationSec] = useState('7');
   const [ttlHours, setTtlHours] = useState('24');
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {

@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { View, FlatList, Pressable, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  View,
+  FlatList,
+  Pressable,
+  Alert,
+  RefreshControl,
+  ActivityIndicator,
+  TextInput,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
@@ -17,9 +25,10 @@ import {
   useAdminMediaList,
   useAdminMediaUpload,
   useAdminMediaDelete,
+  useAdminMediaBulkDelete,
 } from '@/hooks/admin/useAdminMedia';
 import type { Media, MediaKind } from '@/lib/api/admin-types';
-import { greenman } from '@/theme/colors';
+import { greenman, semantic } from '@/theme/colors';
 
 const FILTERS: { label: string; value: MediaKind | 'all' }[] = [
   { label: 'Все', value: 'all' },
@@ -43,10 +52,33 @@ function guessMime(uri: string, name?: string | null): string {
 export default function AdminMediaIndex() {
   const router = useRouter();
   const [filter, setFilter] = useState<MediaKind | 'all'>('all');
-  const list = useAdminMediaList(filter === 'all' ? {} : { type: filter });
+  const [q, setQ] = useState('');
+  const [selection, setSelection] = useState<Set<number>>(new Set());
+  const selectMode = selection.size > 0;
+
+  const listParams = useMemo(() => {
+    const p: { type?: MediaKind; q?: string } = {};
+    if (filter !== 'all') p.type = filter;
+    if (q.trim()) p.q = q.trim();
+    return p;
+  }, [filter, q]);
+
+  const list = useAdminMediaList(listParams);
   const upload = useAdminMediaUpload();
   const remove = useAdminMediaDelete();
+  const bulkRemove = useAdminMediaBulkDelete();
   const [progress, setProgress] = useState<number | null>(null);
+
+  const toggleSelect = (id: number) => {
+    setSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelection(new Set());
 
   const addFromGallery = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -112,6 +144,36 @@ export default function AdminMediaIndex() {
     ]);
   };
 
+  const onBulkDelete = () => {
+    const ids = [...selection];
+    if (!ids.length) return;
+    Alert.alert(
+      `Удалить ${ids.length}?`,
+      'Выбранные медиа будут удалены безвозвратно.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: () =>
+            bulkRemove
+              .mutateAsync(ids)
+              .then(() => {
+                Toast.show({ type: 'success', text1: `Удалено ${ids.length}` });
+                clearSelection();
+              })
+              .catch((e) =>
+                Toast.show({
+                  type: 'error',
+                  text1: 'Не удалось удалить',
+                  text2: e?.response?.data?.message ?? e?.message,
+                })
+              ),
+        },
+      ]
+    );
+  };
+
   const openItemActions = (m: Media) => {
     Alert.alert(m.originalName ?? 'Медиа', undefined, [
       {
@@ -159,16 +221,66 @@ export default function AdminMediaIndex() {
   return (
     <Screen>
       <Header
-        title="Медиа"
-        onBack={() => router.back()}
+        title={selectMode ? `Выбрано: ${selection.size}` : 'Медиа'}
+        onBack={selectMode ? clearSelection : () => router.back()}
         rightAction={
-          <IconButton
-            icon={<Ionicons name="add" size={22} color={greenman[7]} />}
-            onPress={onAdd}
-            accessibilityLabel="Загрузить медиа"
-          />
+          selectMode ? (
+            <IconButton
+              icon={<Ionicons name="trash-outline" size={20} color={semantic.danger} />}
+              onPress={onBulkDelete}
+              accessibilityLabel="Удалить выбранные"
+            />
+          ) : (
+            <IconButton
+              icon={<Ionicons name="add" size={22} color={greenman[7]} />}
+              onPress={onAdd}
+              accessibilityLabel="Загрузить медиа"
+            />
+          )
         }
       />
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingTop: 12,
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: greenman[0],
+            paddingHorizontal: 12,
+            height: 40,
+            borderRadius: 999,
+          }}
+        >
+          <Ionicons name="search" size={16} color={semantic.inkDim} />
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Поиск по имени…"
+            placeholderTextColor={semantic.inkMuted}
+            style={{
+              flex: 1,
+              fontFamily: 'Manrope_500Medium',
+              fontSize: 14,
+              color: semantic.ink,
+            }}
+          />
+          {q ? (
+            <Pressable onPress={() => setQ('')}>
+              <Ionicons name="close-circle" size={16} color={semantic.inkDim} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
       <View className="flex-row flex-wrap gap-2 px-4 py-3">
         {FILTERS.map((f) => {
@@ -208,8 +320,12 @@ export default function AdminMediaIndex() {
         <EmptyState variant="error" title="Не удалось загрузить библиотеку" />
       ) : (list.data ?? []).length === 0 ? (
         <EmptyState
-          title="Библиотека пуста"
-          subtitle="Загрузите фото, видео или файл — нажмите + в правом верхнем углу."
+          title={q ? 'Ничего не найдено' : 'Библиотека пуста'}
+          subtitle={
+            q
+              ? 'Попробуйте изменить запрос или сбросить фильтр.'
+              : 'Загрузите фото, видео или файл — нажмите + в правом верхнем углу.'
+          }
         />
       ) : (
         <FlatList
@@ -222,34 +338,77 @@ export default function AdminMediaIndex() {
           refreshControl={
             <RefreshControl refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
           }
-          renderItem={({ item }) => (
-            <Pressable
-              onLongPress={() => openItemActions(item)}
-              onPress={() => openItemActions(item)}
-              className="flex-1 aspect-square overflow-hidden rounded-xl border border-border bg-greenman-0"
-            >
-              {item.type === 'image' ? (
-                <Image source={{ uri: item.url }} style={{ flex: 1 }} contentFit="cover" />
-              ) : (
-                <View className="flex-1 items-center justify-center">
-                  <Ionicons
-                    name={
-                      item.type === 'video'
-                        ? 'videocam'
-                        : item.type === 'audio'
-                          ? 'musical-notes'
-                          : 'document'
-                    }
-                    size={28}
-                    color={greenman[7]}
-                  />
-                  <Text className="mt-1 px-1 text-[10px] text-ink-dim" numberOfLines={1}>
-                    {item.originalName ?? ''}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const selected = selection.has(item.id);
+            const typeIcon =
+              item.type === 'video'
+                ? 'videocam'
+                : item.type === 'audio'
+                  ? 'musical-notes'
+                  : item.type === 'file'
+                    ? 'document'
+                    : null;
+            return (
+              <Pressable
+                onLongPress={() => toggleSelect(item.id)}
+                onPress={() =>
+                  selectMode ? toggleSelect(item.id) : openItemActions(item)
+                }
+                className="flex-1 aspect-square overflow-hidden rounded-xl border border-border bg-greenman-0"
+                style={
+                  selected
+                    ? { borderColor: greenman[7], borderWidth: 2 }
+                    : undefined
+                }
+              >
+                {item.type === 'image' ? (
+                  <Image source={{ uri: item.url }} style={{ flex: 1 }} contentFit="cover" />
+                ) : (
+                  <View className="flex-1 items-center justify-center p-1">
+                    <Ionicons
+                      name={
+                        item.type === 'video'
+                          ? 'videocam'
+                          : item.type === 'audio'
+                            ? 'musical-notes'
+                            : 'document'
+                      }
+                      size={28}
+                      color={greenman[7]}
+                    />
+                    <Text
+                      className="mt-1 px-1 text-[10px] text-ink-dim"
+                      numberOfLines={1}
+                    >
+                      {item.originalName ?? ''}
+                    </Text>
+                  </View>
+                )}
+                {typeIcon ? (
+                  <View className="absolute bottom-1.5 left-1.5 h-5 w-5 items-center justify-center rounded-full bg-black/55">
+                    <Ionicons name={typeIcon} size={11} color="#fff" />
+                  </View>
+                ) : null}
+                {selected ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: greenman[7],
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          }}
         />
       )}
     </Screen>

@@ -5,7 +5,7 @@ import Toast from 'react-native-toast-message';
 import { AdminFormScreen } from '@/components/admin/FormScreen';
 import { DraftToggle } from '@/components/admin/DraftToggle';
 import { MediaPicker } from '@/components/admin/MediaPicker';
-import { BlockEditor } from '@/components/admin/BlockEditor';
+import { BlockEditorWebView } from '@/components/admin/BlockEditorWebView';
 import { SlugInput, slugify } from '@/components/admin/SlugInput';
 import { Text } from '@/components/ui/Text';
 import { webinars } from '@/hooks/admin/useAdminSocial';
@@ -29,7 +29,7 @@ export default function AdminWebinarEdit() {
   const [cover, setCover] = useState<Media[]>([]);
   const [attachments, setAttachments] = useState<Media[]>([]);
   const [blocks, setBlocks] = useState<EditorDoc | null>({ blocks: [] });
-  const [isDraft, setIsDraft] = useState(true);
+  const [isDraft, setIsDraft] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function AdminWebinarEdit() {
         onChange={setVideo}
       />
 
-      <BlockEditor label="Описание" value={blocks} onChange={setBlocks} />
+      <BlockEditorWebView label="Описание" value={blocks} onChange={setBlocks} />
 
       <MediaPicker
         label="Материалы (файлы)"

@@ -74,6 +74,36 @@ export default function ProfileScreen() {
           <Text className="mt-1 text-sm text-ink-dim">Пользователь #{userId}</Text>
         </View>
 
+        <View className="mt-5 overflow-hidden rounded-xl border border-border bg-white">
+          <NavRow
+            icon="bookmark-outline"
+            title="Сохранённое"
+            subtitle="Посты, статьи, reels и курсы"
+            onPress={() => router.push('/profile/bookmarks')}
+          />
+          <Divider />
+          <NavRow
+            icon="school-outline"
+            title="Мои курсы"
+            subtitle="Прогресс и следующий день"
+            onPress={() => router.push('/social/my-courses')}
+          />
+          <Divider />
+          <NavRow
+            icon="reader-outline"
+            title="Домашние задания"
+            subtitle="Отчёты и их статусы"
+            onPress={() => router.push('/profile/homework')}
+          />
+          <Divider />
+          <NavRow
+            icon="heart-outline"
+            title="Активность"
+            subtitle="Что вы лайкали"
+            onPress={() => router.push('/profile/activity')}
+          />
+        </View>
+
         <View className="mt-5 rounded-xl border border-border bg-white p-4">
           <Text className="text-sm font-semibold text-ink">Страна</Text>
           <View className="mt-3 flex-row gap-2">
@@ -136,6 +166,39 @@ export default function ProfileScreen() {
       </ScrollView>
     </Screen>
   );
+}
+
+function NavRow({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="flex-row items-center gap-3 px-4 py-3 active:bg-greenman-0"
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-greenman-0">
+        <Ionicons name={icon} size={20} color={greenman[7]} />
+      </View>
+      <View className="flex-1">
+        <Text className="text-sm font-semibold text-ink">{title}</Text>
+        {subtitle ? <Text className="text-xs text-ink-dim">{subtitle}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={greenman[7]} />
+    </Pressable>
+  );
+}
+
+function Divider() {
+  return <View className="h-px bg-border" style={{ marginLeft: 68 }} />;
 }
 
 function CountryChip({

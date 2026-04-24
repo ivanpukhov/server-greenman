@@ -18,6 +18,11 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
+import {
+  SourceSerif4_400Regular,
+  SourceSerif4_400Regular_Italic,
+  SourceSerif4_600SemiBold,
+} from '@expo-google-fonts/source-serif-4';
 import { initI18n } from '@/i18n';
 import { useAuthStore } from '@/stores/auth.store';
 import { useCountryStore } from '@/stores/country.store';
@@ -50,6 +55,9 @@ export default function RootLayout() {
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
+    SourceSerif4_400Regular,
+    SourceSerif4_400Regular_Italic,
+    SourceSerif4_600SemiBold,
   });
   const bootstrap = useAuthStore((s) => s.bootstrap);
   const isReady = useAuthStore((s) => s.isReady);

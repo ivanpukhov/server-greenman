@@ -1,213 +1,204 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, View, RefreshControl, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { socialApi } from '@/features/social/api';
-import { greenman } from '@/theme/colors';
+import type { FeedItem, FeedKind } from '@/features/social/types';
+import { greenman, semantic } from '@/theme/colors';
+import { FeedCard } from '@/components/social/FeedCard';
+import { FeedStoriesRow, type StoryGroupItem } from '@/components/social/FeedStoriesRow';
+import { FeedSkeleton } from '@/components/social/FeedSkeleton';
+import { useInfiniteFeed, useToggleBookmark, useToggleReaction } from '@/hooks/useFeed';
 
-type FeedItem = {
-  kind: 'post' | 'reel' | 'article' | 'webinar';
-  id: number;
-  slug?: string;
-  title?: string;
-  text?: string;
-  excerpt?: string;
-  cover?: { url?: string | null } | null;
-};
+type KindFilter = 'all' | FeedKind;
 
-type StoryGroup = {
-  adminUserId: number;
-  stories?: Array<{ id: number; media?: { url?: string | null } | null }>;
-};
-
-const KIND_LABELS: Record<FeedItem['kind'], string> = {
-  post: 'Пост',
-  reel: 'Reel',
-  article: 'Статья',
-  webinar: 'Вебинар',
-};
+const FILTERS: { key: KindFilter; label: string }[] = [
+  { key: 'all', label: 'Всё' },
+  { key: 'post', label: 'Посты' },
+  { key: 'article', label: 'Статьи' },
+  { key: 'reel', label: 'Reels' },
+  { key: 'webinar', label: 'Вебинары' },
+];
 
 export default function FeedScreen() {
-  const feedQuery = useQuery({
-    queryKey: ['social', 'feed', { limit: 30 }],
-    queryFn: async () => {
-      const data = await socialApi.feed({ limit: 30 });
-      return (Array.isArray(data) ? data : data?.items ?? []) as FeedItem[];
-    },
-  });
+  const [filter, setFilter] = useState<KindFilter>('all');
+
+  const feedQuery = useInfiniteFeed('latest');
+  const toggleLike = useToggleReaction();
+  const toggleBookmark = useToggleBookmark();
 
   const storiesQuery = useQuery({
     queryKey: ['social', 'stories', 'active'],
     queryFn: async () => {
       const data = await socialApi.stories.active();
-      return (Array.isArray(data) ? data : []) as StoryGroup[];
+      return (Array.isArray(data) ? data : []) as StoryGroupItem[];
     },
   });
 
   const stories = storiesQuery.data ?? [];
-  const items = feedQuery.data ?? [];
+  const items = useMemo<FeedItem[]>(() => {
+    const flat = feedQuery.data?.pages.flatMap((p) => p.items) ?? [];
+    return filter === 'all' ? flat : flat.filter((it) => it.kind === filter);
+  }, [feedQuery.data, filter]);
+
   const refreshing = feedQuery.isRefetching || storiesQuery.isRefetching;
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     feedQuery.refetch();
     storiesQuery.refetch();
-  };
+  }, [feedQuery, storiesQuery]);
 
-  const openItem = (it: FeedItem) => {
+  const onEndReached = useCallback(() => {
+    if (feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
+      feedQuery.fetchNextPage();
+    }
+  }, [feedQuery]);
+
+  const openItem = useCallback((it: FeedItem) => {
     if (it.kind === 'article' && it.slug) router.push(`/social/article/${it.slug}`);
     else if (it.kind === 'webinar' && it.slug) router.push(`/social/webinar/${it.slug}`);
     else if (it.kind === 'reel') router.push('/reels');
-    else if (it.kind === 'post') router.push(`/social/post/${it.id}`);
-  };
+    else if (it.kind === 'post') router.push(`/social/post/${it.entityId}`);
+  }, []);
+
+  const onLike = useCallback(
+    (it: FeedItem) => {
+      if (it.kind === 'course' || it.kind === 'story') return;
+      toggleLike.mutate({ type: it.kind, id: it.entityId });
+    },
+    [toggleLike]
+  );
+
+  const onBookmark = useCallback(
+    (it: FeedItem) => {
+      if (it.kind === 'story') return;
+      toggleBookmark.mutate({ type: it.kind, id: it.entityId });
+    },
+    [toggleBookmark]
+  );
+
+  const onComment = useCallback((it: FeedItem) => openItem(it), [openItem]);
 
   const Header = useMemo(
     () => (
       <View>
-        {stories.length > 0 ? (
-          <FlatList
-            horizontal
-            data={stories}
-            keyExtractor={(g) => String(g.adminUserId)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, gap: 12 }}
-            renderItem={({ item: g }) => {
-              const first = g.stories?.[0];
-              return (
-                <Pressable
-                  onPress={() => first?.id && router.push(`/social/story/${first.id}`)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Открыть сториз"
-                  className="items-center active:opacity-70"
-                >
-                  <View className="h-16 w-16 overflow-hidden rounded-full border-2 border-greenman-6 bg-greenman-0">
-                    {first?.media?.url ? (
-                      <Image
-                        source={{ uri: first.media.url }}
-                        style={{ flex: 1 }}
-                        contentFit="cover"
-                        transition={150}
-                      />
-                    ) : (
-                      <View className="flex-1 items-center justify-center">
-                        <Ionicons name="image-outline" size={22} color={greenman[7]} />
-                      </View>
-                    )}
-                  </View>
-                </Pressable>
-              );
-            }}
-          />
-        ) : null}
-
-        <View className="flex-row gap-2 px-3 pb-2">
-          {(['reels', 'articles', 'courses'] as const).map((k) => {
-            const label =
-              k === 'reels' ? 'Reels' : k === 'articles' ? 'Статьи' : 'Курсы';
-            const go = () =>
-              k === 'reels'
-                ? router.push('/reels')
-                : k === 'articles'
-                  ? router.push('/social/articles')
-                  : router.push('/social/courses');
+        <View className="flex-row items-center justify-between px-md pb-xs pt-xs">
+          <Text className="text-h3 font-bold text-ink" style={{ fontFamily: 'Hagrid_700Bold' }}>
+            Лента
+          </Text>
+          <Pressable
+            onPress={() => router.push('/social/search')}
+            accessibilityRole="button"
+            accessibilityLabel="Поиск"
+            hitSlop={10}
+            className="h-10 w-10 items-center justify-center rounded-full bg-surface-sunken active:opacity-80"
+          >
+            <Ionicons name="search" size={20} color={semantic.ink} />
+          </Pressable>
+        </View>
+        <FeedStoriesRow groups={stories} />
+        <View className="flex-row flex-wrap gap-xs px-sm pb-sm pt-xs">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
             return (
               <Pressable
-                key={k}
-                onPress={go}
+                key={f.key}
+                onPress={() => setFilter(f.key)}
                 accessibilityRole="button"
-                accessibilityLabel={label}
-                className="rounded-full bg-greenman-0 px-4 py-1.5 active:opacity-70"
+                accessibilityLabel={f.label}
+                className={`rounded-full px-md py-1.5 active:opacity-80 ${
+                  active ? 'bg-greenman-7' : 'bg-surface-muted'
+                }`}
               >
-                <Text className="text-xs font-semibold text-greenman-8">{label}</Text>
+                <Text
+                  className={`text-caption font-semibold ${
+                    active ? 'text-white' : 'text-greenman-8'
+                  }`}
+                >
+                  {f.label}
+                </Text>
               </Pressable>
             );
           })}
         </View>
       </View>
     ),
-    [stories]
+    [stories, filter]
   );
 
-  if (feedQuery.isLoading && !feedQuery.data) {
-    return (
-      <Screen>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={greenman[7]} />
-        </View>
-      </Screen>
-    );
-  }
+  const isLoading = feedQuery.isLoading && !feedQuery.data;
 
   return (
     <Screen>
-      <FlatList
-        data={items}
-        keyExtractor={(it) => `${it.kind}-${it.id}`}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListHeaderComponent={Header}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => openItem(item)}
-            accessibilityRole="button"
-            accessibilityLabel={item.title ?? KIND_LABELS[item.kind]}
-            className="border-b border-border px-3 py-3 active:bg-greenman-0"
-          >
-            <Text className="text-[10px] font-semibold uppercase text-greenman-7">
-              {KIND_LABELS[item.kind]}
-            </Text>
-            {item.title ? (
-              <Text className="mt-0.5 text-base font-semibold text-ink">
-                {item.title}
-              </Text>
-            ) : null}
-            {item.text ? (
-              <Text className="mt-1 text-sm text-ink-dim" numberOfLines={4}>
-                {item.text}
-              </Text>
-            ) : null}
-            {item.excerpt ? (
-              <Text className="mt-1 text-sm text-ink-dim" numberOfLines={3}>
-                {item.excerpt}
-              </Text>
-            ) : null}
-            {item.cover?.url ? (
-              <Image
-                source={{ uri: item.cover.url }}
-                style={{ width: '100%', height: 180, marginTop: 8, borderRadius: 8 }}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : null}
-          </Pressable>
-        )}
-        ListEmptyComponent={
-          feedQuery.isError ? (
-            <View className="p-8 items-center">
-              <Ionicons name="cloud-offline-outline" size={32} color={greenman[7]} />
-              <Text className="mt-2 text-sm text-ink-dim">
-                Не удалось загрузить ленту
-              </Text>
-              <Pressable
-                onPress={onRefresh}
-                className="mt-3 rounded-full bg-greenman-0 px-4 py-2 active:opacity-70"
-                accessibilityRole="button"
-              >
-                <Text className="text-xs font-semibold text-greenman-8">
-                  Попробовать снова
+      {isLoading ? (
+        <FeedSkeleton />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(it) => it.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={greenman[7]} />
+          }
+          ListHeaderComponent={Header}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={4}
+          windowSize={5}
+          removeClippedSubviews
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.5}
+          renderItem={({ item }) => (
+            <FeedCard
+              item={item}
+              onPress={() => openItem(item)}
+              onLike={() => onLike(item)}
+              onComment={() => onComment(item)}
+              onBookmark={() => onBookmark(item)}
+            />
+          )}
+          ListFooterComponent={
+            feedQuery.isFetchingNextPage ? (
+              <View className="py-lg items-center">
+                <ActivityIndicator color={semantic.accent} />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            feedQuery.isError ? (
+              <View className="px-8 py-16 items-center">
+                <Ionicons name="cloud-offline-outline" size={40} color={greenman[7]} />
+                <Text className="mt-sm text-label text-ink-dim">Не удалось загрузить ленту</Text>
+                <Pressable
+                  onPress={onRefresh}
+                  accessibilityRole="button"
+                  className="mt-md rounded-full bg-greenman-7 px-lg py-2.5 active:opacity-80"
+                >
+                  <Text className="text-caption font-semibold text-white">Обновить</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View className="px-8 py-16 items-center">
+                <Ionicons name="sparkles-outline" size={40} color={greenman[7]} />
+                <Text className="mt-sm text-label text-ink-dim">
+                  {filter === 'all' ? 'Пока пусто' : 'Ничего не найдено'}
                 </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View className="p-8 items-center">
-              <Text className="text-sm text-ink-dim">Лента пуста</Text>
-            </View>
-          )
-        }
-      />
+                {filter !== 'all' ? (
+                  <Pressable
+                    onPress={() => setFilter('all')}
+                    accessibilityRole="button"
+                    className="mt-sm rounded-full bg-surface-muted px-md py-xs active:opacity-80"
+                  >
+                    <Text className="text-caption font-semibold text-greenman-8">Показать всё</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )
+          }
+        />
+      )}
     </Screen>
   );
 }

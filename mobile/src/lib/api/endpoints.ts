@@ -36,8 +36,11 @@ export const endpoints = {
     confirmCode: '/admin/auth/confirm-code',
   },
   adminSocial: {
+    stats: '/admin/social/stats',
+    drafts: '/admin/social/drafts',
     media: '/admin/social/media',
     mediaById: (id: number) => `/admin/social/media/${id}`,
+    mediaBulkRemove: '/admin/social/media/bulk-remove',
     posts: '/admin/social/posts',
     postById: (id: number) => `/admin/social/posts/${id}`,
     reels: '/admin/social/reels',

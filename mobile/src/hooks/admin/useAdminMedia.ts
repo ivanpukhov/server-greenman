@@ -3,7 +3,7 @@ import { adminApi } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import type { Media, MediaKind } from '@/lib/api/admin-types';
 
-type ListParams = { type?: MediaKind; limit?: number };
+type ListParams = { type?: MediaKind; limit?: number; q?: string };
 
 export function useAdminMediaList(params: ListParams = {}) {
   return useQuery({
@@ -35,7 +35,7 @@ export function useAdminMediaUpload() {
       } as unknown as Blob);
 
       const { data } = await adminApi.post<Media>(endpoints.adminSocial.media, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (d) => d,
         timeout: 0,
         onUploadProgress: (e) => {
           if (!onProgress || !e.total) return;
@@ -55,6 +55,18 @@ export function useAdminMediaDelete() {
   return useMutation({
     mutationFn: async (id: number) => {
       await adminApi.delete(endpoints.adminSocial.mediaById(id));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'media'] });
+    },
+  });
+}
+
+export function useAdminMediaBulkDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      await adminApi.post(endpoints.adminSocial.mediaBulkRemove, { ids });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'media'] });

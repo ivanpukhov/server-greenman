@@ -3,6 +3,8 @@ import { api } from '@/lib/api/client';
 export const socialApi = {
   feed: (params?: { cursor?: string; limit?: number }) =>
     api.get('/social/feed', { params }).then((r) => r.data),
+  search: (params: { q: string; kind?: string; limit?: number }) =>
+    api.get('/social/search', { params }).then((r) => r.data),
   posts: {
     list: (params?: { limit?: number; before?: string }) =>
       api.get('/social/posts', { params }).then((r) => r.data),
@@ -40,6 +42,12 @@ export const socialApi = {
       api.get(`/social/courses/enrollments/${enrollmentId}/support`).then((r) => r.data),
     supportSend: (enrollmentId: number, body: { text: string }) =>
       api.post(`/social/courses/enrollments/${enrollmentId}/support`, body).then((r) => r.data),
+    completeDay: (slug: string, dayNumber: number | string) =>
+      api.post(`/social/courses/${slug}/days/${dayNumber}/complete`).then((r) => r.data),
+  },
+  profile: {
+    activity: () => api.get('/social/profile/activity').then((r) => r.data),
+    homework: () => api.get('/social/profile/homework').then((r) => r.data),
   },
   polls: {
     vote: (id: number, optionIds: number[]) =>
@@ -55,7 +63,13 @@ export const socialApi = {
   reactions: {
     counts: (type: string, id: number) =>
       api.get('/social/reactions', { params: { type, id } }).then((r) => r.data),
-    toggle: (type: string, id: number, reaction: string) =>
+    toggle: (type: string, id: number, reaction: string = 'like') =>
       api.post('/social/reactions/toggle', { type, id, reaction }).then((r) => r.data),
+  },
+  bookmarks: {
+    list: (params?: { kind?: string; limit?: number; before?: string }) =>
+      api.get('/social/bookmarks', { params }).then((r) => r.data),
+    toggle: (type: string, id: number) =>
+      api.post('/social/bookmarks/toggle', { type, id }).then((r) => r.data),
   },
 };

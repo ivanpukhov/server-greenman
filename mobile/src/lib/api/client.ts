@@ -12,7 +12,6 @@ function resolveBaseUrl(): string {
 export const api: AxiosInstance = axios.create({
   baseURL: resolveBaseUrl(),
   timeout: 20000,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config) => {
@@ -40,7 +39,6 @@ api.interceptors.response.use(
 export const adminApi: AxiosInstance = axios.create({
   baseURL: resolveBaseUrl(),
   timeout: 60000,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 adminApi.interceptors.request.use((config) => {
