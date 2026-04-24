@@ -749,10 +749,10 @@ const ensureUsersSchema = async () => {
     }
 };
 
-const ensureSocialDatabase = async () => {
+const ensureStoriesSchema = async () => {
+    const queryInterface = socialDB.getQueryInterface();
+
     try {
-        await socialDB.sync();
-        const queryInterface = socialDB.getQueryInterface();
         const tableDefinition = await queryInterface.describeTable('stories');
         if (!tableDefinition.categoryTitle) {
             await queryInterface.addColumn('stories', 'categoryTitle', {
@@ -782,6 +782,19 @@ const ensureSocialDatabase = async () => {
                 defaultValue: 0
             });
         }
+    } catch (err) {
+        const message = String(err?.message || err?.parent?.message || '');
+        if (message.includes('No description found') || message.includes('no such table')) {
+            return;
+        }
+        throw err;
+    }
+};
+
+const ensureSocialDatabase = async () => {
+    try {
+        await ensureStoriesSchema();
+        await socialDB.sync();
     } catch (err) {
         console.error('Ошибка синхронизации базы данных соцсети:', err);
     }
