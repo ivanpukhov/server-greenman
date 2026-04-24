@@ -699,6 +699,20 @@ const ensureUsersSchema = async () => {
     try {
         const tableDefinition = await queryInterface.describeTable('users');
 
+        if (!tableDefinition.firstName) {
+            await queryInterface.addColumn('users', 'firstName', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
+        if (!tableDefinition.lastName) {
+            await queryInterface.addColumn('users', 'lastName', {
+                type: Sequelize.STRING,
+                allowNull: true
+            });
+        }
+
         if (!tableDefinition.lastIncomingMessageAt) {
             await queryInterface.addColumn('users', 'lastIncomingMessageAt', {
                 type: Sequelize.DATE,
@@ -749,6 +763,36 @@ const ensureUsersSchema = async () => {
 const ensureSocialDatabase = async () => {
     try {
         await socialDB.sync();
+        const queryInterface = socialDB.getQueryInterface();
+        const tableDefinition = await queryInterface.describeTable('stories');
+        if (!tableDefinition.categoryTitle) {
+            await queryInterface.addColumn('stories', 'categoryTitle', {
+                type: Sequelize.STRING(80),
+                allowNull: false,
+                defaultValue: 'Greenman'
+            });
+        }
+        if (!tableDefinition.categorySlug) {
+            await queryInterface.addColumn('stories', 'categorySlug', {
+                type: Sequelize.STRING(100),
+                allowNull: false,
+                defaultValue: 'greenman'
+            });
+        }
+        if (!tableDefinition.categoryOrder) {
+            await queryInterface.addColumn('stories', 'categoryOrder', {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+                defaultValue: 0
+            });
+        }
+        if (!tableDefinition.storyOrder) {
+            await queryInterface.addColumn('stories', 'storyOrder', {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+                defaultValue: 0
+            });
+        }
     } catch (err) {
         console.error('Ошибка синхронизации базы данных соцсети:', err);
     }

@@ -7,8 +7,9 @@ import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAuthStore } from '@/stores/auth.store';
 import { useCountryStore } from '@/stores/country.store';
+import { useDeleteAccount } from '@/hooks/useProfile';
 import { setLocale, getLocale, type AppLocale } from '@/i18n';
-import { ink, sand, greenman, clay } from '@/theme/colors';
+import { ink, sand } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { useState } from 'react';
 
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
   const country = useCountryStore((s) => s.country);
   const setCountry = useCountryStore((s) => s.setCountry);
   const [locale, setLocaleState] = useState<AppLocale>(getLocale());
+  const deleteAccount = useDeleteAccount();
 
   const handleLocale = (l: AppLocale) => {
     setLocale(l);
@@ -40,6 +42,28 @@ export default function SettingsScreen() {
       { text: 'Отмена', style: 'cancel' },
       { text: 'Выйти', style: 'destructive', onPress: () => { logout(); router.back(); } },
     ]);
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Удалить аккаунт?',
+      'Профиль, адреса, сохранения, лайки, репосты и комментарии будут удалены. Заказы останутся в системе без привязки к аккаунту.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount.mutateAsync();
+              router.replace('/');
+            } catch (e: any) {
+              Alert.alert('Не удалось удалить аккаунт', e?.response?.data?.message ?? 'Попробуйте ещё раз');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -143,6 +167,20 @@ export default function SettingsScreen() {
 
         {isAuth ? (
           <View className="mt-8">
+            <AnimatedPressable onPress={() => router.push('/auth/profile')} haptic="selection">
+              <View
+                className="mb-3 flex-row items-center gap-3 rounded-xl bg-white px-4 py-3.5"
+                style={shadows.flat}
+              >
+                <View className="h-10 w-10 items-center justify-center rounded-pill bg-sand-1">
+                  <Ionicons name="person-outline" size={20} color={ink.DEFAULT} />
+                </View>
+                <Text className="flex-1 text-[16px] font-bold text-ink">
+                  Имя и фамилия
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={sand[4]} />
+              </View>
+            </AnimatedPressable>
             <AnimatedPressable onPress={confirmLogout} haptic="medium">
               <View
                 className="flex-row items-center gap-3 rounded-xl bg-white px-4 py-3.5"
@@ -153,6 +191,23 @@ export default function SettingsScreen() {
                 </View>
                 <Text className="flex-1 text-[16px] font-bold" style={{ color: '#b00020' }}>
                   Выйти из аккаунта
+                </Text>
+              </View>
+            </AnimatedPressable>
+            <AnimatedPressable
+              onPress={confirmDelete}
+              haptic="medium"
+              disabled={deleteAccount.isPending}
+            >
+              <View
+                className="mt-3 flex-row items-center gap-3 rounded-xl border border-red-100 bg-white px-4 py-3.5"
+                style={shadows.flat}
+              >
+                <View className="h-10 w-10 items-center justify-center rounded-pill bg-red-50">
+                  <Ionicons name="trash-outline" size={20} color="#b00020" />
+                </View>
+                <Text className="flex-1 text-[16px] font-bold" style={{ color: '#b00020' }}>
+                  Удалить аккаунт
                 </Text>
               </View>
             </AnimatedPressable>

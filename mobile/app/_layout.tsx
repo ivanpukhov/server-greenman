@@ -1,6 +1,6 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Stack, SplashScreen, useRouter } from 'expo-router';
+import { Stack, SplashScreen, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -61,8 +61,11 @@ export default function RootLayout() {
   });
   const bootstrap = useAuthStore((s) => s.bootstrap);
   const isReady = useAuthStore((s) => s.isReady);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const requiresProfile = useAuthStore((s) => s.requiresProfile);
   const hasChosen = useCountryStore((s) => s.hasChosen);
   const router = useRouter();
+  const segments = useSegments();
   const [bootstrapped, setBootstrapped] = useState(false);
 
   useEffect(() => {
@@ -81,9 +84,11 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
       if (!hasChosen) {
         router.replace('/country-modal');
+      } else if (isAuthenticated && requiresProfile && segments.join('/') !== 'auth/profile') {
+        router.replace('/auth/profile');
       }
     }
-  }, [fontsLoaded, isReady, bootstrapped, hasChosen, router]);
+  }, [fontsLoaded, isReady, bootstrapped, hasChosen, isAuthenticated, requiresProfile, segments, router]);
 
   if (!fontsLoaded || !isReady || !bootstrapped) {
     return null;
@@ -98,6 +103,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="auth/phone" />
             <Stack.Screen name="auth/code" />
+            <Stack.Screen name="auth/profile" options={{ gestureEnabled: false }} />
             <Stack.Screen
               name="country-modal"
               options={{ presentation: 'modal', gestureEnabled: false }}

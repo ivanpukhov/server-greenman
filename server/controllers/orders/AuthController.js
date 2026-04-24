@@ -53,7 +53,21 @@ const AuthController = {
             await user.save();
 
             const token = jwtUtility.generateToken(user.id);
-            res.status(200).json({ token, userId: user.id });
+            const firstName = user.firstName || null;
+            const lastName = user.lastName || null;
+            res.status(200).json({
+                token,
+                userId: user.id,
+                user: {
+                    id: user.id,
+                    phoneNumber: user.phoneNumber,
+                    firstName,
+                    lastName,
+                    displayName: [firstName, lastName].filter(Boolean).join(' ') || null,
+                    requiresProfile: !firstName || !lastName
+                },
+                requiresProfile: !firstName || !lastName
+            });
         } catch (error) {
             res.status(500).json({ message: 'Ошибка при подтверждении кода', error });
         }

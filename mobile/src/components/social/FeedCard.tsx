@@ -7,7 +7,6 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { cssInterop } from 'nativewind';
 import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { IconButton } from '@/components/ui/IconButton';
 import { greenman, clay, sun } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { formatRelativeRu } from '@/lib/format/relativeTime';
@@ -249,6 +248,7 @@ function PostCard(props: Props) {
 
   return (
     <Animated.View entering={FadeIn.duration(220)} className="mx-4 mb-8">
+      <View style={{ width: CARD_W }}>
       {hasMedia ? (
         <AnimatedPressable
           onPress={onPress}
@@ -333,10 +333,11 @@ function PostCard(props: Props) {
       )}
       {/* engagement bar — overlapped */}
       <View
-        className="mx-5 -mt-5 overflow-hidden rounded-lg bg-surface"
+        className="-mt-5 overflow-hidden rounded-lg bg-surface"
         style={shadows.card}
       >
         <Engagement p={props} flat />
+      </View>
       </View>
     </Animated.View>
   );
@@ -418,7 +419,7 @@ function ArticleCard(props: Props) {
           </View>
         </View>
       </AnimatedPressable>
-      <View className="mx-5 mt-2 flex-row items-center justify-between">
+      <View className="mt-2 flex-row items-center justify-between px-1">
         <View className="flex-row items-center gap-4">
           <ActionBtn
             icon="heart-outline"
@@ -647,7 +648,7 @@ function WebinarCard(props: Props) {
           </View>
         </View>
       </AnimatedPressable>
-      <View className="mx-5 mt-3">
+      <View className="mt-3 overflow-hidden rounded-lg bg-surface" style={shadows.soft}>
         <Engagement p={props} flat />
       </View>
     </Animated.View>

@@ -30,6 +30,32 @@ function minPrice(product: Product): number | null {
   return types.reduce((min, t) => (t.price < min ? t.price : min), types[0].price);
 }
 
+function ProductRating({ product, small }: { product: Product; small?: boolean }) {
+  const count = product.rating?.count ?? 0;
+  const average = product.rating?.average ?? 0;
+  if (!count) {
+    return (
+      <View className="flex-row items-center gap-1">
+        <Ionicons name="star-outline" size={small ? 12 : 13} color="#a8aaa4" />
+        <Text className={`${small ? 'text-[10px]' : 'text-[11px]'} text-ink-muted`}>
+          Нет отзывов
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View className="flex-row items-center gap-1">
+      <Ionicons name="star" size={small ? 12 : 13} color="#d8942b" />
+      <Text className={`${small ? 'text-[10px]' : 'text-[11px]'} font-bold text-ink`}>
+        {average.toFixed(1)}
+      </Text>
+      <Text className={`${small ? 'text-[10px]' : 'text-[11px]'} text-ink-muted`}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
 function ProductCardInner({ product, variant = 'grid', width }: Props) {
   const router = useRouter();
   const currency = useCountryStore((s) => s.currency);
@@ -69,14 +95,15 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
   if (variant === 'rail' || variant === 'compact' || variant === 'hero') {
     const cardW = width ?? (variant === 'hero' ? 260 : variant === 'compact' ? 150 : 180);
     const imgH = variant === 'hero' ? 260 : variant === 'compact' ? 150 : 180;
+    const bodyH = variant === 'compact' ? 92 : 104;
 
     return (
       <AnimatedPressable
         onPress={goDetail}
         haptic="selection"
         scale={0.97}
-        wrapperStyle={[{ width: cardW }, shadows.soft]}
-        className="rounded-lg overflow-hidden bg-surface"
+        wrapperStyle={[{ width: cardW, minWidth: cardW, maxWidth: cardW, flexBasis: cardW }, shadows.soft]}
+        className="w-full overflow-hidden rounded-lg bg-surface"
       >
         <View style={{ width: cardW, height: imgH }} className="relative bg-sand-1">
           <ProductPlaceholder
@@ -119,15 +146,18 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
             ) : null}
           </View>
         </View>
-        <View className="gap-1 p-4">
+        <View className="gap-1 p-4" style={{ width: cardW, height: bodyH, minWidth: 0 }}>
           <Text
             className="font-semibold text-[14px] leading-[18px] text-ink"
             numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ maxWidth: cardW - 32, minWidth: 0 }}
           >
             {product.name}
           </Text>
+          <ProductRating product={product} small={variant === 'compact'} />
           {price != null ? (
-            <View className="mt-1 flex-row items-baseline gap-1">
+            <View className="mt-1 flex-row items-baseline gap-1" style={{ maxWidth: cardW - 32, minWidth: 0 }}>
               {hasMultiple ? (
                 <Text
                   className="text-[10px] font-bold uppercase text-ink-muted"
@@ -137,8 +167,11 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
                 </Text>
               ) : null}
               <Text
-                className="font-display text-[20px] leading-[22px] text-ink"
+                className="font-display text-[19px] leading-[22px] text-ink"
                 tracking="tight"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ flexShrink: 1, minWidth: 0 }}
               >
                 {formatPrice(price, currency)}
               </Text>
@@ -153,13 +186,13 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
 
   // GRID variant — 2-col
   return (
-    <View className="flex-1">
+    <View className="flex-1" style={{ minWidth: 0 }}>
       <AnimatedPressable
         onPress={goDetail}
         haptic="selection"
         scale={0.97}
         wrapperStyle={shadows.flat}
-        className="overflow-hidden rounded-lg bg-surface"
+        className="min-h-[276px] overflow-hidden rounded-lg bg-surface"
       >
         <View className="relative aspect-[4/5] bg-sand-1">
           <ProductPlaceholder
@@ -202,15 +235,18 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
             ) : null}
           </View>
         </View>
-        <View className="gap-1 px-3 pb-4 pt-3">
+        <View className="gap-1 px-3 pb-4 pt-3" style={{ height: 104, minWidth: 0 }}>
           <Text
             className="text-[13px] leading-[17px] font-semibold text-ink"
             numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ minWidth: 0 }}
           >
             {product.name}
           </Text>
+          <ProductRating product={product} small />
           {price != null ? (
-            <View className="mt-0.5 flex-row items-baseline gap-1">
+            <View className="mt-0.5 flex-row items-baseline gap-1" style={{ minWidth: 0 }}>
               {hasMultiple ? (
                 <Text
                   className="text-[10px] font-bold uppercase text-ink-muted"
@@ -220,8 +256,11 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
                 </Text>
               ) : null}
               <Text
-                className="font-display text-[18px] leading-[20px] text-ink"
+                className="font-display text-[17px] leading-[20px] text-ink"
                 tracking="tight"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ flexShrink: 1, minWidth: 0 }}
               >
                 {formatPrice(price, currency)}
               </Text>

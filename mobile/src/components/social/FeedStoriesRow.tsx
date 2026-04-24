@@ -10,6 +10,10 @@ import { greenman } from '@/theme/colors';
 type MediaObj = { url?: string | null } | null | undefined;
 
 export type StoryGroupItem = {
+  id?: string;
+  categorySlug?: string;
+  categoryTitle?: string;
+  categoryOrder?: number;
   adminUserId: number;
   adminName?: string | null;
   adminAvatar?: MediaObj;
@@ -35,13 +39,13 @@ export function FeedStoriesRow({ groups }: Props) {
         const seen = g.viewedAll ?? g.stories?.every((s) => s.viewed) ?? false;
         return (
           <AnimatedPressable
-            key={g.adminUserId}
+            key={g.categorySlug ?? g.id ?? String(g.adminUserId)}
             onPress={() => first?.id && router.push(`/social/story/${first.id}`)}
             haptic="selection"
             scale={0.92}
             wrapperClassName="items-center"
             accessibilityRole="button"
-            accessibilityLabel={g.adminName ?? 'Сториз'}
+            accessibilityLabel={g.categoryTitle ?? g.adminName ?? 'Сториз'}
           >
             <StoryRing size={68} seen={seen}>
               {preview ? (
@@ -61,7 +65,7 @@ export function FeedStoriesRow({ groups }: Props) {
               className="mt-2 max-w-[72px] text-center text-[11px] font-semibold text-ink"
               numberOfLines={1}
             >
-              {g.adminName ?? 'Greenman'}
+              {g.categoryTitle ?? g.adminName ?? 'Greenman'}
             </Text>
           </AnimatedPressable>
         );

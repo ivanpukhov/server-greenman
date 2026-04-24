@@ -58,6 +58,10 @@ export type Story = {
   id: number;
   adminUserId: number;
   mediaId: number;
+  categoryTitle: string;
+  categorySlug: string;
+  categoryOrder: number;
+  storyOrder: number;
   caption: string | null;
   durationSec: number;
   publishedAt: string | null;

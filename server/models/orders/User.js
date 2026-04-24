@@ -14,6 +14,14 @@ const User = orderDB.define('user', {
         unique: true,
         allowNull: false
     },
+    firstName: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
+    lastName: {
+        type: Sequelize.STRING,
+        allowNull: true
+    },
     role: {
         type: Sequelize.STRING,
         defaultValue: 'user' // 'user' или 'admin'

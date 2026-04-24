@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
-import type { Product } from '@/lib/api/types';
+import type { Product, ProductReviewsResponse } from '@/lib/api/types';
 
 export type SearchType = 'name' | 'disease';
 
@@ -41,5 +41,35 @@ export function useSearchProducts(type: SearchType, query: string) {
       return data;
     },
     staleTime: 60 * 1000,
+  });
+}
+
+export function useProductReviews(productId: number | string | undefined) {
+  const numericId = typeof productId === 'string' ? Number(productId) : productId;
+  return useQuery({
+    queryKey: ['product', numericId, 'reviews'],
+    enabled: Number.isFinite(numericId) && numericId! > 0,
+    queryFn: async () => {
+      const { data } = await api.get<ProductReviewsResponse>(endpoints.products.reviews(numericId!));
+      return data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateProductReview(productId: number | string | undefined) {
+  const qc = useQueryClient();
+  const numericId = typeof productId === 'string' ? Number(productId) : productId;
+  return useMutation({
+    mutationFn: async (payload: { rating: number; body?: string }) => {
+      if (!numericId) throw new Error('productId is required');
+      const { data } = await api.post(endpoints.products.reviews(numericId), payload);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product', numericId] });
+      qc.invalidateQueries({ queryKey: ['product', numericId, 'reviews'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 }

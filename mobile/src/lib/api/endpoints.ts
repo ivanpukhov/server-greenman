@@ -6,6 +6,8 @@ export const endpoints = {
   },
   profile: {
     me: '/profile',
+    update: '/profile',
+    remove: '/profile',
   },
   orderProfiles: {
     create: '/order-profiles',
@@ -23,6 +25,7 @@ export const endpoints = {
   products: {
     list: '/products',
     byId: (id: number) => `/products/${id}`,
+    reviews: (id: number) => `/products/${id}/reviews`,
     search: (name: string) => `/products/search/${encodeURIComponent(name)}`,
     byIdsAndTypes: '/products/getProductsByIdsAndTypes',
   },

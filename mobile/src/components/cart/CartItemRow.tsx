@@ -1,5 +1,4 @@
-import { Pressable, View } from 'react-native';
-import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { Pressable, View, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/components/ui/Text';
@@ -15,24 +14,16 @@ export function CartItemRow({ item }: Props) {
   const remove = useCartStore((s) => s.remove);
   const updateQty = useCartStore((s) => s.updateQty);
 
-  const renderRightActions = () => (
-    <View className="my-1 w-24 items-center justify-center rounded-xl bg-red-500">
-      <Ionicons name="trash-outline" size={22} color="#fff" />
-      <Text className="mt-1 text-xs font-bold text-white">Удалить</Text>
-    </View>
-  );
+  const confirmRemove = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert('Удалить товар?', item.productName, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: () => remove(item.productId, item.type.id) },
+    ]);
+  };
 
   return (
-    <Swipeable
-      renderRightActions={renderRightActions}
-      onSwipeableOpen={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-        remove(item.productId, item.type.id);
-      }}
-      friction={2}
-      rightThreshold={60}
-    >
-      <View className="flex-row gap-3 rounded-xl border border-border bg-white p-3">
+      <View className="flex-row gap-3 rounded-lg border border-border bg-white p-3">
         <ProductPlaceholder
           name={item.productName}
           size="thumb"
@@ -45,11 +36,15 @@ export function CartItemRow({ item }: Props) {
           <Text className="mt-1 text-xs text-ink-dim" numberOfLines={1}>
             {item.type.type}
           </Text>
-          <View className="mt-2 flex-row items-center justify-between">
-            <Text className="text-base font-bold text-greenman-8">
+          <View className="mt-3 flex-row items-center justify-between gap-2">
+            <Text
+              className="flex-1 text-[15px] font-bold text-greenman-8"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {formatPrice(item.type.price * item.quantity, currency)}
             </Text>
-            <View className="flex-row items-center gap-1 rounded-full bg-greenman-0 px-1">
+            <View className="flex-row items-center gap-1 rounded-lg bg-greenman-0 px-1">
               <StepBtn
                 icon="remove"
                 accessibilityLabel="Уменьшить количество"
@@ -73,8 +68,15 @@ export function CartItemRow({ item }: Props) {
             </View>
           </View>
         </View>
+        <Pressable
+          onPress={confirmRemove}
+          accessibilityRole="button"
+          accessibilityLabel="Удалить товар"
+          className="h-9 w-9 items-center justify-center rounded-lg bg-sand-1 active:bg-red-50"
+        >
+          <Ionicons name="trash-outline" size={17} color="#8f2f2f" />
+        </Pressable>
       </View>
-    </Swipeable>
   );
 }
 

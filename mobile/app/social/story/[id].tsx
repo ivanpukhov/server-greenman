@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -23,7 +23,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Text } from '@/components/ui/Text';
 import { socialApi } from '@/features/social/api';
-import { semantic } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -36,7 +35,7 @@ type Story = {
   media?: { url?: string | null; type?: 'image' | 'video'; blurhash?: string | null } | null;
 };
 
-type Group = { adminUserId: number; stories: Story[] };
+type Group = { id?: string; categorySlug?: string; categoryTitle?: string; adminUserId: number; stories: Story[] };
 
 export default function StoryScreen() {
   const insets = useSafeAreaInsets();
@@ -112,7 +111,7 @@ export default function StoryScreen() {
       <FlatList
         ref={pagerRef}
         data={groups}
-        keyExtractor={(g) => String(g.adminUserId)}
+        keyExtractor={(g) => g.categorySlug ?? g.id ?? String(g.adminUserId)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -302,7 +301,7 @@ function GroupView({
             fontSize: 14,
           }}
         >
-          Greenman
+          {group.categoryTitle ?? 'Greenman'}
         </Text>
         <Pressable
           onPress={onClose}

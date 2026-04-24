@@ -10,7 +10,7 @@ type Props = {
   hidden?: boolean;
 };
 
-export function FloatingCartButton({ bottomOffset = 96, hidden }: Props) {
+export function FloatingCartButton({ bottomOffset = 112, hidden }: Props) {
   const router = useRouter();
   const cartCount = useCartStore((s) => s.items.reduce((n, i) => n + i.quantity, 0));
 
@@ -28,10 +28,10 @@ export function FloatingCartButton({ bottomOffset = 96, hidden }: Props) {
         }}
         accessibilityLabel="Открыть корзину"
         accessibilityRole="button"
-        className="h-14 flex-row items-center rounded-full bg-greenman-7 pl-4 pr-5 shadow-pop active:opacity-90"
+        className="h-12 flex-row items-center rounded-lg bg-greenman-7 pl-4 pr-4 shadow-pop active:opacity-90"
       >
         <Ionicons name="bag-handle" size={22} color="#fff" />
-        <Text className="ml-2 text-sm font-bold text-white">В корзине</Text>
+        <Text className="ml-2 text-sm font-bold text-white">Корзина</Text>
         <View className="ml-3 min-w-6 items-center justify-center rounded-full bg-white px-2 py-0.5">
           <Text className="text-xs font-bold text-greenman-8">{cartCount}</Text>
         </View>

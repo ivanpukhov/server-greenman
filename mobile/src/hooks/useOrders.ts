@@ -3,12 +3,7 @@ import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import type { Order, OrderProfile } from '@/lib/api/types';
 import { useAuthStore } from '@/stores/auth.store';
-
-type ProfileResponse = {
-  phoneNumber: string;
-  orderProfiles: unknown[];
-  orders: Order[];
-};
+import type { ProfileResponse } from '@/hooks/useProfile';
 
 export function useMyOrders() {
   const userId = useAuthStore((s) => s.userId);

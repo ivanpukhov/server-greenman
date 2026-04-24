@@ -1,4 +1,4 @@
-import { View, Platform } from 'react-native';
+import { View } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,21 +101,24 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        left: 14,
-        right: 14,
-        bottom: Math.max(insets.bottom, 14),
+        left: 0,
+        right: 0,
+        bottom: 0,
       }}
     >
       <View
-        className="overflow-hidden rounded-pill"
-        style={[shadows.float, Platform.OS === 'android' ? { borderRadius: 999 } : null]}
+        className="overflow-hidden rounded-t-xl"
+        style={shadows.float}
       >
         <LinearGradient
           colors={['#05210f', '#0b2a17', '#04401d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View className="flex-row items-center justify-between px-2 py-2">
+          <View
+            className="flex-row items-center justify-between px-2 pt-2"
+            style={{ paddingBottom: Math.max(insets.bottom, 10) }}
+          >
             {state.routes.map((route, idx) => {
               const focused = state.index === idx;
               const badge = route.name === 'cart' ? cartCount : undefined;

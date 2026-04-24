@@ -12,8 +12,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
   BottomSheetTextInput,
-  BottomSheetFooter,
-  type BottomSheetFooterProps,
+  BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -42,7 +41,7 @@ type CommentItem = {
   parentCommentId: number | null;
   createdAt: string;
   editedAt?: string | null;
-  author: Author;
+  author?: Author;
 };
 
 type TreeNode = CommentItem & { children: CommentItem[] };
@@ -62,10 +61,23 @@ const commentKeys = {
   list: (t: CommentableType, id: number) => ['social', 'comments', t, id] as const,
 };
 
+function fallbackAuthor(c: Pick<CommentItem, 'userId' | 'adminUserId'>): Author {
+  if (c.adminUserId) return { id: `admin-${c.adminUserId}`, name: 'Greenman', kind: 'admin' };
+  if (c.userId) return { id: `user-${c.userId}`, name: 'Пользователь', kind: 'user' };
+  return { id: 'anon', name: 'Гость', kind: 'anon' };
+}
+
+function normalizeComment(c: CommentItem): CommentItem & { author: Author } {
+  return {
+    ...c,
+    author: c.author ?? fallbackAuthor(c),
+  };
+}
+
 function buildTree(flat: CommentItem[]): TreeNode[] {
   const roots: TreeNode[] = [];
   const byId = new Map<number, TreeNode>();
-  for (const c of flat) byId.set(c.id, { ...c, children: [] });
+  for (const c of flat) byId.set(c.id, { ...normalizeComment(c), children: [] });
   for (const node of byId.values()) {
     if (node.parentCommentId && byId.has(node.parentCommentId)) {
       byId.get(node.parentCommentId)!.children.push(node);
@@ -109,8 +121,9 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
     queryFn: async () => {
       if (!id) return [];
       const data = (await socialApi.comments.list(type, id)) as CommentItem[];
-      onCountChange?.(data.length);
-      return data;
+      const normalized = data.map(normalizeComment);
+      onCountChange?.(normalized.length);
+      return normalized;
     },
     enabled: !!id,
     staleTime: 15_000,
@@ -129,7 +142,7 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
       if (!id) return;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       qc.setQueryData<CommentItem[]>(commentKeys.list(type, id), (prev) => {
-        const next = [...(prev ?? []), created];
+        const next = [...(prev ?? []).map(normalizeComment), normalizeComment(created)];
         onCountChange?.(next.length);
         return next;
       });
@@ -162,19 +175,18 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
     createM.mutate({ body: text, parentCommentId: replyTo?.id });
   };
 
-  const renderFooter = useCallback(
-    (props: BottomSheetFooterProps) => (
-      <BottomSheetFooter {...props}>
-        <View
-          style={{
-            paddingHorizontal: spacing.md,
-            paddingTop: spacing.xs,
-            paddingBottom: spacing.md,
-            backgroundColor: semantic.surface,
-            borderTopWidth: 1,
-            borderTopColor: semantic.border,
-          }}
-        >
+  const inputBlock = (
+    <BottomSheetView>
+      <View
+        style={{
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.xs,
+          paddingBottom: spacing.md,
+          backgroundColor: semantic.surface,
+          borderTopWidth: 1,
+          borderTopColor: semantic.border,
+        }}
+      >
           {replyTo ? (
             <View
               style={{
@@ -190,7 +202,7 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
             >
               <Ionicons name="return-down-forward" size={14} color={semantic.accent} />
               <Text style={[ui.meta, { flex: 1 }]} numberOfLines={1}>
-                Ответ {replyTo.author.name}
+                Ответ {normalizeComment(replyTo).author.name}
               </Text>
               <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
                 <Ionicons name="close" size={16} color={semantic.inkDim} />
@@ -259,10 +271,8 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
               )}
             </Pressable>
           </View>
-        </View>
-      </BottomSheetFooter>
-    ),
-    [input, replyTo, isAuthed, createM.isPending]
+      </View>
+    </BottomSheetView>
   );
 
   const renderItem = useCallback(
@@ -281,7 +291,6 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
       ref={sheetRef}
       snapPoints={snapPoints}
       backdropComponent={renderBackdrop}
-      footerComponent={renderFooter}
       enablePanDownToClose
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
@@ -311,7 +320,7 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
         data={tree}
         keyExtractor={(it) => String(it.id)}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingVertical: spacing.sm, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingVertical: spacing.sm, paddingBottom: spacing.lg }}
         ListEmptyComponent={
           q.isLoading ? (
             <View style={{ padding: spacing.xl, alignItems: 'center' }}>
@@ -328,6 +337,7 @@ export const CommentsSheet = forwardRef<CommentsSheetRef, Props>(function Commen
           )
         }
       />
+      {inputBlock}
     </BottomSheetModal>
   );
 });
@@ -345,7 +355,8 @@ function CommentRow({
 }) {
   const myUserId = useAuthStore((s) => s.userId);
   const canDelete = node.userId != null && node.userId === myUserId;
-  const isAdmin = node.author.kind === 'admin';
+  const author = node.author ?? fallbackAuthor(node);
+  const isAdmin = author.kind === 'admin';
 
   return (
     <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
@@ -369,7 +380,7 @@ function CommentRow({
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             <Text style={ui.label} numberOfLines={1}>
-              {node.author.name}
+              {author.name}
             </Text>
             {isAdmin ? (
               <View

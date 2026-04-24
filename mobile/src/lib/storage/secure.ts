@@ -7,6 +7,8 @@ export type SecureSession = {
   token: string;
   userId: number;
   authAt: number;
+  firstName?: string | null;
+  lastName?: string | null;
 };
 
 export type AdminSecureSession = {

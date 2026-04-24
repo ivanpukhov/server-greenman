@@ -22,6 +22,28 @@ export type Product = {
   applicationMethodAdults?: string | null;
   videoUrl?: string | null;
   types?: ProductType[];
+  rating?: ProductRating;
+};
+
+export type ProductRating = {
+  average: number;
+  count: number;
+};
+
+export type ProductReview = {
+  id: number;
+  productId: number;
+  userId: number;
+  rating: number;
+  body: string | null;
+  author?: { id: string; name: string };
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ProductReviewsResponse = {
+  rating: ProductRating;
+  reviews: ProductReview[];
 };
 
 export type User = {
@@ -29,6 +51,19 @@ export type User = {
   phoneNumber: string;
   role: 'user' | 'admin';
   isPhoneConfirmed: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  requiresProfile?: boolean;
+};
+
+export type ProfileUser = {
+  id: number;
+  phoneNumber: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  requiresProfile: boolean;
 };
 
 export type OrderProfile = {
@@ -133,4 +168,6 @@ export type AuthRegisterLoginResponse = {
 export type AuthConfirmCodeResponse = {
   token: string;
   userId: number;
+  user?: ProfileUser;
+  requiresProfile?: boolean;
 };

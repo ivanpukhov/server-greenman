@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/Button';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Shimmer } from '@/components/ui/Shimmer';
 import { useAuthStore } from '@/stores/auth.store';
-import { greenman, clay, sun, sand, ink, plum } from '@/theme/colors';
+import { greenman, clay, sun, sand, ink } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { useCountryStore } from '@/stores/country.store';
 import { useMyOrders, useOrderProfiles, useDeleteOrderProfile } from '@/hooks/useOrders';
+import { useProfile } from '@/hooks/useProfile';
 import { formatPrice } from '@/lib/format/price';
 import { ProfileHero } from '@/components/profile/ProfileHero';
-import type { Order, OrderProfile, OrderStatus } from '@/lib/api/types';
+import type { Order, OrderProfile } from '@/lib/api/types';
 
 cssInterop(LinearGradient, { className: 'style' });
 
@@ -42,9 +43,11 @@ export default function ProfileScreen() {
   const userId = useAuthStore((s) => s.userId);
   const logout = useAuthStore((s) => s.logout);
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  const storedDisplayName = useAuthStore((s) => s.displayName);
   const country = useCountryStore((s) => s.country);
   const setCountry = useCountryStore((s) => s.setCountry);
 
+  const profile = useProfile();
   const orders = useMyOrders();
   const profiles = useOrderProfiles();
 
@@ -61,7 +64,7 @@ export default function ProfileScreen() {
 
   const ordersData = orders.data ?? [];
   const profilesData = profiles.data ?? [];
-  const displayName = `Пользователь #${userId}`;
+  const displayName = profile.data?.displayName || storedDisplayName || `Пользователь #${userId}`;
 
   return (
     <Screen edges={['left', 'right']}>
@@ -70,8 +73,9 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={
           <RefreshControl
-            refreshing={orders.isRefetching || profiles.isRefetching}
+            refreshing={profile.isRefetching || orders.isRefetching || profiles.isRefetching}
             onRefresh={() => {
+              profile.refetch();
               orders.refetch();
               profiles.refetch();
             }}
@@ -150,8 +154,8 @@ export default function ProfileScreen() {
 
         <View className="mt-8 px-5">
           <View className="flex-row gap-2">
-            <CountryPill active={country === 'KZ'} label="Казахстан" onPress={() => setCountry('KZ')} />
-            <CountryPill active={country === 'RF'} label="Россия" onPress={() => setCountry('RF')} />
+            <CountryPill active={country === 'KZ'} country="KZ" label="Казахстан" onPress={() => setCountry('KZ')} />
+            <CountryPill active={country === 'RF'} country="RF" label="Россия" onPress={() => setCountry('RF')} />
           </View>
         </View>
 
@@ -245,7 +249,7 @@ function ActionGrid({ router }: { router: ReturnType<typeof useRouter> }) {
     },
   ];
   return (
-    <View className="flex-row flex-wrap gap-3">
+    <View className="flex-row flex-wrap justify-between" style={{ rowGap: 12 }}>
       {items.map((it) => (
         <AnimatedPressable
           key={it.title}
@@ -456,20 +460,38 @@ function AddressesList({
 function CountryPill({
   active,
   label,
+  country,
   onPress,
 }: {
   active: boolean;
   label: string;
+  country: 'KZ' | 'RF';
   onPress: () => void;
 }) {
+  const flag = country === 'KZ' ? '🇰🇿' : '🇷🇺';
+  const currency = country === 'KZ' ? 'KZT' : 'RUB';
   return (
     <AnimatedPressable onPress={onPress} haptic="selection" wrapperStyle={{ flex: 1 }}>
       <View
-        className={`h-11 items-center justify-center rounded-pill ${active ? 'bg-ink' : 'bg-sand-1'}`}
+        className={`min-h-[58px] justify-center rounded-lg px-3 py-2.5 ${
+          active ? 'bg-ink' : 'bg-sand-1'
+        }`}
       >
-        <Text className={`text-[13px] font-bold ${active ? 'text-white' : 'text-ink/60'}`} tracking="tight">
-          {label}
-        </Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-[18px]">{flag}</Text>
+          <View className="min-w-0 flex-1">
+            <Text
+              className={`text-[13px] font-bold ${active ? 'text-white' : 'text-ink'}`}
+              tracking="tight"
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+            <Text className={`mt-0.5 text-[11px] ${active ? 'text-white/60' : 'text-ink/50'}`}>
+              {currency}
+            </Text>
+          </View>
+        </View>
       </View>
     </AnimatedPressable>
   );

@@ -7,5 +7,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.get('/', authMiddleware, OrderProfileController.getUserDetails);
+router.patch('/', authMiddleware, OrderProfileController.updateUserProfile);
+router.delete('/', authMiddleware, OrderProfileController.deleteAccount);
 
 module.exports = router;

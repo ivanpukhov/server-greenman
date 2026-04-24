@@ -1,11 +1,72 @@
 const Product = require('../models/Product');
 const ProductType = require('../models/ProductType');
+const ProductReview = require('../models/ProductReview');
+const User = require('../models/orders/User');
 const indexProductsInMeiliSearch = require('../indexation');
 const axios = require('axios'); // Для выполнения HTTP-запросов
 const OpenAI = require('openai');
 const meiliSearchClient = require('../utilities/meiliSearchClient')
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
+
+function emptyRating() {
+    return { average: 0, count: 0 };
+}
+
+async function ratingMap(productIds) {
+    if (!productIds.length) return new Map();
+    const rows = await ProductReview.findAll({
+        where: { productId: { [Op.in]: productIds } },
+        attributes: [
+            'productId',
+            [Sequelize.fn('COUNT', Sequelize.col('id')), 'count'],
+            [Sequelize.fn('AVG', Sequelize.col('rating')), 'average']
+        ],
+        group: ['productId'],
+        raw: true
+    });
+    return new Map(
+        rows.map((r) => [
+            Number(r.productId),
+            {
+                average: Math.round(Number(r.average || 0) * 10) / 10,
+                count: Number(r.count || 0)
+            }
+        ])
+    );
+}
+
+async function attachRatings(products) {
+    const arr = Array.isArray(products) ? products : [products];
+    const ids = arr.map((p) => Number(p.id)).filter(Boolean);
+    const ratings = await ratingMap(ids);
+    const serialized = arr.map((p) => ({
+        ...(p.toJSON ? p.toJSON() : p),
+        rating: ratings.get(Number(p.id)) || emptyRating()
+    }));
+    return Array.isArray(products) ? serialized : serialized[0];
+}
+
+function serializeAuthor(user) {
+    if (!user) return { id: 'anon', name: 'Пользователь' };
+    const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return { id: `user-${user.id}`, name: name || 'Пользователь' };
+}
+
+async function hydrateReviews(reviews) {
+    const userIds = [...new Set(reviews.map((r) => r.userId).filter(Boolean))];
+    const users = userIds.length
+        ? await User.findAll({ where: { id: userIds }, attributes: ['id', 'firstName', 'lastName'] })
+        : [];
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    return reviews.map((r) => {
+        const json = r.toJSON ? r.toJSON() : r;
+        return {
+            ...json,
+            author: serializeAuthor(usersById.get(json.userId))
+        };
+    });
+}
 
 
 
@@ -50,7 +111,8 @@ const productController = {
 
             const responsePayload = {
                 ...product.toJSON(),
-                types: productTypes
+                types: productTypes,
+                rating: emptyRating()
             };
             console.log('Ответ сервера:', responsePayload);
             res.status(201).json(responsePayload);
@@ -114,7 +176,7 @@ const productController = {
             const products = await Product.findAll({
                 include: [{model: ProductType, as: 'types'}]
             });
-            res.json(products);
+            res.json(await attachRatings(products));
         } catch (err) {
             res.status(500).json({error: err.message});
         }
@@ -126,7 +188,7 @@ const productController = {
                 include: [{model: ProductType, as: 'types'}]
             });
             if (product) {
-                res.json(product);
+                res.json(await attachRatings(product));
             } else {
                 res.status(404).json({error: 'Продукт не найден'});
             }
@@ -179,7 +241,7 @@ const productController = {
             const updatedProduct = await Product.findByPk(id, {
                 include: [{ model: ProductType, as: 'types' }]
             });
-            res.json(updatedProduct);
+            res.json(await attachRatings(updatedProduct));
         } catch (err) {
             console.error('Ошибка при обновлении продукта:', err);
             res.status(500).json({ error: err.message });
@@ -252,12 +314,68 @@ const productController = {
             });
 
             if (products.length > 0) {
-                res.json(products);
+                res.json(await attachRatings(products));
             } else {
                 res.status(404).json({ error: 'Продукты не найдены' });
             }
         } catch (err) {
             res.status(500).json({ error: 'Ошибка поиска: ' + err.message });
+        }
+    },
+
+    listReviews: async (req, res) => {
+        try {
+            const product = await Product.findByPk(req.params.id);
+            if (!product) return res.status(404).json({error: 'Продукт не найден'});
+
+            const reviews = await ProductReview.findAll({
+                where: {productId: product.id},
+                order: [['createdAt', 'DESC'], ['id', 'DESC']]
+            });
+            res.json({
+                rating: (await attachRatings(product)).rating,
+                reviews: await hydrateReviews(reviews)
+            });
+        } catch (err) {
+            res.status(500).json({error: err.message});
+        }
+    },
+
+    createReview: async (req, res) => {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) return res.status(401).json({message: 'Нужна авторизация'});
+
+            const product = await Product.findByPk(req.params.id);
+            if (!product) return res.status(404).json({error: 'Продукт не найден'});
+
+            const rating = Number(req.body?.rating);
+            const body = String(req.body?.body || '').trim();
+            if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+                return res.status(400).json({message: 'Оценка должна быть от 1 до 5'});
+            }
+            if (body.length > 2000) {
+                return res.status(400).json({message: 'Отзыв слишком длинный'});
+            }
+
+            const [review, created] = await ProductReview.findOrCreate({
+                where: {productId: product.id, userId},
+                defaults: {rating, body: body || null}
+            });
+            if (!created) {
+                review.rating = rating;
+                review.body = body || null;
+                await review.save();
+            }
+
+            const [hydrated] = await hydrateReviews([review]);
+            const ratedProduct = await attachRatings(product);
+            res.status(created ? 201 : 200).json({
+                review: hydrated,
+                rating: ratedProduct.rating
+            });
+        } catch (err) {
+            res.status(500).json({error: err.message});
         }
     },
 

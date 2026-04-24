@@ -16,7 +16,6 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Section } from '@/components/ui/Section';
 import { Chip } from '@/components/ui/Chip';
 import { ProductRail } from '@/components/product/ProductRail';
-import { ProductGrid, ProductGridSkeleton } from '@/components/product/ProductGrid';
 import { useProducts } from '@/hooks/useProducts';
 import { useCountryStore } from '@/stores/country.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -27,6 +26,8 @@ import { formatPrice } from '@/lib/format/price';
 
 const WHATSAPP_URL = 'https://wa.me/77001234567';
 const { width: SCREEN_W } = Dimensions.get('window');
+const QUICK_GAP = 12;
+const QUICK_TILE_W = (SCREEN_W - 40 - QUICK_GAP) / 2;
 
 function greetingKey(): 'morning' | 'day' | 'evening' | 'night' {
   const h = new Date().getHours();
@@ -55,8 +56,6 @@ export default function HomeScreen() {
 
   const sorted = useMemo(() => products ?? [], [products]);
   const top = useMemo(() => sorted.slice(0, 8), [sorted]);
-  const fresh = useMemo(() => sorted.slice(8, 14), [sorted]);
-  const recommended = useMemo(() => sorted.slice(3, 9), [sorted]);
 
   const activeOrder = orders.data?.find(
     (o) => o.status !== 'доставлено' && o.status !== 'отменен',
@@ -195,8 +194,8 @@ export default function HomeScreen() {
 
         {/* =========== QUICK ACTIONS (overlapping) =========== */}
         <View
-          className="mx-5 flex-row flex-wrap gap-3"
-          style={{ marginTop: -42 }}
+          className="mx-5 flex-row justify-between"
+          style={{ marginTop: -42, gap: QUICK_GAP }}
         >
           <QuickTile
             bg="bg-white"
@@ -218,7 +217,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        <View className="mx-5 mt-3 flex-row flex-wrap gap-3">
+        <View className="mx-5 mt-3 flex-row justify-between" style={{ gap: QUICK_GAP }}>
           <QuickTile
             bg="bg-sand-1"
             icon={<Ionicons name="bookmark-outline" size={20} color={sand[4]} />}
@@ -231,7 +230,7 @@ export default function HomeScreen() {
             bg="bg-sun-0"
             icon={<Ionicons name="school-outline" size={20} color={sun[3]} />}
             label="Курсы"
-            sub="Травы · дни"
+            sub="Уроки · задания"
             onPress={() => router.push('/social/my-courses')}
             accentBg="#ffe68a80"
           />
@@ -396,7 +395,7 @@ export default function HomeScreen() {
                 className="mt-3 font-serif text-[26px] leading-[30px] text-white"
                 tracking="tight"
               >
-                Научись{'\n'}травничеству{'\n'}с нуля
+                Забота о здоровье{'\n'}шаг за шагом
               </Text>
               <Text className="mt-3 text-[13px] leading-[18px] text-white/85" numberOfLines={2}>
                 Короткие уроки · домашние задания · поддержка
@@ -413,50 +412,6 @@ export default function HomeScreen() {
             </LinearGradient>
           </AnimatedPressable>
         </View>
-
-        {/* =========== RECOMMENDED GRID (staggered feeling) =========== */}
-        {recommended.length ? (
-          <View className="mt-10">
-            <View className="px-5">
-              <Text
-                className="text-[10px] font-bold uppercase text-sun-3"
-                tracking="widest"
-              >
-                Для вас
-              </Text>
-              <Text className="mt-1.5 font-serif text-[22px] leading-[26px] text-ink">
-                Подобрано по интересам
-              </Text>
-            </View>
-            <View className="mt-4 px-5">
-              {isLoading ? (
-                <ProductGridSkeleton rows={2} />
-              ) : (
-                <ProductGrid products={recommended.slice(0, 4)} />
-              )}
-            </View>
-          </View>
-        ) : null}
-
-        {/* =========== NEW ARRIVALS RAIL =========== */}
-        {fresh.length ? (
-          <>
-            <Section
-              eyebrow="Новинки"
-              title="Только что поступили"
-              serif
-              spacing="loose"
-              noGutter
-              className="px-5"
-              eyebrowTone="clay"
-            >
-              {null}
-            </Section>
-            <View className="mt-1">
-              <ProductRail products={fresh} size="compact" />
-            </View>
-          </>
-        ) : null}
 
         {/* =========== WHATSAPP CTA =========== */}
         <View className="mt-12 px-5">
@@ -534,8 +489,7 @@ function QuickTile({
       onPress={onPress}
       haptic="selection"
       scale={0.97}
-      wrapperClassName="flex-1 basis-[47%]"
-      wrapperStyle={elevated ? shadows.card : shadows.soft}
+      wrapperStyle={{ width: QUICK_TILE_W, ...(elevated ? shadows.card : shadows.soft) }}
       className={`rounded-lg p-4 ${bg}`}
     >
       <View
