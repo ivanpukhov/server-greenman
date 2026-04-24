@@ -1,4 +1,4 @@
-import { View, ScrollView, Alert, RefreshControl, Dimensions } from 'react-native';
+import { View, ScrollView, Alert, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,11 +16,10 @@ import { useMyOrders, useOrderProfiles, useDeleteOrderProfile } from '@/hooks/us
 import { useProfile } from '@/hooks/useProfile';
 import { formatPrice } from '@/lib/format/price';
 import { ProfileHero } from '@/components/profile/ProfileHero';
+import { CountryMark, CurrencyMark } from '@/components/ui/CountryMark';
 import type { Order, OrderProfile } from '@/lib/api/types';
 
 cssInterop(LinearGradient, { className: 'style' });
-
-const SCREEN_W = Dimensions.get('window').width;
 
 type StatusTone = {
   bg: string;
@@ -249,15 +248,19 @@ function ActionGrid({ router }: { router: ReturnType<typeof useRouter> }) {
     },
   ];
   return (
-    <View className="flex-row flex-wrap justify-between" style={{ rowGap: 12 }}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 12, paddingRight: 2 }}
+    >
       {items.map((it) => (
         <AnimatedPressable
           key={it.title}
           onPress={it.onPress}
           haptic="selection"
-          wrapperStyle={{ width: (SCREEN_W - 40 - 12) / 2, ...shadows.flat }}
+          wrapperStyle={{ width: 158, ...shadows.flat }}
         >
-          <View className={`rounded-lg ${it.bg} p-4`} style={{ minHeight: 130 }}>
+          <View className={`rounded-lg ${it.bg} p-4`} style={{ minHeight: 128 }}>
             <View
               className="h-11 w-11 items-center justify-center rounded-pill"
               style={{ backgroundColor: it.iconBg }}
@@ -276,7 +279,7 @@ function ActionGrid({ router }: { router: ReturnType<typeof useRouter> }) {
           </View>
         </AnimatedPressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -468,17 +471,15 @@ function CountryPill({
   country: 'KZ' | 'RF';
   onPress: () => void;
 }) {
-  const flag = country === 'KZ' ? '🇰🇿' : '🇷🇺';
-  const currency = country === 'KZ' ? 'KZT' : 'RUB';
   return (
     <AnimatedPressable onPress={onPress} haptic="selection" wrapperStyle={{ flex: 1 }}>
       <View
-        className={`min-h-[58px] justify-center rounded-lg px-3 py-2.5 ${
+        className={`min-h-[64px] justify-center rounded-lg px-3 py-3 ${
           active ? 'bg-ink' : 'bg-sand-1'
         }`}
       >
-        <View className="flex-row items-center gap-2">
-          <Text className="text-[18px]">{flag}</Text>
+        <View className="flex-row items-center gap-3">
+          <CountryMark country={country} size="md" active={active} />
           <View className="min-w-0 flex-1">
             <Text
               className={`text-[13px] font-bold ${active ? 'text-white' : 'text-ink'}`}
@@ -487,9 +488,9 @@ function CountryPill({
             >
               {label}
             </Text>
-            <Text className={`mt-0.5 text-[11px] ${active ? 'text-white/60' : 'text-ink/50'}`}>
-              {currency}
-            </Text>
+            <View className="mt-1 self-start">
+              <CurrencyMark country={country} active={active} />
+            </View>
           </View>
         </View>
       </View>

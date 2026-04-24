@@ -27,9 +27,9 @@ type QuickAction = {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Новый пост', icon: 'add-circle-outline', href: '/admin/posts/new' },
+  { label: 'Новый баннер', icon: 'albums-outline', href: '/admin/banners/new' },
   { label: 'Новая статья', icon: 'create-outline', href: '/admin/articles/new' },
   { label: 'Новая сторис', icon: 'ellipse-outline', href: '/admin/stories/new' },
-  { label: 'Новый Reel', icon: 'videocam-outline', href: '/admin/reels/new' },
 ];
 
 type SectionTile = {
@@ -98,54 +98,60 @@ export default function AdminDashboard() {
       label: 'Посты',
       icon: 'megaphone-outline',
       href: '/admin/posts',
-      count: s?.posts.total,
-      draftCount: s?.posts.draft,
+      count: s?.posts?.total,
+      draftCount: s?.posts?.draft,
     },
     {
       label: 'Статьи',
       icon: 'document-text-outline',
       href: '/admin/articles',
-      count: s?.articles.total,
-      draftCount: s?.articles.draft,
+      count: s?.articles?.total,
+      draftCount: s?.articles?.draft,
     },
     {
       label: 'Reels',
       icon: 'videocam-outline',
       href: '/admin/reels',
-      count: s?.reels.total,
-      draftCount: s?.reels.draft,
+      count: s?.reels?.total,
+      draftCount: s?.reels?.draft,
     },
     {
       label: 'Сторис',
       icon: 'ellipse-outline',
       href: '/admin/stories',
-      count: s?.stories.total,
+      count: s?.stories?.total,
+    },
+    {
+      label: 'Баннеры',
+      icon: 'albums-outline',
+      href: '/admin/banners',
+      count: s?.banners?.total,
     },
     {
       label: 'Вебинары',
       icon: 'easel-outline',
       href: '/admin/webinars',
-      count: s?.webinars.total,
-      draftCount: s?.webinars.draft,
+      count: s?.webinars?.total,
+      draftCount: s?.webinars?.draft,
     },
     {
       label: 'Курсы',
       icon: 'school-outline',
       href: '/admin/courses',
-      count: s?.courses.total,
-      draftCount: s?.courses.draft,
+      count: s?.courses?.total,
+      draftCount: s?.courses?.draft,
     },
     {
       label: 'Комментарии',
       icon: 'chatbubbles-outline',
       href: '/admin/comments',
-      count: s?.comments.total,
+      count: s?.comments?.total,
     },
     {
       label: 'Медиа',
       icon: 'images-outline',
       href: '/admin/media',
-      count: s?.media.total,
+      count: s?.media?.total,
     },
     {
       label: 'Товары',
@@ -199,9 +205,9 @@ export default function AdminDashboard() {
               marginBottom: spacing.lg,
             }}
           >
-            <StatTile label="Студенты" value={s.enrollments.active} />
-            <StatTile label="Курсы" value={s.courses.total} />
-            <StatTile label="Комментарии" value={s.comments.total} />
+            <StatTile label="Студенты" value={s.enrollments?.active ?? 0} />
+            <StatTile label="Курсы" value={s.courses?.total ?? 0} />
+            <StatTile label="Комментарии" value={s.comments?.total ?? 0} />
           </View>
         ) : stats.isLoading ? (
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>

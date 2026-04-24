@@ -4,6 +4,7 @@ const authMiddleware = require('../../middleware/authMiddleware');
 const postController = require('../../controllers/social/postController');
 const reelController = require('../../controllers/social/reelController');
 const storyController = require('../../controllers/social/storyController');
+const bannerController = require('../../controllers/social/bannerController');
 const articleController = require('../../controllers/social/articleController');
 const webinarController = require('../../controllers/social/webinarController');
 const pollController = require('../../controllers/social/pollController');
@@ -52,6 +53,9 @@ router.post('/reels/:id/view', optionalAuth, reelController.view);
 // Stories
 router.get('/stories/active', optionalAuth, storyController.publicActive);
 router.post('/stories/:id/view', authMiddleware, storyController.view);
+
+// Home banners
+router.get('/banners', optionalAuth, bannerController.publicList);
 
 // Articles
 router.get('/articles', optionalAuth, articleController.publicList);

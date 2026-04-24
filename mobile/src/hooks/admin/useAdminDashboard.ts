@@ -9,6 +9,7 @@ export type AdminStats = {
   webinars: { total: number; draft: number };
   courses: { total: number; draft: number };
   stories: { total: number };
+  banners: { total: number };
   enrollments: { total: number; active: number };
   comments: { total: number };
   media: { total: number };

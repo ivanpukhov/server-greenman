@@ -2,7 +2,6 @@ import { View } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,8 +11,8 @@ import { useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { shadows } from '@/theme/shadows';
 import { useCartStore } from '@/stores/cart.store';
+import { greenman, sand, semantic } from '@/theme/colors';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -44,12 +43,12 @@ function TabButton({
   }, [focused, pulse]);
 
   const bubbleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.86 + pulse.value * 0.18 }],
-    opacity: 0.15 + pulse.value * 0.85,
+    transform: [{ scale: 0.94 + pulse.value * 0.06 }],
+    opacity: pulse.value,
   }));
 
   const iconLift = useAnimatedStyle(() => ({
-    transform: [{ translateY: -pulse.value * 2 }],
+    transform: [{ translateY: -pulse.value }],
   }));
 
   return (
@@ -59,19 +58,19 @@ function TabButton({
         onPress();
       }}
       haptic="none"
-      scale={0.88}
+      scale={0.92}
       wrapperClassName="flex-1 items-center justify-center"
     >
-      <View className="h-14 w-14 items-center justify-center">
+      <View className="h-9 w-12 items-center justify-center">
         <Animated.View
           style={bubbleStyle}
-          className="absolute h-11 w-11 rounded-pill bg-white"
+          className="absolute h-9 w-12 rounded-pill bg-greenman-0"
         />
         <Animated.View style={iconLift}>
           <Ionicons
             name={focused ? meta.on : meta.off}
-            size={focused ? 22 : 22}
-            color={focused ? '#04401d' : 'rgba(255,255,255,0.66)'}
+            size={21}
+            color={focused ? greenman[8] : sand[4]}
           />
         </Animated.View>
         {badge && badge > 0 ? (
@@ -83,8 +82,9 @@ function TabButton({
         ) : null}
       </View>
       <Text
-        className={`mt-0.5 text-[10px] ${focused ? 'font-bold text-white' : 'font-semibold text-white/50'}`}
-        tracking="wide"
+        className={`mt-1 text-[10px] ${focused ? 'font-bold text-greenman-8' : 'font-semibold text-ink/45'}`}
+        tracking="tight"
+        numberOfLines={1}
       >
         {meta.label}
       </Text>
@@ -104,45 +104,39 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         left: 0,
         right: 0,
         bottom: 0,
+        backgroundColor: '#ffffff',
+        borderTopWidth: 1,
+        borderTopColor: semantic.border,
       }}
     >
-      <View
-        className="overflow-hidden rounded-t-xl"
-        style={shadows.float}
-      >
-        <LinearGradient
-          colors={['#05210f', '#0b2a17', '#04401d']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <View>
+        <View
+          className="flex-row items-center justify-between px-2 pt-2"
+          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
         >
-          <View
-            className="flex-row items-center justify-between px-2 pt-2"
-            style={{ paddingBottom: Math.max(insets.bottom, 10) }}
-          >
-            {state.routes.map((route, idx) => {
-              const focused = state.index === idx;
-              const badge = route.name === 'cart' ? cartCount : undefined;
-              return (
-                <TabButton
-                  key={route.key}
-                  focused={focused}
-                  name={route.name}
-                  badge={badge}
-                  onPress={() => {
-                    const event = navigation.emit({
-                      type: 'tabPress',
-                      target: route.key,
-                      canPreventDefault: true,
-                    });
-                    if (!focused && !event.defaultPrevented) {
-                      navigation.navigate(route.name as never);
-                    }
-                  }}
-                />
-              );
-            })}
-          </View>
-        </LinearGradient>
+          {state.routes.map((route, idx) => {
+            const focused = state.index === idx;
+            const badge = route.name === 'cart' ? cartCount : undefined;
+            return (
+              <TabButton
+                key={route.key}
+                focused={focused}
+                name={route.name}
+                badge={badge}
+                onPress={() => {
+                  const event = navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+                  if (!focused && !event.defaultPrevented) {
+                    navigation.navigate(route.name as never);
+                  }
+                }}
+              />
+            );
+          })}
+        </View>
       </View>
     </View>
   );

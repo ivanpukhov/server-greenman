@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { ScrollView, View, RefreshControl, Linking, Dimensions } from 'react-native';
+import { ScrollView, View, RefreshControl, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -17,38 +18,46 @@ import { Section } from '@/components/ui/Section';
 import { Chip } from '@/components/ui/Chip';
 import { ProductRail } from '@/components/product/ProductRail';
 import { useProducts } from '@/hooks/useProducts';
+import { useHomeBanners } from '@/hooks/useBanners';
 import { useCountryStore } from '@/stores/country.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMyOrders } from '@/hooks/useOrders';
 import { greenman, clay, sand, sun } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { formatPrice } from '@/lib/format/price';
+import { CountryMark } from '@/components/ui/CountryMark';
+import type { HomeBanner } from '@/lib/api/types';
 
 const WHATSAPP_URL = 'https://wa.me/77001234567';
-const { width: SCREEN_W } = Dimensions.get('window');
 const QUICK_GAP = 12;
-const QUICK_TILE_W = (SCREEN_W - 40 - QUICK_GAP) / 2;
+const QUICK_TILE_W = 156;
+const BANNER_W = 318;
 
-function greetingKey(): 'morning' | 'day' | 'evening' | 'night' {
-  const h = new Date().getHours();
-  if (h < 6) return 'night';
-  if (h < 12) return 'morning';
-  if (h < 18) return 'day';
-  return 'evening';
-}
-
-const GREETING_TEXT: Record<string, string> = {
-  morning: 'Доброе утро',
-  day: 'Добрый день',
-  evening: 'Добрый вечер',
-  night: 'Доброй ночи',
-};
+const DEFAULT_BANNERS: HomeBanner[] = [
+  {
+    id: -1,
+    type: 'text',
+    title: 'Забота о здоровье без суеты',
+    text: 'Подберите средства, курсы и консультацию Greenman под вашу задачу.',
+    buttonText: 'Открыть каталог',
+    buttonUrl: '/catalog',
+    linkUrl: null,
+    backgroundColor: '#05210f',
+    textColor: '#ffffff',
+    mediaId: null,
+    order: 0,
+    publishedAt: null,
+    isDraft: false,
+    media: null,
+  },
+];
 
 export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: products, isLoading, refetch, isRefetching } = useProducts();
+  const banners = useHomeBanners();
   const country = useCountryStore((s) => s.country);
   const currency = useCountryStore((s) => s.currency);
   const isAuth = useAuthStore((s) => s.isAuthenticated);
@@ -63,8 +72,7 @@ export default function HomeScreen() {
 
   const searchPresets = (t('main.search_presets.items', { returnObjects: true }) as string[]) ?? [];
 
-  const greetingText = GREETING_TEXT[greetingKey()];
-  const flag = country === 'KZ' ? '🇰🇿' : '🇷🇺';
+  const homeBanners = banners.data?.length ? banners.data : DEFAULT_BANNERS;
 
   const openWA = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -89,39 +97,11 @@ export default function HomeScreen() {
           style={{
             paddingTop: insets.top + 14,
             paddingHorizontal: 22,
-            paddingBottom: 68,
-            borderBottomLeftRadius: 40,
-            borderBottomRightRadius: 40,
+            paddingBottom: 54,
+            borderBottomLeftRadius: 28,
+            borderBottomRightRadius: 28,
           }}
         >
-          {/* decorative blobs */}
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              right: -60,
-              top: -40,
-              height: 200,
-              width: 200,
-              borderRadius: 100,
-              backgroundColor: greenman[5],
-              opacity: 0.2,
-            }}
-          />
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: -80,
-              bottom: 30,
-              height: 160,
-              width: 160,
-              borderRadius: 80,
-              backgroundColor: clay[4],
-              opacity: 0.14,
-            }}
-          />
-
           {/* top row: country + menu */}
           <View className="flex-row items-center justify-between">
             <AnimatedPressable
@@ -130,9 +110,7 @@ export default function HomeScreen() {
               wrapperClassName=""
               className="flex-row items-center gap-2 rounded-pill border border-white/15 bg-white/10 py-1.5 pl-2 pr-3"
             >
-              <View className="h-6 w-6 items-center justify-center rounded-pill bg-white/20">
-                <Text className="text-[12px]">{flag}</Text>
-              </View>
+              <CountryMark country={country} size="sm" active />
               <Text
                 className="text-[11px] font-bold uppercase text-white"
                 tracking="wide"
@@ -159,22 +137,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* greeting */}
-          <Animated.View entering={FadeInDown.delay(80).springify()} className="mt-7">
-            <Text
-              className="font-serif text-[14px] italic text-white/70"
-              tracking="wide"
-            >
-              {greetingText}
-            </Text>
-            <Text
-              className="mt-1 font-serif text-[38px] leading-[42px] text-white"
-              tracking="tight"
-            >
-              Трав{'\u00A0'}для тебя.{'\n'}
-              <Text className="font-serif-italic text-white/60">Сегодня.</Text>
-            </Text>
-          </Animated.View>
+          <HomeBannerCarousel banners={homeBanners} router={router} />
 
           {/* search pill */}
           <AnimatedPressable
@@ -182,7 +145,7 @@ export default function HomeScreen() {
             haptic="selection"
             scale={0.98}
             wrapperStyle={shadows.float}
-            className="mt-8 flex-row items-center gap-3 rounded-pill bg-white px-5 py-4"
+            className="mt-5 flex-row items-center gap-3 rounded-pill bg-white px-5 py-4"
           >
             <Ionicons name="search" size={18} color={greenman[9]} />
             <Text className="flex-1 text-[14px] text-ink-dim">Ромашка, кашель, иммунитет…</Text>
@@ -192,49 +155,11 @@ export default function HomeScreen() {
           </AnimatedPressable>
         </LinearGradient>
 
-        {/* =========== QUICK ACTIONS (overlapping) =========== */}
-        <View
-          className="mx-5 flex-row justify-between"
-          style={{ marginTop: -42, gap: QUICK_GAP }}
-        >
-          <QuickTile
-            bg="bg-white"
-            icon={<Ionicons name="bag-check-outline" size={20} color={greenman[9]} />}
-            label="Мои заказы"
-            sub={activeOrder ? `#${activeOrder.id} · ${activeOrder.status}` : 'История'}
-            onPress={() => router.push('/profile')}
-            accentBg="#e7f3ea"
-            elevated
-          />
-          <QuickTile
-            bg="bg-white"
-            icon={<Ionicons name="chatbubbles-outline" size={20} color={clay[5]} />}
-            label="Консультация"
-            sub="Врач · WhatsApp"
-            onPress={openWA}
-            accentBg={clay[0]}
-            elevated
-          />
-        </View>
-
-        <View className="mx-5 mt-3 flex-row justify-between" style={{ gap: QUICK_GAP }}>
-          <QuickTile
-            bg="bg-sand-1"
-            icon={<Ionicons name="bookmark-outline" size={20} color={sand[4]} />}
-            label="Сохранённое"
-            sub="Посты и статьи"
-            onPress={() => router.push('/profile/bookmarks')}
-            accentBg="#ebe5d4"
-          />
-          <QuickTile
-            bg="bg-sun-0"
-            icon={<Ionicons name="school-outline" size={20} color={sun[3]} />}
-            label="Курсы"
-            sub="Уроки · задания"
-            onPress={() => router.push('/social/my-courses')}
-            accentBg="#ffe68a80"
-          />
-        </View>
+        <QuickActionsRail
+          activeOrder={activeOrder}
+          openWA={openWA}
+          router={router}
+        />
 
         {/* =========== ACTIVE ORDER RAIL =========== */}
         {isAuth && activeOrder ? (
@@ -490,7 +415,7 @@ function QuickTile({
       haptic="selection"
       scale={0.97}
       wrapperStyle={{ width: QUICK_TILE_W, ...(elevated ? shadows.card : shadows.soft) }}
-      className={`rounded-lg p-4 ${bg}`}
+      className={`min-h-[124px] rounded-lg p-4 ${bg}`}
     >
       <View
         className="h-10 w-10 items-center justify-center rounded-pill"
@@ -508,5 +433,150 @@ function QuickTile({
         {sub}
       </Text>
     </AnimatedPressable>
+  );
+}
+
+function QuickActionsRail({
+  activeOrder,
+  openWA,
+  router,
+}: {
+  activeOrder?: { id: number; status: string };
+  openWA: () => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, gap: QUICK_GAP }}
+    >
+      <QuickTile
+        bg="bg-white"
+        icon={<Ionicons name="bag-check-outline" size={20} color={greenman[9]} />}
+        label="Мои заказы"
+        sub={activeOrder ? `#${activeOrder.id} · ${activeOrder.status}` : 'История'}
+        onPress={() => router.push('/order/list' as any)}
+        accentBg="#e7f3ea"
+        elevated
+      />
+      <QuickTile
+        bg="bg-white"
+        icon={<Ionicons name="chatbubbles-outline" size={20} color={clay[5]} />}
+        label="Консультация"
+        sub="WhatsApp"
+        onPress={openWA}
+        accentBg={clay[0]}
+        elevated
+      />
+      <QuickTile
+        bg="bg-sand-1"
+        icon={<Ionicons name="bookmark-outline" size={20} color={sand[4]} />}
+        label="Сохранённое"
+        sub="Посты и статьи"
+        onPress={() => router.push('/profile/bookmarks')}
+        accentBg="#ebe5d4"
+      />
+      <QuickTile
+        bg="bg-sun-0"
+        icon={<Ionicons name="school-outline" size={20} color={sun[3]} />}
+        label="Курсы"
+        sub="Уроки"
+        onPress={() => router.push('/social/my-courses')}
+        accentBg="#ffe68a80"
+      />
+    </ScrollView>
+  );
+}
+
+function HomeBannerCarousel({
+  banners,
+  router,
+}: {
+  banners: HomeBanner[];
+  router: ReturnType<typeof useRouter>;
+}) {
+  const openLink = (url?: string | null) => {
+    if (!url) return;
+    Haptics.selectionAsync().catch(() => {});
+    if (/^https?:\/\//i.test(url)) {
+      Linking.openURL(url).catch(() => {});
+      return;
+    }
+    router.push(url as any);
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(80).springify()} className="mt-6">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={BANNER_W + 12}
+        decelerationRate="fast"
+        contentContainerStyle={{ gap: 12, paddingRight: 4 }}
+      >
+        {banners.map((banner) => {
+          const imageUrl = banner.media?.thumbnailUrl || banner.media?.url;
+          const isImage = banner.type === 'image' || banner.type === 'image_link';
+          const pressUrl = banner.type === 'image_link' ? banner.linkUrl : banner.buttonUrl;
+          return (
+            <AnimatedPressable
+              key={banner.id}
+              onPress={() => openLink(pressUrl)}
+              disabled={!pressUrl}
+              scale={pressUrl ? 0.98 : 1}
+              haptic="none"
+              wrapperStyle={{ width: BANNER_W }}
+              className="h-[176px] overflow-hidden rounded-xl"
+            >
+              <View className="flex-1" style={{ backgroundColor: banner.backgroundColor || '#05210f' }}>
+                {isImage && imageUrl ? (
+                  <Image source={{ uri: imageUrl }} style={{ flex: 1 }} contentFit="cover" />
+                ) : (
+                  <View className="flex-1 justify-between p-5">
+                    <View>
+                      <Text
+                        className="text-[10px] font-bold uppercase"
+                        tracking="widest"
+                        style={{ color: banner.textColor || '#fff', opacity: 0.65 }}
+                      >
+                        Greenman
+                      </Text>
+                      <Text
+                        className="mt-2 font-serif text-[27px] leading-[30px]"
+                        tracking="tight"
+                        numberOfLines={2}
+                        style={{ color: banner.textColor || '#fff' }}
+                      >
+                        {banner.title}
+                      </Text>
+                      {banner.text ? (
+                        <Text
+                          className="mt-2 text-[13px] leading-[18px]"
+                          numberOfLines={2}
+                          style={{ color: banner.textColor || '#fff', opacity: 0.78 }}
+                        >
+                          {banner.text}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {banner.buttonText ? (
+                      <View className="self-start rounded-pill bg-white px-4 py-2">
+                        <Text className="text-[12px] font-bold text-ink">{banner.buttonText}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              </View>
+              {banner.type === 'image_link' ? (
+                <View className="absolute bottom-3 right-3 h-9 w-9 items-center justify-center rounded-pill bg-white">
+                  <Ionicons name="arrow-forward" size={16} color={greenman[9]} />
+                </View>
+              ) : null}
+            </AnimatedPressable>
+          );
+        })}
+      </ScrollView>
+    </Animated.View>
   );
 }
