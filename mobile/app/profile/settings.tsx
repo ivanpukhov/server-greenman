@@ -12,6 +12,7 @@ import { setLocale, getLocale, type AppLocale } from '@/i18n';
 import { ink, sand } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 import { useState } from 'react';
+import { CountryMark, CurrencyMark } from '@/components/ui/CountryMark';
 
 const LANGUAGES: { key: AppLocale; label: string; sub: string }[] = [
   { key: 'ru', label: 'Русский', sub: 'Основной язык' },
@@ -19,9 +20,9 @@ const LANGUAGES: { key: AppLocale; label: string; sub: string }[] = [
   { key: 'en', label: 'English', sub: 'International' },
 ];
 
-const COUNTRIES: { key: 'KZ' | 'RF'; label: string; flag: string; currency: string }[] = [
-  { key: 'KZ', label: 'Казахстан', flag: '🇰🇿', currency: 'KZT' },
-  { key: 'RF', label: 'Россия', flag: '🇷🇺', currency: 'RUB' },
+const COUNTRIES: { key: 'KZ' | 'RF'; label: string }[] = [
+  { key: 'KZ', label: 'Казахстан' },
+  { key: 'RF', label: 'Россия' },
 ];
 
 export default function SettingsScreen() {
@@ -83,11 +84,11 @@ export default function SettingsScreen() {
                 wrapperStyle={shadows.flat}
               >
                 <View
-                  className={`flex-row items-center gap-4 rounded-xl px-4 py-3.5 ${
+                  className={`flex-row items-center gap-4 rounded-xl px-4 py-4 ${
                     country === c.key ? 'bg-ink' : 'bg-white'
                   }`}
                 >
-                  <Text style={{ fontSize: 26 }}>{c.flag}</Text>
+                  <CountryMark country={c.key} size="lg" active={country === c.key} />
                   <View className="flex-1">
                     <Text
                       className={`text-[16px] font-bold ${country === c.key ? 'text-white' : 'text-ink'}`}
@@ -95,12 +96,9 @@ export default function SettingsScreen() {
                     >
                       {c.label}
                     </Text>
-                    <Text
-                      className={`text-[12px] ${country === c.key ? 'text-white/70' : 'text-ink/50'}`}
-                      tracking="tight"
-                    >
-                      {c.currency}
-                    </Text>
+                    <View className="mt-1 self-start">
+                      <CurrencyMark country={c.key} active={country === c.key} />
+                    </View>
                   </View>
                   {country === c.key ? (
                     <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
