@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -7,10 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { socialApi } from '@/features/social/api';
-import { semantic, greenman } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
-import { radii } from '@/theme/radii';
+import { sand, ink } from '@/theme/colors';
 import { EmptyState } from '@/components/common/EmptyState';
 
 type Kind = 'all' | 'post' | 'article' | 'reel' | 'webinar';
@@ -65,7 +64,7 @@ export default function RepostsScreen() {
     if (query.isLoading) {
       return (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={greenman[7]} />
+          <ActivityIndicator color={ink.DEFAULT} />
         </View>
       );
     }
@@ -83,9 +82,9 @@ export default function RepostsScreen() {
         keyExtractor={(it) => `${it.kind}-${it.data.id}`}
         renderItem={({ item }) => <RepostRow item={item} onPress={() => openItem(item)} />}
         ItemSeparatorComponent={() => (
-          <View style={{ height: 1, backgroundColor: semantic.border, marginLeft: 92 }} />
+          <View className="h-px bg-sand-2" style={{ marginLeft: 92 }} />
         )}
-        contentContainerStyle={{ paddingVertical: spacing.xs }}
+        contentContainerStyle={{ paddingVertical: 4 }}
       />
     );
   }, [items, query.isLoading]);
@@ -98,34 +97,28 @@ export default function RepostsScreen() {
         showsHorizontalScrollIndicator={false}
         data={TABS}
         keyExtractor={(t) => t.key}
-        contentContainerStyle={{
-          gap: spacing.xs,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.xs,
-        }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}
         renderItem={({ item }) => {
           const active = item.key === kind;
           return (
-            <Pressable
+            <AnimatedPressable
               onPress={() => setKind(item.key)}
-              accessibilityRole="button"
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: 6,
-                borderRadius: radii.full,
-                backgroundColor: active ? greenman[7] : semantic.surfaceSunken,
-              }}
+              haptic="selection"
+              scale={0.94}
             >
-              <Text
-                style={{
-                  fontFamily: 'Manrope_600SemiBold',
-                  fontSize: 13,
-                  color: active ? '#fff' : semantic.ink,
-                }}
+              <View
+                className={`h-9 items-center justify-center rounded-pill px-4 ${
+                  active ? 'bg-ink' : 'bg-sand-1'
+                }`}
               >
-                {item.label}
-              </Text>
-            </Pressable>
+                <Text
+                  className={`text-[12px] font-bold ${active ? 'text-white' : 'text-ink/60'}`}
+                  tracking="tight"
+                >
+                  {item.label}
+                </Text>
+              </View>
+            </AnimatedPressable>
           );
         }}
       />
@@ -147,72 +140,39 @@ function RepostRow({ item, onPress }: { item: RepostItem; onPress: () => void })
     null;
   const title = item.data.title ?? item.data.text ?? item.data.description ?? '—';
   const kindLabel =
-    item.kind === 'article'
-      ? 'Статья'
-      : item.kind === 'post'
-      ? 'Пост'
-      : item.kind === 'reel'
-      ? 'Reel'
-      : 'Вебинар';
+    item.kind === 'article' ? 'Статья'
+    : item.kind === 'post' ? 'Пост'
+    : item.kind === 'reel' ? 'Reel'
+    : 'Вебинар';
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-      }}
-    >
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: radii.md,
-          overflow: 'hidden',
-          backgroundColor: semantic.surfaceSunken,
-        }}
-      >
-        {cover ? (
-          <Image
-            source={{ uri: cover }}
-            placeholder={blurhash ? { blurhash } : undefined}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            transition={120}
-          />
-        ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="repeat" size={22} color={semantic.inkMuted} />
-          </View>
-        )}
+    <AnimatedPressable onPress={onPress} haptic="selection" scale={0.98}>
+      <View className="flex-row items-center gap-3 px-4 py-3.5">
+        <View className="h-16 w-16 overflow-hidden rounded-xl bg-sand-1">
+          {cover ? (
+            <Image
+              source={{ uri: cover }}
+              placeholder={blurhash ? { blurhash } : undefined}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              transition={120}
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center">
+              <Ionicons name="repeat" size={22} color={sand[4]} />
+            </View>
+          )}
+        </View>
+        <View className="flex-1">
+          <Text variant="meta-upper" tracking="widest" className="text-greenman-7">
+            {kindLabel}
+          </Text>
+          <Text numberOfLines={2} className="mt-0.5 text-[15px] font-semibold text-ink">
+            {title}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={sand[4]} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontFamily: 'Manrope_500Medium',
-            fontSize: 11,
-            color: greenman[7],
-            textTransform: 'uppercase',
-            letterSpacing: 0.6,
-          }}
-        >
-          {kindLabel}
-        </Text>
-        <Text
-          numberOfLines={2}
-          style={{
-            fontFamily: 'Manrope_600SemiBold',
-            fontSize: 15,
-            color: semantic.ink,
-            marginTop: 2,
-          }}
-        >
-          {title}
-        </Text>
-      </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }

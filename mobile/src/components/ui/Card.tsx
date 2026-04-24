@@ -1,30 +1,121 @@
-import { Pressable, View, ViewProps } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { cssInterop } from 'nativewind';
-import * as Haptics from 'expo-haptics';
+import { View, ViewProps, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
+import { cssInterop } from 'nativewind';
+import { AnimatedPressable } from './AnimatedPressable';
+import { shadows } from '@/theme/shadows';
+import { gradients } from '@/theme/colors';
 
 cssInterop(View, { className: 'style' });
-cssInterop(Animated.View, { className: 'style' });
+cssInterop(LinearGradient, { className: 'style' });
 
-type Variant = 'flat' | 'elevated' | 'outline' | 'tonal';
+type Variant =
+  | 'flat'
+  | 'raised'
+  | 'elevated'
+  | 'outline'
+  | 'tonal'
+  | 'sand'
+  | 'cream'
+  | 'inverse'
+  | 'gradient'
+  | 'gradient-clay'
+  | 'gradient-sunrise'
+  | 'gradient-plum';
 
-type Props = ViewProps & {
+type Radius = 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+
+type Props = Omit<ViewProps, 'style'> & {
   variant?: Variant;
-  padded?: boolean;
+  padded?: boolean | 'sm' | 'md' | 'lg' | 'xl';
   pressable?: boolean;
   onPress?: () => void;
   haptic?: boolean;
+  radius?: Radius;
   className?: string;
+  innerClassName?: string;
+  style?: ViewStyle | ViewStyle[];
   children: ReactNode;
 };
 
-const variants: Record<Variant, string> = {
-  flat: 'bg-white',
-  elevated: 'bg-white shadow-soft',
-  outline: 'bg-white border border-border',
-  tonal: 'bg-greenman-0',
+const radiusClass: Record<Radius, string> = {
+  sm: 'rounded-sm',
+  md: 'rounded-md',
+  lg: 'rounded-lg',
+  xl: 'rounded-xl',
+  '2xl': 'rounded-2xl',
 };
+
+const padClass = (p: Props['padded']) => {
+  if (!p) return '';
+  if (p === true || p === 'md') return 'p-5';
+  if (p === 'sm') return 'p-4';
+  if (p === 'lg') return 'p-6';
+  if (p === 'xl') return 'p-7';
+  return '';
+};
+
+function variantClass(v: Variant): string {
+  switch (v) {
+    case 'flat':
+      return 'bg-surface';
+    case 'raised':
+      return 'bg-surface';
+    case 'elevated':
+      return 'bg-surface';
+    case 'outline':
+      return 'bg-surface border border-border';
+    case 'tonal':
+      return 'bg-greenman-0';
+    case 'sand':
+      return 'bg-sand-1';
+    case 'cream':
+      return 'bg-surface-cream border border-border';
+    case 'inverse':
+      return 'bg-ink';
+    default:
+      return '';
+  }
+}
+
+function variantShadow(v: Variant): ViewStyle | undefined {
+  if (v === 'raised') return shadows.soft;
+  if (v === 'elevated') return shadows.card;
+  if (v === 'inverse') return shadows.float;
+  if (v === 'gradient') return shadows.glow;
+  if (v === 'gradient-clay') return shadows.glowClay;
+  if (v === 'gradient-sunrise' || v === 'gradient-plum') return shadows.float;
+  return undefined;
+}
+
+function Gradient({
+  variant,
+  children,
+  className,
+}: {
+  variant: Extract<Variant, 'gradient' | 'gradient-clay' | 'gradient-sunrise' | 'gradient-plum'>;
+  children: ReactNode;
+  className?: string;
+}) {
+  const colors =
+    variant === 'gradient'
+      ? gradients.cta
+      : variant === 'gradient-clay'
+      ? gradients.clay
+      : variant === 'gradient-sunrise'
+      ? gradients.sunrise
+      : gradients.plum;
+  return (
+    <LinearGradient
+      colors={colors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      className={className}
+    >
+      {children}
+    </LinearGradient>
+  );
+}
 
 export function Card({
   variant = 'flat',
@@ -32,39 +123,43 @@ export function Card({
   pressable,
   onPress,
   haptic = true,
+  radius = 'lg',
   className,
+  innerClassName,
+  style,
   children,
   ...rest
 }: Props) {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const isGradient = variant.startsWith('gradient');
+  const shadowStyle = variantShadow(variant);
+  const shellClass = `overflow-hidden ${radiusClass[radius]} ${!isGradient ? variantClass(variant) : ''} ${className ?? ''}`;
+  const inner = `${padClass(padded)} ${innerClassName ?? ''}`;
 
-  const base = `rounded-xl ${variants[variant]} ${padded ? 'p-4' : ''} ${className ?? ''}`;
+  const body = isGradient ? (
+    <Gradient variant={variant as any} className={inner}>
+      {children}
+    </Gradient>
+  ) : (
+    <View className={inner}>{children}</View>
+  );
 
-  if (!pressable) {
+  if (pressable) {
     return (
-      <View className={base} {...rest}>
-        {children}
-      </View>
+      <AnimatedPressable
+        onPress={onPress}
+        haptic={haptic ? 'selection' : 'none'}
+        scale={0.98}
+        className={shellClass}
+        wrapperStyle={[shadowStyle as any, ...(Array.isArray(style) ? style : style ? [style] : [])]}
+      >
+        {body}
+      </AnimatedPressable>
     );
   }
 
   return (
-    <Animated.View style={animatedStyle} className={base}>
-      <Pressable
-        onPressIn={() => {
-          scale.value = withSpring(0.98, { damping: 18, stiffness: 300 });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, { damping: 18, stiffness: 300 });
-        }}
-        onPress={() => {
-          if (haptic) Haptics.selectionAsync().catch(() => {});
-          onPress?.();
-        }}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
+    <View className={shellClass} style={[shadowStyle as any, ...(Array.isArray(style) ? style : style ? [style] : [])]} {...rest}>
+      {body}
+    </View>
   );
 }

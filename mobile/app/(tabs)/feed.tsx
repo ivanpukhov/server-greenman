@@ -1,16 +1,18 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, View, RefreshControl, ActivityIndicator, Share } from 'react-native';
+import { FlatList, View, RefreshControl, ActivityIndicator, Share } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
+import { IconButton } from '@/components/ui/IconButton';
 import { socialApi } from '@/features/social/api';
 import type { FeedItem, FeedKind, RepostableType } from '@/features/social/types';
-import { greenman, semantic } from '@/theme/colors';
+import { ink, sand } from '@/theme/colors';
 import { FeedCard } from '@/components/social/FeedCard';
 import { FeedStoriesRow, type StoryGroupItem } from '@/components/social/FeedStoriesRow';
 import { FeedSkeleton } from '@/components/social/FeedSkeleton';
+import { FeedHighlight } from '@/components/social/FeedHighlight';
 import {
   useInfiniteFeed,
   useToggleBookmark,
@@ -24,6 +26,7 @@ import {
   type CommentableType,
 } from '@/components/social/CommentsSheet';
 import { useAuthStore } from '@/stores/auth.store';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 
 type KindFilter = 'all' | FeedKind;
 
@@ -34,6 +37,9 @@ const FILTERS: { key: KindFilter; label: string }[] = [
   { key: 'reel', label: 'Reels' },
   { key: 'webinar', label: 'Вебинары' },
 ];
+
+const HIGHLIGHT_EVERY = 6;
+const HIGHLIGHT_VARIANTS = ['courses', 'newsletter', 'community'] as const;
 
 const WEB_BASE = 'https://greenman.kz';
 
@@ -57,6 +63,10 @@ function shareMessageFor(it: FeedItem): string {
   if (it.description) return it.description;
   return 'Greenman';
 }
+
+type Row =
+  | { type: 'feed'; item: FeedItem; key: string }
+  | { type: 'highlight'; variant: (typeof HIGHLIGHT_VARIANTS)[number]; key: string };
 
 export default function FeedScreen() {
   const [filter, setFilter] = useState<KindFilter>('all');
@@ -83,6 +93,7 @@ export default function FeedScreen() {
   });
 
   const stories = storiesQuery.data ?? [];
+
   const items = useMemo<FeedItem[]>(() => {
     const flat = feedQuery.data?.pages.flatMap((p) => p.items) ?? [];
     const seen = new Set<string>();
@@ -95,6 +106,20 @@ export default function FeedScreen() {
     }
     return filter === 'all' ? unique : unique.filter((it) => it.kind === filter);
   }, [feedQuery.data, filter]);
+
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    items.forEach((it, idx) => {
+      const key = it.id ?? `${it.kind}-${it.entityId}`;
+      out.push({ type: 'feed', item: it, key });
+      const position = idx + 1;
+      if (filter === 'all' && position % HIGHLIGHT_EVERY === 0) {
+        const v = HIGHLIGHT_VARIANTS[Math.floor(position / HIGHLIGHT_EVERY) % HIGHLIGHT_VARIANTS.length];
+        out.push({ type: 'highlight', variant: v, key: `hl-${position}-${v}` });
+      }
+    });
+    return out;
+  }, [items, filter]);
 
   const refreshing = feedQuery.isRefetching || storiesQuery.isRefetching;
 
@@ -157,7 +182,7 @@ export default function FeedScreen() {
     try {
       await Share.share({ url, message: `${message}\n${url}` });
     } catch {
-      // игнорируем отмену/ошибку — native share sheet
+      // ignore
     }
   }, []);
 
@@ -182,45 +207,66 @@ export default function FeedScreen() {
     [activeTarget, qc]
   );
 
+  const openHighlight = useCallback((variant: (typeof HIGHLIGHT_VARIANTS)[number]) => {
+    if (variant === 'courses') router.push('/social/my-courses');
+    else if (variant === 'newsletter') router.push('/social/search');
+    else router.push('/social/search');
+  }, []);
+
   const Header = useMemo(
     () => (
       <View>
-        <View className="flex-row items-center justify-between px-md pb-xs pt-xs">
-          <Text className="text-h3 font-bold text-ink" style={{ fontFamily: 'Hagrid_700Bold' }}>
-            Лента
-          </Text>
-          <Pressable
-            onPress={() => router.push('/social/search')}
-            accessibilityRole="button"
-            accessibilityLabel="Поиск"
-            hitSlop={10}
-            className="h-10 w-10 items-center justify-center rounded-full bg-surface-sunken active:opacity-80"
-          >
-            <Ionicons name="search" size={20} color={semantic.ink} />
-          </Pressable>
+        <View className="px-5 pb-2 pt-3">
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1">
+              <Text variant="meta-upper" tracking="widest" className="text-ink/50">
+                Что нового
+              </Text>
+              <Text
+                variant="display-serif"
+                className="mt-1 text-ink"
+                style={{ fontSize: 34, lineHeight: 38 }}
+              >
+                Лента
+              </Text>
+            </View>
+            <IconButton
+              icon={<Ionicons name="search" size={20} color={ink.DEFAULT} />}
+              tone="sand"
+              size="md"
+              onPress={() => router.push('/social/search')}
+              accessibilityLabel="Поиск"
+            />
+          </View>
         </View>
+
         <FeedStoriesRow groups={stories} />
-        <View className="flex-row flex-wrap gap-xs px-sm pb-sm pt-xs">
+
+        <View className="flex-row gap-2 px-5 pb-4 pt-1">
           {FILTERS.map((f) => {
             const active = filter === f.key;
             return (
-              <Pressable
+              <AnimatedPressable
                 key={f.key}
                 onPress={() => setFilter(f.key)}
+                haptic="selection"
+                scale={0.94}
                 accessibilityRole="button"
                 accessibilityLabel={f.label}
-                className={`rounded-full px-md py-1.5 active:opacity-80 ${
-                  active ? 'bg-greenman-7' : 'bg-surface-muted'
-                }`}
               >
-                <Text
-                  className={`text-caption font-semibold ${
-                    active ? 'text-white' : 'text-greenman-8'
+                <View
+                  className={`h-9 items-center justify-center rounded-pill px-4 ${
+                    active ? 'bg-ink' : 'bg-sand-1'
                   }`}
                 >
-                  {f.label}
-                </Text>
-              </Pressable>
+                  <Text
+                    className={`text-[12px] font-bold ${active ? 'text-white' : 'text-ink/60'}`}
+                    tracking="tight"
+                  >
+                    {f.label}
+                  </Text>
+                </View>
+              </AnimatedPressable>
             );
           })}
         </View>
@@ -237,64 +283,70 @@ export default function FeedScreen() {
         <FeedSkeleton />
       ) : (
         <FlatList
-          data={items}
-          keyExtractor={(it) => it.id ?? `${it.kind}-${it.entityId}`}
+          data={rows}
+          keyExtractor={(r) => r.key}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={greenman[7]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ink.DEFAULT} />
           }
           ListHeaderComponent={Header}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
           initialNumToRender={4}
           windowSize={5}
           removeClippedSubviews
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => (
-            <FeedCard
-              item={item}
-              onPress={() => openItem(item)}
-              onLike={() => onLike(item)}
-              onComment={() => onComment(item)}
-              onBookmark={() => onBookmark(item)}
-              onRepost={() => onRepost(item)}
-              onShare={() => onShare(item)}
-            />
-          )}
+          renderItem={({ item }) => {
+            if (item.type === 'highlight') {
+              return <FeedHighlight variant={item.variant} onPress={() => openHighlight(item.variant)} />;
+            }
+            const it = item.item;
+            return (
+              <FeedCard
+                item={it}
+                onPress={() => openItem(it)}
+                onLike={() => onLike(it)}
+                onComment={() => onComment(it)}
+                onBookmark={() => onBookmark(it)}
+                onRepost={() => onRepost(it)}
+                onShare={() => onShare(it)}
+              />
+            );
+          }}
           ListFooterComponent={
             feedQuery.isFetchingNextPage ? (
-              <View className="py-lg items-center">
-                <ActivityIndicator color={semantic.accent} />
+              <View className="items-center py-8">
+                <ActivityIndicator color={ink.DEFAULT} />
               </View>
             ) : null
           }
           ListEmptyComponent={
             feedQuery.isError ? (
-              <View className="px-8 py-16 items-center">
-                <Ionicons name="cloud-offline-outline" size={40} color={greenman[7]} />
-                <Text className="mt-sm text-label text-ink-dim">Не удалось загрузить ленту</Text>
-                <Pressable
-                  onPress={onRefresh}
-                  accessibilityRole="button"
-                  className="mt-md rounded-full bg-greenman-7 px-lg py-2.5 active:opacity-80"
-                >
-                  <Text className="text-caption font-semibold text-white">Обновить</Text>
-                </Pressable>
+              <View className="items-center px-8 py-16">
+                <Ionicons name="cloud-offline-outline" size={40} color={sand[3]} />
+                <Text className="mt-4 text-ink/60">Не удалось загрузить ленту</Text>
+                <AnimatedPressable onPress={onRefresh} haptic="light" scale={0.96}>
+                  <View className="mt-4 rounded-pill bg-ink px-6 py-3">
+                    <Text className="text-[13px] font-bold text-white" tracking="tight">
+                      Обновить
+                    </Text>
+                  </View>
+                </AnimatedPressable>
               </View>
             ) : (
-              <View className="px-8 py-16 items-center">
-                <Ionicons name="sparkles-outline" size={40} color={greenman[7]} />
-                <Text className="mt-sm text-label text-ink-dim">
+              <View className="items-center px-8 py-16">
+                <Ionicons name="sparkles-outline" size={40} color={sand[3]} />
+                <Text className="mt-4 text-ink/60">
                   {filter === 'all' ? 'Пока пусто' : 'Ничего не найдено'}
                 </Text>
                 {filter !== 'all' ? (
-                  <Pressable
-                    onPress={() => setFilter('all')}
-                    accessibilityRole="button"
-                    className="mt-sm rounded-full bg-surface-muted px-md py-xs active:opacity-80"
-                  >
-                    <Text className="text-caption font-semibold text-greenman-8">Показать всё</Text>
-                  </Pressable>
+                  <AnimatedPressable onPress={() => setFilter('all')} haptic="selection" scale={0.96}>
+                    <View className="mt-3 rounded-pill bg-sand-1 px-5 py-2.5">
+                      <Text className="text-[12px] font-bold text-ink" tracking="tight">
+                        Показать всё
+                      </Text>
+                    </View>
+                  </AnimatedPressable>
                 ) : null}
               </View>
             )

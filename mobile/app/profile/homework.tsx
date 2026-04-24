@@ -1,13 +1,14 @@
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, FlatList, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { socialApi } from '@/features/social/api';
-import { semantic, greenman } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
-import { radii } from '@/theme/radii';
+import { ink, greenman, clay, sand, sun } from '@/theme/colors';
+import { shadows } from '@/theme/shadows';
 import { EmptyState } from '@/components/common/EmptyState';
 import { formatRelativeRu } from '@/lib/format/relativeTime';
 
@@ -20,6 +21,20 @@ type HomeworkItem = {
   day?: { id: number; dayNumber: number; title: string } | null;
   course?: { id: number; slug: string; title: string } | null;
 };
+
+type ReviewStatus = 'approved' | 'rejected' | 'pending';
+
+function reviewConfig(status: string | null | undefined): {
+  label: string;
+  bg: string;
+  dot: string;
+  text: string;
+} {
+  const s = (status ?? 'pending') as ReviewStatus;
+  if (s === 'approved') return { label: 'Принято', bg: 'bg-greenman-1', dot: greenman[7], text: 'text-greenman-9' };
+  if (s === 'rejected') return { label: 'Отклонено', bg: 'bg-red-50', dot: '#b00020', text: 'text-red-700' };
+  return { label: 'На проверке', bg: 'bg-sun-0', dot: sun[3], text: 'text-ink/70' };
+}
 
 export default function HomeworkScreen() {
   const query = useQuery({
@@ -36,7 +51,7 @@ export default function HomeworkScreen() {
       <Header title="Домашние задания" />
       {query.isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={greenman[7]} />
+          <ActivityIndicator color={ink.DEFAULT} />
         </View>
       ) : items.length === 0 ? (
         <EmptyState
@@ -48,11 +63,7 @@ export default function HomeworkScreen() {
           data={items}
           keyExtractor={(it) => String(it.id)}
           renderItem={({ item }) => <HomeworkRow item={item} />}
-          contentContainerStyle={{
-            padding: spacing.md,
-            gap: spacing.sm,
-            paddingBottom: spacing['3xl'],
-          }}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}
         />
       )}
     </Screen>
@@ -60,13 +71,7 @@ export default function HomeworkScreen() {
 }
 
 function HomeworkRow({ item }: { item: HomeworkItem }) {
-  const status = item.reviewStatus;
-  const statusLabel =
-    status === 'approved' ? 'Принято' : status === 'rejected' ? 'Отклонено' : 'На проверке';
-  const statusBg =
-    status === 'approved' ? greenman[1] : status === 'rejected' ? '#FDE2E2' : '#FEF0DB';
-  const statusColor =
-    status === 'approved' ? greenman[8] : status === 'rejected' ? '#B02A37' : '#8A5A10';
+  const cfg = reviewConfig(item.reviewStatus);
 
   const openDay = () => {
     if (item.course?.slug && item.day?.dayNumber) {
@@ -75,102 +80,67 @@ function HomeworkRow({ item }: { item: HomeworkItem }) {
   };
 
   return (
-    <Pressable
-      onPress={openDay}
-      style={{
-        borderWidth: 1,
-        borderColor: semantic.border,
-        backgroundColor: semantic.surface,
-        borderRadius: radii.lg,
-        padding: spacing.md,
-        gap: 6,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: 'Manrope_600SemiBold',
-            fontSize: 12,
-            color: semantic.inkDim,
-          }}
-        >
-          {formatRelativeRu(item.createdAt)}
-        </Text>
-        <View
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-            borderRadius: radii.full,
-            backgroundColor: statusBg,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: 'Manrope_600SemiBold',
-              fontSize: 11,
-              color: statusColor,
-            }}
-          >
-            {statusLabel}
+    <AnimatedPressable onPress={openDay} haptic="selection" wrapperStyle={shadows.flat}>
+      <View className="overflow-hidden rounded-xl bg-white p-4">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-[12px] text-ink/50" tracking="tight">
+            {formatRelativeRu(item.createdAt)}
           </Text>
+          <View className={`flex-row items-center rounded-pill ${cfg.bg} px-3 py-1`}>
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: cfg.dot,
+                marginRight: 6,
+              }}
+            />
+            <Text className={`text-[11px] font-bold ${cfg.text}`} tracking="wide">
+              {cfg.label}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {item.course?.title ? (
-        <Text
-          style={{
-            fontFamily: 'Manrope_500Medium',
-            fontSize: 11,
-            color: greenman[7],
-            textTransform: 'uppercase',
-            letterSpacing: 0.6,
-          }}
-        >
-          {item.course.title}
-        </Text>
-      ) : null}
-      {item.day ? (
-        <Text
-          style={{
-            fontFamily: 'Manrope_700Bold',
-            fontSize: 16,
-            color: semantic.ink,
-          }}
-        >
-          День {item.day.dayNumber}: {item.day.title}
-        </Text>
-      ) : null}
-      {item.text ? (
-        <Text
-          style={{
-            fontFamily: 'Manrope_500Medium',
-            fontSize: 14,
-            color: semantic.ink,
-            marginTop: 2,
-          }}
-          numberOfLines={3}
-        >
-          {item.text}
-        </Text>
-      ) : null}
-      {item.reviewerComment ? (
-        <Text
-          style={{
-            fontFamily: 'Manrope_500Medium',
-            fontSize: 13,
-            color: greenman[8],
-            marginTop: 4,
-          }}
-        >
-          Куратор: {item.reviewerComment}
-        </Text>
-      ) : null}
-    </Pressable>
+        {item.course?.title ? (
+          <Text variant="meta-upper" tracking="widest" className="mt-2.5 text-greenman-7">
+            {item.course.title}
+          </Text>
+        ) : null}
+
+        {item.day ? (
+          <Text
+            className="mt-1 text-ink"
+            style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 17, lineHeight: 22 }}
+          >
+            День {item.day.dayNumber}: {item.day.title}
+          </Text>
+        ) : null}
+
+        {item.text ? (
+          <Text
+            className="mt-2 text-[14px] text-ink/70"
+            numberOfLines={3}
+            tracking="tight"
+          >
+            {item.text}
+          </Text>
+        ) : null}
+
+        {item.reviewerComment ? (
+          <View className="mt-3 rounded-lg bg-greenman-0 p-3">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="chatbubble" size={13} color={greenman[7]} />
+              <Text className="text-[11px] font-bold text-greenman-8" tracking="wide">
+                Куратор
+              </Text>
+            </View>
+            <Text className="mt-1 text-[13px] text-greenman-9" tracking="tight">
+              {item.reviewerComment}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </AnimatedPressable>
   );
 }
