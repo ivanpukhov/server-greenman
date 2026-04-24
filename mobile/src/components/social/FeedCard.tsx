@@ -317,7 +317,7 @@ function PostCard(props: Props) {
           onPress={onPress}
           scale={0.99}
           haptic="selection"
-          wrapperStyle={shadows.soft}
+          wrapperStyle={[{ width: CARD_W }, shadows.soft]}
           className="overflow-hidden rounded-2xl bg-surface p-5"
         >
           <View className="flex-row items-center justify-between">
@@ -334,7 +334,7 @@ function PostCard(props: Props) {
       {/* engagement bar — overlapped */}
       <View
         className="-mt-5 overflow-hidden rounded-lg bg-surface"
-        style={shadows.card}
+        style={[{ width: CARD_W }, shadows.card]}
       >
         <Engagement p={props} flat />
       </View>
@@ -362,7 +362,7 @@ function ArticleCard(props: Props) {
         onPress={onPress}
         haptic="selection"
         scale={0.99}
-        wrapperStyle={shadows.soft}
+        wrapperStyle={[{ width: CARD_W }, shadows.soft]}
         className="overflow-hidden rounded-xl bg-surface-cream"
       >
         <View className="flex-row gap-4 p-4">
@@ -472,7 +472,7 @@ function ReelCard(props: Props) {
         onPress={onPress}
         haptic="selection"
         scale={0.99}
-        wrapperStyle={shadows.float}
+        wrapperStyle={[{ width: CARD_W }, shadows.float]}
         className="overflow-hidden rounded-2xl bg-ink"
       >
         <View style={{ width: CARD_W, height }}>
@@ -577,7 +577,7 @@ function WebinarCard(props: Props) {
         onPress={onPress}
         haptic="selection"
         scale={0.99}
-        wrapperStyle={shadows.card}
+        wrapperStyle={[{ width: CARD_W }, shadows.card]}
         className="overflow-hidden rounded-xl"
       >
         <View style={{ width: CARD_W, height, backgroundColor: '#1f2937' }}>

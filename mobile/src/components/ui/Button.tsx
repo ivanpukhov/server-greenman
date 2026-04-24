@@ -1,5 +1,4 @@
 import { ActivityIndicator, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
 import { Text } from './Text';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -40,32 +39,6 @@ const radius: Record<Size, string> = {
   md: 'rounded-pill',
   lg: 'rounded-pill',
 };
-
-function PrimaryContent({ children }: { children: ReactNode }) {
-  return (
-    <LinearGradient
-      colors={[greenman[5], greenman[7], greenman[9]]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-    >
-      {children}
-    </LinearGradient>
-  );
-}
-
-function ClayContent({ children }: { children: ReactNode }) {
-  return (
-    <LinearGradient
-      colors={[clay[3], clay[5]]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-    >
-      {children}
-    </LinearGradient>
-  );
-}
 
 export function Button({
   label,
@@ -129,7 +102,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={indicatorColor} />
       ) : (
-        <View className="flex-row items-center justify-center">
+        <View className="max-w-full flex-row items-center justify-center px-1">
           {iconLeft ? <View className="mr-2">{iconLeft}</View> : null}
           {label ? (
             <Text
@@ -144,15 +117,9 @@ export function Button({
       )}
     </>
   );
-
-  const inner =
-    variant === 'primary' ? (
-      <PrimaryContent>{content}</PrimaryContent>
-    ) : variant === 'clay' ? (
-      <ClayContent>{content}</ClayContent>
-    ) : (
-      content
-    );
+  const resolvedWrapperStyle = full
+    ? [shadowStyle ?? {}, { alignSelf: 'stretch' as const }]
+    : shadowStyle;
 
   return (
     <AnimatedPressable
@@ -163,10 +130,10 @@ export function Button({
       onPress={onPress}
       scale={0.955}
       wrapperClassName={`${layout} ${isDisabled ? 'opacity-50' : ''} ${className ?? ''}`}
-      wrapperStyle={shadowStyle}
+      wrapperStyle={resolvedWrapperStyle}
       className={`${baseShape} ${shell}`}
     >
-      {inner}
+      {content}
     </AnimatedPressable>
   );
 }

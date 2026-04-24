@@ -20,6 +20,7 @@ export default function CartScreen() {
   const isAuth = useAuthStore((s) => s.isAuthenticated);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = 58 + Math.max(insets.bottom, 8);
 
   const goCheckout = () => {
     if (!isAuth) {
@@ -62,8 +63,8 @@ export default function CartScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 200 + insets.bottom }}>
-        <View className="gap-2">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarHeight + 156 }}>
+        <View className="gap-3">
           {items.map((item) => (
             <CartItemRow key={`${item.productId}-${item.type.id}`} item={item} />
           ))}
@@ -96,14 +97,14 @@ export default function CartScreen() {
       </ScrollView>
 
       <View
-        style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-        className="absolute bottom-0 left-0 right-0 border-t border-border bg-white px-5 pt-4 shadow-pop"
+        style={{ bottom: tabBarHeight, paddingBottom: 16 }}
+        className="absolute left-0 right-0 border-t border-border bg-white px-5 pt-4 shadow-pop"
       >
         <View className="mb-3 flex-row items-center justify-between">
           <Text className="text-sm text-ink-dim">Итого</Text>
           <Text className="text-2xl font-display text-ink">{formatPrice(subtotal, currency)}</Text>
         </View>
-        <Button label="Оформить заказ" size="lg" onPress={goCheckout} />
+        <Button label="Оформить заказ" size="lg" full onPress={goCheckout} />
       </View>
     </Screen>
   );

@@ -161,7 +161,7 @@ export default function HomeScreen() {
               Забота о здоровье.{'\n'}
               <Text className="font-serif-italic text-white/60">Сегодня.</Text>
             </Text>
-            <Text className="mt-3 max-w-[285px] text-[13px] leading-[19px] text-white/62">
+            <Text className="mt-3 max-w-[285px] text-[13px] leading-[19px] text-white/70">
               Натуральные средства, курсы и консультации Greenman в одном месте.
             </Text>
           </Animated.View>
