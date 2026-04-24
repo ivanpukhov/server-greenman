@@ -26,8 +26,6 @@ export default function AdminLayout() {
       <Stack.Screen name="posts/[id]" />
       <Stack.Screen name="stories/index" />
       <Stack.Screen name="stories/[id]" />
-      <Stack.Screen name="banners/index" />
-      <Stack.Screen name="banners/[id]" />
       <Stack.Screen name="reels/index" />
       <Stack.Screen name="reels/[id]" />
       <Stack.Screen name="articles/index" />

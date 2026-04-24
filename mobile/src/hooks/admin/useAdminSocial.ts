@@ -4,7 +4,6 @@ import { endpoints } from '@/lib/api/endpoints';
 import type {
   AdminComment,
   Article,
-  Banner,
   Course,
   CourseDay,
   Post,
@@ -89,13 +88,6 @@ export const stories = makeCrud<Story>(
   'stories',
   endpoints.adminSocial.stories,
   endpoints.adminSocial.storyById,
-  { hasGet: false }
-);
-
-export const banners = makeCrud<Banner>(
-  'banners',
-  endpoints.adminSocial.banners,
-  endpoints.adminSocial.bannerById,
   { hasGet: false }
 );
 

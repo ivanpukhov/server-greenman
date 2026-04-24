@@ -41,8 +41,11 @@ export default function CartScreen() {
             Загляните в каталог — найдём средство, которое подойдёт именно вам.
           </Text>
           <Button
-            label="В каталог"
-            className="mt-8 w-full"
+            label="Перейти в каталог"
+            size="lg"
+            full
+            className="mt-8"
+            iconRight={<Ionicons name="arrow-forward" size={16} color="#ffffff" />}
             onPress={() => router.push('/catalog')}
           />
         </View>
