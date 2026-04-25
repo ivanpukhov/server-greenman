@@ -109,7 +109,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await clearSession();
+    await Promise.all([clearSession(), clearAdminSession()]);
     set({
       token: null,
       userId: null,
@@ -118,6 +118,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       displayName: null,
       requiresProfile: false,
       isAuthenticated: false,
+      adminToken: null,
+      adminUserId: null,
+      adminProfile: null,
+      isAdmin: false,
     });
   },
 

@@ -60,6 +60,7 @@ export type User = {
 export type ProfileUser = {
   id: number;
   phoneNumber: string;
+  role?: 'user' | 'admin';
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
@@ -169,5 +170,11 @@ export type AuthConfirmCodeResponse = {
   token: string;
   userId: number;
   user?: ProfileUser;
+  isAdmin?: boolean;
+  adminProfile?: {
+    fullName: string;
+    iin: string;
+    phoneNumber: string;
+  } | null;
   requiresProfile?: boolean;
 };

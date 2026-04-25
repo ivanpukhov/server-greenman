@@ -1,18 +1,19 @@
-import { View, ScrollView, Alert } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, ScrollView, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/auth.store';
 import { useCountryStore } from '@/stores/country.store';
 import { useDeleteAccount } from '@/hooks/useProfile';
-import { setLocale, getLocale, type AppLocale } from '@/i18n';
-import { ink, sand } from '@/theme/colors';
-import { shadows } from '@/theme/shadows';
-import { useState } from 'react';
+import { getLocale, setLocale, type AppLocale } from '@/i18n';
 import { CountryMark, CurrencyMark } from '@/components/ui/CountryMark';
+import { greenman, ink, sand } from '@/theme/colors';
+import { shadows } from '@/theme/shadows';
 
 const LANGUAGES: { key: AppLocale; label: string; sub: string }[] = [
   { key: 'ru', label: 'Русский', sub: 'Основной язык' },
@@ -31,11 +32,14 @@ export default function SettingsScreen() {
   const country = useCountryStore((s) => s.country);
   const setCountry = useCountryStore((s) => s.setCountry);
   const [locale, setLocaleState] = useState<AppLocale>(getLocale());
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system');
   const deleteAccount = useDeleteAccount();
 
-  const handleLocale = (l: AppLocale) => {
-    setLocale(l);
-    setLocaleState(l);
+  const handleLocale = (next: AppLocale) => {
+    setLocale(next);
+    setLocaleState(next);
   };
 
   const confirmLogout = () => {
@@ -63,7 +67,7 @@ export default function SettingsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -72,143 +76,96 @@ export default function SettingsScreen() {
       <Header title="Настройки" />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 60 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 80 }}
       >
-        <SettingSection title="Страна и валюта">
-          <View className="gap-2">
-            {COUNTRIES.map((c, i) => (
-              <AnimatedPressable
-                key={c.key}
-                onPress={() => setCountry(c.key)}
-                haptic="selection"
-                wrapperStyle={shadows.flat}
-              >
-                <View
-                  className={`flex-row items-center gap-4 rounded-xl px-4 py-4 ${
-                    country === c.key ? 'bg-ink' : 'bg-white'
-                  }`}
-                >
-                  <CountryMark country={c.key} size="lg" active={country === c.key} />
-                  <View className="flex-1">
-                    <Text
-                      className={`text-[16px] font-bold ${country === c.key ? 'text-white' : 'text-ink'}`}
-                      tracking="tight"
-                    >
-                      {c.label}
-                    </Text>
-                    <View className="mt-1 self-start">
-                      <CurrencyMark country={c.key} active={country === c.key} />
-                    </View>
-                  </View>
-                  {country === c.key ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
-                  ) : (
-                    <View className="h-5 w-5 rounded-pill border-2 border-sand-3" />
-                  )}
-                </View>
-              </AnimatedPressable>
-            ))}
-          </View>
+        <SettingSection title="Уведомления" caption="Будем уведомлять о статусе заказов и новых материалах.">
+          <SettingRow
+            icon="notifications-outline"
+            label="Push-уведомления"
+            right={<Switch value={pushEnabled} onValueChange={setPushEnabled} trackColor={{ true: greenman[7] }} />}
+          />
+          <SettingRow
+            icon="mail-outline"
+            label="Email-рассылка"
+            right={<Switch value={emailEnabled} onValueChange={setEmailEnabled} trackColor={{ true: greenman[7] }} />}
+          />
         </SettingSection>
 
-        <SettingSection title="Язык интерфейса">
-          <View className="gap-2">
-            {LANGUAGES.map((l) => (
+        <SettingSection title="Регион">
+          {COUNTRIES.map((item) => (
+            <SettingRow
+              key={item.key}
+              iconNode={<CountryMark country={item.key} size="md" active={country === item.key} />}
+              label={item.label}
+              subtitle={<CurrencyMark country={item.key} active={country === item.key} />}
+              active={country === item.key}
+              onPress={() => setCountry(item.key)}
+              right={country === item.key ? <Ionicons name="checkmark-circle" size={20} color={greenman[7]} /> : undefined}
+            />
+          ))}
+        </SettingSection>
+
+        <SettingSection title="Язык">
+          {LANGUAGES.map((item) => (
+            <SettingRow
+              key={item.key}
+              icon="language-outline"
+              label={item.label}
+              subtitle={item.sub}
+              active={locale === item.key}
+              onPress={() => handleLocale(item.key)}
+              right={locale === item.key ? <Ionicons name="checkmark-circle" size={20} color={greenman[7]} /> : undefined}
+            />
+          ))}
+        </SettingSection>
+
+        <SettingSection title="Тема">
+          <View className="flex-row rounded-pill bg-sand-1 p-1">
+            {([
+              ['system', 'Система'],
+              ['light', 'Светлая'],
+              ['dark', 'Тёмная'],
+            ] as const).map(([key, label]) => (
               <AnimatedPressable
-                key={l.key}
-                onPress={() => handleLocale(l.key)}
+                key={key}
+                onPress={() => setTheme(key)}
                 haptic="selection"
-                wrapperStyle={shadows.flat}
+                wrapperStyle={{ flex: 1 }}
+                className={`h-10 items-center justify-center rounded-pill ${theme === key ? 'bg-white' : ''}`}
               >
-                <View
-                  className={`flex-row items-center gap-4 rounded-xl px-4 py-3.5 ${
-                    locale === l.key ? 'bg-greenman-9' : 'bg-white'
-                  }`}
-                >
-                  <View
-                    className="h-10 w-10 items-center justify-center rounded-pill"
-                    style={{
-                      backgroundColor:
-                        locale === l.key ? 'rgba(255,255,255,0.15)' : sand[1],
-                    }}
-                  >
-                    <Ionicons
-                      name="language"
-                      size={18}
-                      color={locale === l.key ? '#ffffff' : ink.DEFAULT}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className={`text-[16px] font-bold ${locale === l.key ? 'text-white' : 'text-ink'}`}
-                      tracking="tight"
-                    >
-                      {l.label}
-                    </Text>
-                    <Text
-                      className={`text-[12px] ${locale === l.key ? 'text-white/70' : 'text-ink/50'}`}
-                      tracking="tight"
-                    >
-                      {l.sub}
-                    </Text>
-                  </View>
-                  {locale === l.key ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
-                  ) : (
-                    <View className="h-5 w-5 rounded-pill border-2 border-sand-3" />
-                  )}
-                </View>
+                <Text className={`text-[13px] font-semibold ${theme === key ? 'text-ink' : 'text-ink/50'}`}>
+                  {label}
+                </Text>
               </AnimatedPressable>
             ))}
           </View>
         </SettingSection>
 
         {isAuth ? (
-          <View className="mt-8">
-            <AnimatedPressable onPress={() => router.push('/auth/profile')} haptic="selection">
-              <View
-                className="mb-3 flex-row items-center gap-3 rounded-xl bg-white px-4 py-3.5"
-                style={shadows.flat}
-              >
-                <View className="h-10 w-10 items-center justify-center rounded-pill bg-sand-1">
-                  <Ionicons name="person-outline" size={20} color={ink.DEFAULT} />
-                </View>
-                <Text className="flex-1 text-[16px] font-bold text-ink">
-                  Имя и фамилия
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={sand[4]} />
-              </View>
-            </AnimatedPressable>
-            <AnimatedPressable onPress={confirmLogout} haptic="medium">
-              <View
-                className="flex-row items-center gap-3 rounded-xl bg-white px-4 py-3.5"
-                style={shadows.flat}
-              >
-                <View className="h-10 w-10 items-center justify-center rounded-pill bg-sand-1">
-                  <Ionicons name="log-out-outline" size={20} color="#b00020" />
-                </View>
-                <Text className="flex-1 text-[16px] font-bold" style={{ color: '#b00020' }}>
-                  Выйти из аккаунта
-                </Text>
-              </View>
-            </AnimatedPressable>
-            <AnimatedPressable
-              onPress={confirmDelete}
-              haptic="medium"
+          <SettingSection title="Аккаунт">
+            <SettingRow icon="person-outline" label="Изменить имя" onPress={() => router.push('/auth/profile')} />
+            <SettingRow icon="call-outline" label="Изменить телефон" subtitle="Скоро" disabled />
+          </SettingSection>
+        ) : null}
+
+        <SettingSection title="О приложении">
+          <SettingRow icon="logo-whatsapp" label="Поддержка в WhatsApp" onPress={() => Linking.openURL('https://wa.me/77001234567')} />
+          <SettingRow icon="mail-outline" label="Связаться с нами" onPress={() => Linking.openURL('mailto:hello@greenman.kz')} />
+          <SettingRow icon="document-text-outline" label="Условия использования" onPress={() => Alert.alert('Условия использования', 'Текст условий будет добавлен в следующем релизе.')} />
+          <SettingRow icon="shield-checkmark-outline" label="Политика конфиденциальности" onPress={() => Alert.alert('Политика конфиденциальности', 'Текст политики будет добавлен в следующем релизе.')} />
+          <SettingRow icon="information-circle-outline" label="Версия" subtitle="1.0.0" disabled />
+        </SettingSection>
+
+        {isAuth ? (
+          <View className="mt-2 gap-3">
+            <Button label="Выйти из аккаунта" variant="secondary" full onPress={confirmLogout} />
+            <Button
+              label="Удалить аккаунт"
+              variant="ghost"
+              full
               disabled={deleteAccount.isPending}
-            >
-              <View
-                className="mt-3 flex-row items-center gap-3 rounded-xl border border-red-100 bg-white px-4 py-3.5"
-                style={shadows.flat}
-              >
-                <View className="h-10 w-10 items-center justify-center rounded-pill bg-red-50">
-                  <Ionicons name="trash-outline" size={20} color="#b00020" />
-                </View>
-                <Text className="flex-1 text-[16px] font-bold" style={{ color: '#b00020' }}>
-                  Удалить аккаунт
-                </Text>
-              </View>
-            </AnimatedPressable>
+              onPress={confirmDelete}
+            />
           </View>
         ) : null}
       </ScrollView>
@@ -216,13 +173,68 @@ export default function SettingsScreen() {
   );
 }
 
-function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
+function SettingSection({
+  title,
+  caption,
+  children,
+}: {
+  title: string;
+  caption?: string;
+  children: React.ReactNode;
+}) {
   return (
     <View className="mb-6">
-      <Text variant="meta-upper" tracking="widest" className="mb-3 text-ink/50">
+      <Text variant="meta-upper" tracking="wide" className="mb-2 text-ink/50">
         {title}
       </Text>
-      {children}
+      <View className="overflow-hidden rounded-lg bg-white" style={shadows.flat}>
+        {children}
+      </View>
+      {caption ? <Text className="mt-2 text-[11px] leading-[14px] text-ink/50">{caption}</Text> : null}
     </View>
+  );
+}
+
+function SettingRow({
+  icon,
+  iconNode,
+  label,
+  subtitle,
+  active,
+  disabled,
+  right,
+  onPress,
+}: {
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconNode?: React.ReactNode;
+  label: string;
+  subtitle?: string | React.ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  right?: React.ReactNode;
+  onPress?: () => void;
+}) {
+  const content = (
+    <View className={`min-h-14 flex-row items-center gap-3 border-b border-border px-4 py-3 ${active ? 'bg-greenman-0' : 'bg-white'} ${disabled ? 'opacity-45' : ''}`}>
+      <View className="h-9 w-9 items-center justify-center rounded-full bg-sand-1">
+        {iconNode ?? (icon ? <Ionicons name={icon} size={18} color={active ? greenman[7] : ink.DEFAULT} /> : null)}
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="text-[15px] font-semibold text-ink">{label}</Text>
+        {typeof subtitle === 'string' ? (
+          <Text className="mt-0.5 text-[11px] text-ink/50">{subtitle}</Text>
+        ) : subtitle ? (
+          <View className="mt-1 self-start">{subtitle}</View>
+        ) : null}
+      </View>
+      {right ?? (onPress ? <Ionicons name="chevron-forward" size={17} color={sand[4]} /> : null)}
+    </View>
+  );
+
+  if (!onPress) return content;
+  return (
+    <AnimatedPressable onPress={onPress} disabled={disabled} haptic="selection" scale={0.98}>
+      {content}
+    </AnimatedPressable>
   );
 }

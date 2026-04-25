@@ -178,10 +178,10 @@ export default function ProfileScreen() {
                     <Text variant="meta-upper" tracking="widest" className="text-white/60">
                       Админ
                     </Text>
-                    <Text
-                      className="mt-0.5 text-white"
-                      style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 20, lineHeight: 24 }}
-                    >
+            <Text
+              className="mt-0.5 text-white"
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 20, lineHeight: 24 }}
+            >
                       Панель управления
                     </Text>
                   </View>
@@ -269,7 +269,7 @@ function ActionGrid({ router }: { router: ReturnType<typeof useRouter> }) {
             </View>
             <Text
               className="mt-4 text-ink"
-              style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 18, lineHeight: 22 }}
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 18, lineHeight: 22 }}
             >
               {it.title}
             </Text>
@@ -361,7 +361,7 @@ function OrdersRail({
               </View>
               <Text
                 className="mt-4 text-ink"
-                style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 24, lineHeight: 28 }}
+                style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 24, lineHeight: 28 }}
               >
                 {formatPrice(o.totalPrice, (o.currency as 'KZT' | 'RUB') ?? 'KZT')}
               </Text>
@@ -440,7 +440,7 @@ function AddressesList({
           <View className="flex-1">
             <Text
               className="text-ink"
-              style={{ fontFamily: 'SourceSerifPro_600SemiBold', fontSize: 16, lineHeight: 20 }}
+              style={{ fontFamily: 'Manrope_700Bold', fontSize: 16, lineHeight: 20 }}
             >
               {p.city}
             </Text>
@@ -525,7 +525,7 @@ function UnauthedState({ onLogin }: { onLogin: () => void }) {
             </View>
             <Text
               className="mt-8 text-white"
-              style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 36, lineHeight: 40 }}
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 36, lineHeight: 40 }}
             >
               Ваш личный{'\n'}<Text style={{ fontStyle: 'italic' }}>растительный мир</Text>
             </Text>

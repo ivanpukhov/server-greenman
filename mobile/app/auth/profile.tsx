@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { StickyCTA } from '@/components/ui/StickyCTA';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { greenman } from '@/theme/colors';
@@ -45,57 +46,56 @@ export default function AuthProfileScreen() {
   };
 
   return (
-    <Screen avoidKeyboard>
-      <Header title="Профиль" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <Screen edges={['left', 'right']} avoidKeyboard>
+      <Header title="Профиль" floating />
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 96, paddingBottom: 148 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="h-14 w-14 items-center justify-center rounded-full bg-greenman-0">
-            <Ionicons name="person-outline" size={26} color={greenman[7]} />
-          </View>
-          <Text className="mt-4 text-2xl font-display text-ink">Как вас зовут?</Text>
-          <Text className="mt-2 text-sm leading-5 text-ink-dim">
-            Имя и фамилия нужны для профиля, заказов и обращений в поддержку.
-          </Text>
+        <View className="h-24 w-24 items-center justify-center rounded-full bg-greenman-0">
+          <Ionicons name="person-outline" size={42} color={greenman[7]} />
+        </View>
+        <Text className="mt-8 font-display text-[28px] leading-[34px] text-ink">
+          Расскажите о себе
+        </Text>
+        <Text className="mt-2 text-[15px] leading-[22px] text-ink/60">
+          Имя и фамилия нужны для заказов и обращений в поддержку.
+        </Text>
 
-          <View className="mt-6 gap-4">
-            <Input
-              label="Имя"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="Например, Алия"
-              autoCapitalize="words"
-              autoFocus
-              error={firstError}
-              leftIcon={<Ionicons name="person-outline" size={18} color={greenman[7]} />}
-            />
-            <Input
-              label="Фамилия"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Например, Садыкова"
-              autoCapitalize="words"
-              error={lastError}
-              leftIcon={<Ionicons name="id-card-outline" size={18} color={greenman[7]} />}
-            />
-          </View>
+        <View className="mt-8 gap-4">
+          <Input
+            label="Имя"
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="Например, Алия"
+            autoCapitalize="words"
+            autoFocus
+            error={firstError}
+            leftIcon={<Ionicons name="person-outline" size={18} color={greenman[7]} />}
+          />
+          <Input
+            label="Фамилия"
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Например, Садыкова"
+            autoCapitalize="words"
+            error={lastError}
+            leftIcon={<Ionicons name="id-card-outline" size={18} color={greenman[7]} />}
+          />
+        </View>
+      </ScrollView>
 
-          <View className="mt-7">
-            <Button
-              label="Сохранить"
-              size="lg"
-              full
-              loading={update.isPending}
-              onPress={save}
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <StickyCTA>
+        <Button
+          label="Продолжить"
+          size="lg"
+          full
+          loading={update.isPending}
+          disabled={!first || !last}
+          onPress={save}
+        />
+      </StickyCTA>
     </Screen>
   );
 }

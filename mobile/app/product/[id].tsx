@@ -1,65 +1,82 @@
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import { View, ScrollView, Dimensions, TextInput, Pressable, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMemo, useState } from 'react';
+import { Share, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
-import { useMemo, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import { cssInterop } from 'nativewind';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Shimmer } from '@/components/ui/Shimmer';
 import { Header } from '@/components/ui/Header';
+import { Shimmer } from '@/components/ui/Shimmer';
 import { Chip } from '@/components/ui/Chip';
+import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { ProductPlaceholder } from '@/components/ui/ProductPlaceholder';
-import { useCreateProductReview, useProduct, useProductReviews } from '@/hooks/useProducts';
-import { useCountryStore } from '@/stores/country.store';
+import { StickyCTA } from '@/components/ui/StickyCTA';
+import { ProductGallery } from '@/components/product/ProductGallery';
+import { ProductRail } from '@/components/product/ProductRail';
+import { useProduct, useProductReviews, useProducts } from '@/hooks/useProducts';
 import { useCartStore } from '@/stores/cart.store';
-import { useAuthStore } from '@/stores/auth.store';
+import { useCountryStore } from '@/stores/country.store';
 import { formatPrice } from '@/lib/format/price';
-import { greenman, ink, sand } from '@/theme/colors';
+import { greenman, ink, sand, sun } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
-import type { ProductRating, ProductReview } from '@/lib/api/types';
+import type { ProductRating, ProductType } from '@/lib/api/types';
 
-cssInterop(LinearGradient, { className: 'style' });
-
-const { width: SCREEN_W } = Dimensions.get('window');
-const HERO_H = SCREEN_W;
+function minType(types: ProductType[]) {
+  if (!types.length) return null;
+  return types.reduce((min, type) => (type.price < min.price ? type : min), types[0]);
+}
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
   const currency = useCountryStore((s) => s.currency);
   const add = useCartStore((s) => s.add);
   const cartItems = useCartStore((s) => s.items);
-  const { data: product, isLoading, isError } = useProduct(id);
-  const productReviews = useProductReviews(id);
-
-  const types = product?.types ?? [];
+  const { data: product, isLoading, isError, refetch } = useProduct(id);
+  const reviews = useProductReviews(id);
+  const products = useProducts();
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
+  const [justAdded, setJustAdded] = useState(false);
 
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const types = product?.types ?? [];
   const selectedType = useMemo(() => {
     if (!types.length) return null;
-    if (selectedTypeId != null) return types.find((t) => t.id === selectedTypeId) ?? types[0];
-    return types[0];
+    if (selectedTypeId != null) return types.find((t) => t.id === selectedTypeId) ?? minType(types);
+    return minType(types);
   }, [types, selectedTypeId]);
+
+  const related = useMemo(
+    () => (products.data ?? []).filter((p) => p.id !== product?.id).slice(0, 8),
+    [products.data, product?.id],
+  );
 
   if (isLoading) {
     return (
       <Screen edges={['left', 'right']}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Header title="" floating />
-        <View className="px-5 pt-16">
-          <Shimmer style={{ aspectRatio: 1, width: '100%', borderRadius: 24 }} />
-          <Shimmer style={{ height: 28, width: '75%', borderRadius: 8, marginTop: 24 }} />
-          <Shimmer style={{ height: 22, width: '40%', borderRadius: 8, marginTop: 12 }} />
-          <Shimmer style={{ height: 80, width: '100%', borderRadius: 14, marginTop: 20 }} />
+        <Header title="" transparent floating scrollOffset={scrollY} />
+        <View>
+          <Shimmer style={{ aspectRatio: 1, width: '100%' }} />
+          <View className="px-5 pt-6">
+            <Shimmer style={{ height: 28, width: '80%', borderRadius: 10 }} />
+            <Shimmer style={{ height: 18, width: '52%', borderRadius: 8, marginTop: 12 }} />
+            <Shimmer style={{ height: 40, width: '44%', borderRadius: 10, marginTop: 16 }} />
+            <Shimmer style={{ height: 64, width: '100%', borderRadius: 16, marginTop: 20 }} />
+          </View>
         </View>
       </Screen>
     );
@@ -71,31 +88,29 @@ export default function ProductScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <Header title="Товар" />
         <View className="flex-1 items-center justify-center px-6">
-          <View className="h-20 w-20 items-center justify-center rounded-pill bg-sand-1">
-            <Ionicons name="alert-circle-outline" size={36} color={sand[4]} />
+          <View className="h-24 w-24 items-center justify-center rounded-full bg-sand-1">
+            <Ionicons name="alert-circle-outline" size={40} color={sand[4]} />
           </View>
-          <Text
-            variant="h2-serif"
-            className="mt-6 text-center text-ink"
-          >
+          <Text className="mt-6 font-display text-[22px] leading-[28px] text-ink">
             Не удалось загрузить
           </Text>
-          <Text className="mt-2 text-center text-ink/60" tracking="tight">
+          <Text className="mt-2 text-center text-[15px] leading-[22px] text-ink/60">
             Проверьте соединение или попробуйте позже.
           </Text>
+          <Button label="Повторить" className="mt-6" onPress={() => refetch()} />
         </View>
       </Screen>
     );
   }
 
+  const rating = reviews.data?.rating ?? product.rating;
   const diseases = product.diseases ?? [];
-  const hasMultiple = types.length > 1;
   const totalPrice = selectedType ? selectedType.price * qty : 0;
   const inCart = selectedType
-    ? cartItems.some((i) => i.productId === product.id && i.type.id === selectedType.id)
+    ? cartItems.some((item) => item.productId === product.id && item.type.id === selectedType.id)
     : false;
 
-  const handleAdd = () => {
+  const addToCart = () => {
     if (!selectedType) return;
     add(
       {
@@ -103,14 +118,16 @@ export default function ProductScreen() {
         productName: product.name,
         type: { id: selectedType.id, type: selectedType.type, price: selectedType.price },
       },
-      qty
+      qty,
     );
+    setJustAdded(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     Toast.show({
       type: 'success',
       text1: 'Добавлено в корзину',
       text2: `${product.name} · ${selectedType.type} × ${qty}`,
     });
+    setTimeout(() => setJustAdded(false), 1600);
   };
 
   return (
@@ -118,109 +135,81 @@ export default function ProductScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Header
         title={product.name}
+        transparent
         floating
+        scrollOffset={scrollY}
         rightAction={
           <IconButton
             icon={<Ionicons name="share-outline" size={20} color={ink.DEFAULT} />}
             tone="inverse"
             size="md"
             accessibilityLabel="Поделиться"
-            onPress={() => {}}
+            onPress={() => Share.share({ title: product.name, message: product.name })}
           />
         }
       />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
-        <View style={{ height: HERO_H, width: '100%' }}>
-          <ProductPlaceholder
-            name={product.name}
-            alias={product.alias ?? undefined}
-            size="detail"
-            className="h-full w-full"
-          />
-        </View>
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 128 }}
+      >
+        <ProductGallery product={product} />
 
-        <View className="px-5 pt-6">
-          <Text
-            className="text-ink"
-            style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 28, lineHeight: 32 }}
-          >
+        <View className="px-5 pt-5">
+          <View className="flex-row flex-wrap gap-2">
+            <Chip label="Хит сезона" size="xs" selected tone="sun" />
+            {types.length > 1 ? <Chip label="Есть варианты" size="xs" tone="primary" /> : null}
+          </View>
+
+          <Text className="mt-3 font-display text-[28px] leading-[34px] text-ink" numberOfLines={3}>
             {product.name}
           </Text>
+          <Text variant="meta-upper" className="mt-2 text-ink/50" tracking="wide">
+            Травяной сбор
+          </Text>
 
-          <RatingSummary rating={productReviews.data?.rating ?? product.rating} />
+          <RatingSummary rating={rating} />
 
-          {selectedType ? (
-            <Animated.View entering={FadeIn.duration(200)} className="mt-2 flex-row items-baseline gap-3">
-              <Text
-                className="text-greenman-8"
-                style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 28, lineHeight: 32 }}
-              >
-                {formatPrice(totalPrice, currency)}
-              </Text>
-              {qty > 1 ? (
-                <Text className="text-[14px] text-ink/50" tracking="tight">
-                  {formatPrice(selectedType.price, currency)} × {qty}
-                </Text>
-              ) : null}
-            </Animated.View>
-          ) : (
-            <Text className="mt-2 text-ink/50" tracking="tight">
-              Нет в наличии
+          <View className="mt-4 flex-row items-baseline gap-2">
+            <Text className="font-display text-[34px] leading-[40px] text-ink">
+              {selectedType ? formatPrice(selectedType.price, currency) : 'Нет в наличии'}
             </Text>
-          )}
+            {types.length > 1 ? (
+              <Text className="text-[13px] font-semibold text-ink/50">за {selectedType?.type}</Text>
+            ) : null}
+          </View>
 
-          {diseases.length ? (
-            <View className="mt-4 flex-row flex-wrap gap-2">
-              {diseases.map((d, idx) => (
-                <Chip key={idx} label={d} size="sm" tone="primary" />
-              ))}
-            </View>
-          ) : null}
-
-          {hasMultiple ? (
-            <View className="mt-6">
-              <Text variant="meta-upper" tracking="widest" className="mb-3 text-ink/50">
-                Фасовка
+          {types.length > 1 ? (
+            <View className="mt-5">
+              <Text className="mb-3 text-[13px] font-semibold text-ink/60">
+                Выберите вариант
               </Text>
-              <View className="gap-2">
-                {types.map((t) => {
-                  const selected = selectedType?.id === t.id;
+              <View className="flex-row flex-wrap gap-2">
+                {types.map((type) => {
+                  const selected = selectedType?.id === type.id;
                   return (
                     <AnimatedPressable
-                      key={t.id}
-                      onPress={() => setSelectedTypeId(t.id)}
+                      key={type.id}
+                      onPress={() => setSelectedTypeId(type.id)}
                       haptic="selection"
-                      wrapperStyle={selected ? shadows.flat : undefined}
+                      scale={0.97}
+                      wrapperStyle={{ width: '48%' }}
+                      className={`min-h-16 rounded-md border p-3 ${
+                        selected ? 'border-greenman-7 bg-greenman-0' : 'border-ink/10 bg-white'
+                      }`}
                     >
-                      <View
-                        className={`flex-row items-center justify-between rounded-xl border-2 px-4 py-3 ${
-                          selected
-                            ? 'border-greenman-7 bg-greenman-0'
-                            : 'border-sand-2 bg-white'
-                        }`}
-                      >
-                        <View className="flex-row items-center gap-3">
-                          <View
-                            className={`h-5 w-5 items-center justify-center rounded-pill border-2 ${
-                              selected ? 'border-greenman-7 bg-greenman-7' : 'border-sand-3'
-                            }`}
-                          >
-                            {selected ? (
-                              <Ionicons name="checkmark" size={12} color="#fff" />
-                            ) : null}
-                          </View>
-                          <Text
-                            className={`text-[15px] font-semibold ${selected ? 'text-greenman-9' : 'text-ink'}`}
-                          >
-                            {t.type}
+                      <View className="flex-row items-start justify-between gap-2">
+                        <View className="flex-1">
+                          <Text className="text-[13px] font-semibold text-ink" numberOfLines={1}>
+                            {type.type}
+                          </Text>
+                          <Text className="mt-1 font-display text-[15px] leading-[20px] text-ink">
+                            {formatPrice(type.price, currency)}
                           </Text>
                         </View>
-                        <Text
-                          className={`text-[16px] font-bold ${selected ? 'text-greenman-8' : 'text-ink'}`}
-                        >
-                          {formatPrice(t.price, currency)}
-                        </Text>
+                        {selected ? <Ionicons name="checkmark-circle" size={16} color={greenman[7]} /> : null}
                       </View>
                     </AnimatedPressable>
                   );
@@ -229,314 +218,155 @@ export default function ProductScreen() {
             </View>
           ) : null}
 
+          {diseases.length ? (
+            <Section title="Помогает при">
+              <View className="flex-row flex-wrap gap-2">
+                {diseases.map((disease, index) => (
+                  <Chip
+                    key={`${disease}-${index}`}
+                    label={disease}
+                    size="sm"
+                    tone="ink"
+                    onPress={() => router.push(`/search/disease/${encodeURIComponent(disease)}` as any)}
+                  />
+                ))}
+              </View>
+            </Section>
+          ) : null}
+
+          <View className="mt-6 flex-row gap-2">
+            {['Описание', 'Применение', 'Состав', 'Доставка', 'Отзывы'].map((label, index) => (
+              <Chip key={label} label={label} size="xs" selected={index === 0} tone="primary" />
+            ))}
+          </View>
+
           {product.description ? (
-            <InfoSection title="Описание" body={product.description} icon="document-text-outline" />
+            <InfoSection title="Описание" icon="document-text-outline" body={product.description} />
           ) : null}
-          {product.applicationMethodAdults ? (
-            <InfoSection title="Применение (взрослые)" body={product.applicationMethodAdults} icon="person-outline" />
-          ) : null}
-          {product.applicationMethodChildren ? (
-            <InfoSection title="Применение (дети)" body={product.applicationMethodChildren} icon="happy-outline" />
+          {product.applicationMethodAdults || product.applicationMethodChildren ? (
+            <View className="mt-8">
+              <Text className="font-display text-[22px] leading-[28px] text-ink">Как принимать</Text>
+              {product.applicationMethodAdults ? (
+                <InfoCard title="Взрослым" icon="person-outline" body={product.applicationMethodAdults} />
+              ) : null}
+              {product.applicationMethodChildren ? (
+                <InfoCard title="Детям" icon="happy-outline" body={product.applicationMethodChildren} />
+              ) : null}
+            </View>
           ) : null}
           {product.contraindications ? (
-            <InfoSection title="Противопоказания" body={product.contraindications} icon="warning-outline" />
+            <View className="mt-4 rounded-md border border-warning/40 bg-sun-0 p-4">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="warning-outline" size={20} color="#c78412" />
+                <Text className="text-[13px] font-semibold text-ink">Противопоказания</Text>
+              </View>
+              <Text className="mt-2 text-[15px] leading-[22px] text-ink/80">
+                {product.contraindications}
+              </Text>
+            </View>
           ) : null}
 
-          <ReviewsAccordion
-            productId={product.id}
-            rating={productReviews.data?.rating ?? product.rating}
-            reviews={productReviews.data?.reviews ?? []}
-            loading={productReviews.isLoading}
-            refetchReviews={() => productReviews.refetch()}
-          />
+          <DeliverySection />
+          <ReviewsSection rating={rating} count={reviews.data?.reviews.length ?? 0} />
 
-          <View className="mt-6 flex-row items-center gap-3 rounded-xl bg-greenman-0 p-4">
-            <View className="h-10 w-10 items-center justify-center rounded-pill bg-greenman-8">
-              <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+          {related.length ? (
+            <View className="mt-8">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="font-display text-[22px] leading-[28px] text-ink">
+                  Вам понравится
+                </Text>
+                <Text className="text-[13px] font-semibold text-greenman-7">Все</Text>
+              </View>
+              <View className="-mx-5">
+                <ProductRail products={related} />
+              </View>
             </View>
-            <View className="flex-1">
-              <Text className="text-[14px] font-bold text-greenman-9" tracking="tight">
-                Не уверены — подойдёт ли?
-              </Text>
-              <Text className="mt-0.5 text-[12px] text-greenman-8/80" tracking="tight">
-                Напишите в WhatsApp — подскажем по диагнозу.
-              </Text>
-            </View>
-          </View>
+          ) : null}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
-      <View
-        style={{ paddingBottom: Math.max(insets.bottom, 16), ...shadows.float }}
-        className="absolute bottom-0 left-0 right-0 bg-white px-5 pt-3"
-      >
+      <StickyCTA>
         <View className="flex-row items-center gap-3">
-          <View
-            className="h-14 flex-row items-center overflow-hidden rounded-pill bg-sand-1"
-            style={{ paddingHorizontal: 4 }}
-          >
+          <View className="h-11 flex-row items-center rounded-pill border border-ink/10 bg-white px-1">
             <AnimatedPressable
-              onPress={() => qty > 1 && setQty((q) => q - 1)}
+              onPress={() => setQty((value) => Math.max(1, value - 1))}
               disabled={qty <= 1}
               haptic="light"
-              scale={0.88}
-              className={`h-11 w-11 items-center justify-center rounded-pill ${qty <= 1 ? 'opacity-30' : ''}`}
+              className="h-9 w-9 items-center justify-center rounded-full"
             >
-              <Ionicons name="remove" size={20} color={ink.DEFAULT} />
+              <Ionicons name="remove" size={20} color={qty <= 1 ? ink[40] : ink.DEFAULT} />
             </AnimatedPressable>
-            <Text className="w-6 text-center text-[17px] font-bold text-ink">{qty}</Text>
+            <Text className="w-7 text-center text-[17px] font-semibold text-ink">{qty}</Text>
             <AnimatedPressable
-              onPress={() => setQty((q) => q + 1)}
+              onPress={() => setQty((value) => value + 1)}
               haptic="light"
-              scale={0.88}
-              className="h-11 w-11 items-center justify-center rounded-pill"
+              className="h-9 w-9 items-center justify-center rounded-full"
             >
               <Ionicons name="add" size={20} color={ink.DEFAULT} />
             </AnimatedPressable>
           </View>
-
-          <AnimatedPressable
+          <Button
+            label={
+              inCart
+                ? 'В корзине · перейти'
+                : justAdded
+                ? 'В корзине'
+                : selectedType
+                ? `Добавить · ${formatPrice(totalPrice, currency)}`
+                : 'Нет в наличии'
+            }
             disabled={!selectedType}
-            onPress={inCart ? () => router.push('/cart') : handleAdd}
-            haptic={inCart ? 'selection' : 'success'}
-            wrapperStyle={{ flex: 1, ...(selectedType ? shadows.glow : {}) }}
+            loading={false}
+            full
             className="flex-1"
-          >
-            <LinearGradient
-              colors={selectedType
-                ? [greenman[5], greenman[7], greenman[9]]
-                : [sand[2], sand[3]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                width: '100%',
-                height: 56,
-                borderRadius: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                paddingHorizontal: 16,
-              }}
-            >
-              <Ionicons name={inCart ? 'bag-check-outline' : 'bag-add-outline'} size={20} color="#fff" />
-              <Text
-                className="flex-1 text-center text-[15px] font-bold text-white"
-                tracking="tight"
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
-                {inCart
-                  ? 'Перейти в корзину'
-                  : selectedType
-                    ? `В корзину · ${formatPrice(totalPrice, currency)}`
-                    : 'Нет в наличии'}
-              </Text>
-            </LinearGradient>
-          </AnimatedPressable>
+            iconLeft={
+              <Ionicons
+                name={inCart || justAdded ? 'checkmark' : 'bag-add-outline'}
+                size={20}
+                color="#fff"
+              />
+            }
+            onPress={inCart ? () => router.push('/cart') : addToCart}
+          />
         </View>
-      </View>
+      </StickyCTA>
     </Screen>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View className="mt-6">
+      <Text className="mb-3 text-[13px] font-semibold text-ink/60">{title}</Text>
+      {children}
+    </View>
   );
 }
 
 function RatingSummary({ rating }: { rating?: ProductRating }) {
   const count = rating?.count ?? 0;
   const average = rating?.average ?? 0;
+
   return (
     <View className="mt-3 flex-row items-center gap-2">
       <View className="flex-row items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, index) => (
           <Ionicons
-            key={i}
-            name={i < Math.round(average) ? 'star' : 'star-outline'}
-            size={16}
-            color={count ? '#d8942b' : sand[4]}
+            key={index}
+            name={index < Math.round(average) ? 'star' : 'star-outline'}
+            size={14}
+            color={count ? sun[2] : ink[20]}
           />
         ))}
       </View>
       <Text className="text-[13px] font-semibold text-ink">
         {count ? average.toFixed(1) : 'Нет оценок'}
       </Text>
-      <Text className="text-[12px] text-ink/50">
-        {count ? `${count} ${reviewWord(count)}` : 'Будьте первым'}
+      <Text className="text-[13px] text-ink/60">
+        {count ? `· ${count} отзывов` : '· Будьте первым'}
       </Text>
     </View>
   );
-}
-
-function ReviewsAccordion({
-  productId,
-  rating,
-  reviews,
-  loading,
-  refetchReviews,
-}: {
-  productId: number;
-  rating?: ProductRating;
-  reviews: ProductReview[];
-  loading: boolean;
-  refetchReviews: () => void;
-}) {
-  const router = useRouter();
-  const isAuthed = useAuthStore((s) => s.isAuthenticated);
-  const [open, setOpen] = useState(false);
-  const [stars, setStars] = useState(5);
-  const [body, setBody] = useState('');
-  const createReview = useCreateProductReview(productId);
-  const count = rating?.count ?? reviews.length;
-  const average = rating?.average ?? 0;
-
-  const submit = async () => {
-    if (!isAuthed) {
-      router.push('/auth/phone');
-      return;
-    }
-    try {
-      await createReview.mutateAsync({ rating: stars, body: body.trim() || undefined });
-      setBody('');
-      Toast.show({ type: 'success', text1: 'Отзыв сохранён' });
-      refetchReviews();
-    } catch (e: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Не удалось отправить отзыв',
-        text2: e?.response?.data?.message ?? 'Попробуйте ещё раз',
-      });
-    }
-  };
-
-  return (
-    <View className="mt-3 overflow-hidden rounded-xl border border-sand-2 bg-white" style={shadows.flat}>
-      <AnimatedPressable
-        onPress={() => setOpen((v) => !v)}
-        haptic="selection"
-        className="flex-row items-center gap-3 p-4"
-      >
-        <View className="h-8 w-8 items-center justify-center rounded-lg bg-greenman-0">
-          <Ionicons name="star-outline" size={16} color={greenman[8]} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text variant="meta-upper" tracking="widest" className="text-greenman-8">
-            Отзывы
-          </Text>
-          <Text className="mt-1 text-[12px] text-ink/50">
-            {count ? `${average.toFixed(1)} · ${count} ${reviewWord(count)}` : 'Пока нет отзывов'}
-          </Text>
-        </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={sand[4]} />
-      </AnimatedPressable>
-
-      {open ? (
-        <View className="border-t border-sand-2 p-4">
-          <View className="rounded-lg bg-sand-1 p-3">
-            <Text className="text-[13px] font-bold text-ink">Ваша оценка</Text>
-            <View className="mt-2 flex-row gap-1">
-              {Array.from({ length: 5 }).map((_, i) => {
-                const n = i + 1;
-                return (
-                  <Pressable
-                    key={n}
-                    onPress={() => setStars(n)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${n} из 5`}
-                  >
-                    <Ionicons
-                      name={n <= stars ? 'star' : 'star-outline'}
-                      size={28}
-                      color="#d8942b"
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-            <TextInput
-              value={body}
-              onChangeText={setBody}
-              placeholder="Напишите отзыв"
-              placeholderTextColor="#8d958f"
-              multiline
-              textAlignVertical="top"
-              maxLength={2000}
-              style={{
-                marginTop: 12,
-                minHeight: 92,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: '#e4ded1',
-                backgroundColor: '#fff',
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontFamily: 'Manrope_400Regular',
-                fontSize: 14,
-                lineHeight: 20,
-                color: ink.DEFAULT,
-              }}
-            />
-            <AnimatedPressable
-              onPress={submit}
-              disabled={createReview.isPending}
-              haptic="medium"
-              className="mt-3 h-12 items-center justify-center rounded-lg bg-greenman-8"
-            >
-              {createReview.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-[14px] font-bold text-white">
-                  {isAuthed ? 'Отправить отзыв' : 'Войти и оставить отзыв'}
-                </Text>
-              )}
-            </AnimatedPressable>
-          </View>
-
-          <View className="mt-4 gap-3">
-            {loading ? (
-              <ActivityIndicator color={greenman[8]} />
-            ) : reviews.length ? (
-              reviews.map((review) => <ReviewItem key={review.id} review={review} />)
-            ) : (
-              <Text className="py-3 text-center text-[13px] text-ink/50">
-                Отзывов пока нет
-              </Text>
-            )}
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function ReviewItem({ review }: { review: ProductReview }) {
-  return (
-    <View className="rounded-lg border border-sand-2 bg-white p-3">
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="flex-1 text-[13px] font-bold text-ink" numberOfLines={1}>
-          {review.author?.name ?? 'Пользователь'}
-        </Text>
-        <View className="flex-row items-center gap-1">
-          <Ionicons name="star" size={14} color="#d8942b" />
-          <Text className="text-[12px] font-bold text-ink">{review.rating}</Text>
-        </View>
-      </View>
-      {review.body ? (
-        <Text className="mt-2 text-[13px] leading-5 text-ink/75">{review.body}</Text>
-      ) : null}
-      {review.createdAt ? (
-        <Text className="mt-2 text-[11px] text-ink/40">
-          {new Date(review.createdAt).toLocaleDateString('ru-RU')}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function reviewWord(count: number) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'отзыв';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'отзыва';
-  return 'отзывов';
 }
 
 function InfoSection({
@@ -549,18 +379,80 @@ function InfoSection({
   icon: keyof typeof Ionicons.glyphMap;
 }) {
   return (
-    <View className="mt-3 rounded-xl border border-sand-2 bg-white p-4" style={shadows.flat}>
-        <View className="flex-row items-center gap-2">
-          <View className="h-8 w-8 items-center justify-center rounded-lg bg-greenman-0">
-            <Ionicons name={icon} size={16} color={greenman[8]} />
-          </View>
-          <Text variant="meta-upper" tracking="widest" className="flex-1 text-greenman-8">
-            {title}
-          </Text>
-        </View>
-          <Text className="mt-3 text-[14px] leading-5 text-ink/80" tracking="tight">
-            {body}
-          </Text>
+    <View className="mt-8">
+      <View className="mb-3 flex-row items-center gap-2">
+        <Ionicons name={icon} size={20} color={greenman[7]} />
+        <Text className="font-display text-[22px] leading-[28px] text-ink">{title}</Text>
       </View>
+      <Text className="text-[15px] leading-[22px] text-ink/80">{body}</Text>
+    </View>
+  );
+}
+
+function InfoCard({
+  title,
+  body,
+  icon,
+}: {
+  title: string;
+  body: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}) {
+  return (
+    <View className="mt-3 rounded-md bg-sand-1 p-4">
+      <View className="flex-row items-center gap-2">
+        <Ionicons name={icon} size={20} color={greenman[7]} />
+        <Text className="text-[13px] font-semibold text-ink">{title}</Text>
+      </View>
+      <Text className="mt-2 text-[15px] leading-[22px] text-ink/80">{body}</Text>
+    </View>
+  );
+}
+
+function DeliverySection() {
+  const rows = [
+    ['cube-outline', 'Казпочта — от 1800 ₸ · 3-7 дней'],
+    ['bicycle-outline', 'Курьер по городу — 1500 ₸'],
+    ['car-outline', 'inDrive — 4000 ₸ для избранных городов'],
+  ] as const;
+
+  return (
+    <View className="mt-8">
+      <Text className="font-display text-[22px] leading-[28px] text-ink">Доставка</Text>
+      <View className="mt-3 gap-2">
+        {rows.map(([icon, label]) => (
+          <View
+            key={label}
+            className="flex-row items-center gap-3 rounded-md border border-ink/10 bg-white p-3"
+            style={shadows.flat}
+          >
+            <Ionicons name={icon} size={20} color={greenman[7]} />
+            <Text className="flex-1 text-[13px] leading-[18px] text-ink/80">{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ReviewsSection({ rating, count }: { rating?: ProductRating; count: number }) {
+  return (
+    <View className="mt-8 rounded-lg bg-white p-4" style={shadows.flat}>
+      <View className="flex-row items-center justify-between">
+        <Text className="font-display text-[22px] leading-[28px] text-ink">Отзывы</Text>
+        <Text className="text-[13px] font-semibold text-greenman-7">Все ({rating?.count ?? count})</Text>
+      </View>
+      <View className="mt-4 flex-row items-end gap-3">
+        <Text className="font-display text-[34px] leading-[40px] text-ink">
+          {(rating?.average ?? 0).toFixed(1)}
+        </Text>
+        <View className="pb-1">
+          <RatingSummary rating={rating} />
+        </View>
+      </View>
+      <Text className="mt-3 text-[13px] leading-[18px] text-ink/60">
+        Отзывы покупателей появятся здесь после первых заказов с оценкой.
+      </Text>
+    </View>
   );
 }

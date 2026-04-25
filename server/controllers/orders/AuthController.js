@@ -4,6 +4,7 @@ const jwtUtility = require('../../utilities/jwtUtility');
 const sendNotification = require('../../utilities/notificationService');
 const Sequelize = require('sequelize');
 const ensureUserProfileSchema = require('../../utilities/ensureUserProfileSchema');
+const { getAdminByPhone } = require('../../utilities/adminUsers');
 
 const AuthController = {
     // Регистрация или вход пользователя
@@ -21,6 +22,11 @@ const AuthController = {
                     isPhoneConfirmed: false
                 });
                 isNewUser = true;
+            }
+
+            const adminProfile = await getAdminByPhone(phoneNumber);
+            if (adminProfile && user.role !== 'admin') {
+                user.role = 'admin';
             }
 
             const confirmationCode = generateConfirmationCode();
@@ -53,17 +59,41 @@ const AuthController = {
             user.isPhoneConfirmed = true;
             user.confirmationCode = null;
             user.confirmationCodeExpires = null;
+            const adminProfile = await getAdminByPhone(phoneNumber);
+            if (adminProfile) {
+                user.role = 'admin';
+            }
             await user.save();
 
-            const token = jwtUtility.generateToken(user.id);
+            const token = jwtUtility.generateToken(
+                user.id,
+                adminProfile
+                    ? {
+                        isAdmin: true,
+                        phoneNumber: user.phoneNumber,
+                        iin: adminProfile.iin,
+                        role: 'admin',
+                        fullName: adminProfile.fullName || `+7${user.phoneNumber}`
+                    }
+                    : {}
+            );
             const firstName = user.firstName || null;
             const lastName = user.lastName || null;
             res.status(200).json({
                 token,
                 userId: user.id,
+                isAdmin: Boolean(adminProfile),
+                adminProfile: adminProfile
+                    ? {
+                        fullName: adminProfile.fullName || `+7${user.phoneNumber}`,
+                        iin: adminProfile.iin,
+                        phoneNumber: adminProfile.phoneNumber
+                    }
+                    : null,
                 user: {
                     id: user.id,
                     phoneNumber: user.phoneNumber,
+                    role: adminProfile ? 'admin' : user.role,
                     firstName,
                     lastName,
                     displayName: [firstName, lastName].filter(Boolean).join(' ') || null,

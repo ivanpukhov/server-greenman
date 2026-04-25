@@ -1,5 +1,4 @@
 import { Screen } from '@/components/ui/Screen';
-import { Header } from '@/components/ui/Header';
 import { CheckoutKz } from '@/components/checkout/CheckoutKz';
 import { CheckoutRf } from '@/components/checkout/CheckoutRf';
 import { useCountryStore } from '@/stores/country.store';
@@ -7,8 +6,7 @@ import { useCountryStore } from '@/stores/country.store';
 export default function CheckoutScreen() {
   const country = useCountryStore((s) => s.country);
   return (
-    <Screen avoidKeyboard>
-      <Header title="Оформление заказа" />
+    <Screen edges={['left', 'right']} avoidKeyboard>
       {country === 'RF' ? <CheckoutRf /> : <CheckoutKz />}
     </Screen>
   );

@@ -1,16 +1,15 @@
 import { useMemo, useState } from 'react';
 import { View, FlatList, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/ui/Header';
 import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { socialApi } from '@/features/social/api';
-import { sand, ink } from '@/theme/colors';
+import { ink } from '@/theme/colors';
 import { EmptyState } from '@/components/common/EmptyState';
+import { ProfileContentRow } from '@/components/social/ProfileContentRow';
 
 type Kind = 'all' | 'post' | 'article' | 'reel' | 'webinar' | 'course';
 
@@ -83,10 +82,8 @@ export default function BookmarksScreen() {
         data={items}
         keyExtractor={(it) => `${it.kind}-${it.data.id}`}
         renderItem={({ item }) => <BookmarkRow item={item} onPress={() => openItem(item)} />}
-        ItemSeparatorComponent={() => (
-          <View className="h-px bg-sand-2" style={{ marginLeft: 92 }} />
-        )}
-        contentContainerStyle={{ paddingVertical: 4 }}
+        ItemSeparatorComponent={() => <View className="h-3" />}
+        contentContainerStyle={{ paddingVertical: 12 }}
       />
     );
   }, [items, query.isLoading]);
@@ -149,38 +146,14 @@ function BookmarkRow({ item, onPress }: { item: BookmarkItem; onPress: () => voi
     : 'Курс';
 
   return (
-    <AnimatedPressable onPress={onPress} haptic="selection" scale={0.98}>
-      <View className="flex-row items-center gap-3 px-4 py-3.5">
-        <View
-          className="h-16 w-16 overflow-hidden rounded-xl bg-sand-1"
-        >
-          {cover ? (
-            <Image
-              source={{ uri: cover }}
-              placeholder={blurhash ? { blurhash } : undefined}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              transition={120}
-            />
-          ) : (
-            <View className="flex-1 items-center justify-center">
-              <Ionicons name="bookmark" size={22} color={sand[4]} />
-            </View>
-          )}
-        </View>
-        <View className="flex-1">
-          <Text variant="meta-upper" tracking="widest" className="text-greenman-7">
-            {kindLabel}
-          </Text>
-          <Text
-            numberOfLines={2}
-            className="mt-0.5 text-[15px] font-semibold text-ink"
-          >
-            {title}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={sand[4]} />
-      </View>
-    </AnimatedPressable>
+    <ProfileContentRow
+      title={title}
+      eyebrow={kindLabel}
+      meta="Сохранено"
+      cover={cover}
+      blurhash={blurhash}
+      icon="bookmark"
+      onPress={onPress}
+    />
   );
 }

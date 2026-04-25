@@ -12,7 +12,7 @@ import { cssInterop } from 'nativewind';
 cssInterop(Animated.View, { className: 'style' });
 cssInterop(View, { className: 'style' });
 
-type HapticKind = 'none' | 'selection' | 'light' | 'medium' | 'success';
+type HapticKind = 'none' | 'selection' | 'light' | 'medium' | 'success' | 'error';
 
 type Props = Omit<PressableProps, 'style'> & {
   className?: string;
@@ -33,6 +33,8 @@ function fireHaptic(kind: HapticKind) {
   if (kind === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
   if (kind === 'success')
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  if (kind === 'error')
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
 }
 
 export const AnimatedPressable = forwardRef<View, Props>(function AnimatedPressable(
