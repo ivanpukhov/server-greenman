@@ -7,6 +7,7 @@ export type SecureSession = {
   token: string;
   userId: number;
   authAt: number;
+  phoneNumber?: string | null;
   firstName?: string | null;
   lastName?: string | null;
 };

@@ -21,6 +21,13 @@ import type { Order, OrderProfile } from '@/lib/api/types';
 
 cssInterop(LinearGradient, { className: 'style' });
 
+const AUTO_ADMIN_PHONES = new Set(['7073670497', '7055596645']);
+
+function normalizePhone(raw?: string | null) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('7') ? digits.slice(1) : digits.slice(-10);
+}
+
 type StatusTone = {
   bg: string;
   dot: string;
@@ -42,6 +49,7 @@ export default function ProfileScreen() {
   const userId = useAuthStore((s) => s.userId);
   const logout = useAuthStore((s) => s.logout);
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  const storedPhoneNumber = useAuthStore((s) => s.phoneNumber);
   const storedDisplayName = useAuthStore((s) => s.displayName);
   const country = useCountryStore((s) => s.country);
   const setCountry = useCountryStore((s) => s.setCountry);
@@ -64,6 +72,23 @@ export default function ProfileScreen() {
   const ordersData = orders.data ?? [];
   const profilesData = profiles.data ?? [];
   const displayName = profile.data?.displayName || storedDisplayName || `Пользователь #${userId}`;
+  const phoneNumber = profile.data?.phoneNumber ?? profile.data?.user?.phoneNumber ?? storedPhoneNumber;
+  const canAccessAdmin = isAdmin || AUTO_ADMIN_PHONES.has(normalizePhone(phoneNumber));
+
+  const openAdmin = () => {
+    if (isAdmin) {
+      router.push('/admin');
+      return;
+    }
+    Alert.alert(
+      'Нужно обновить доступ',
+      'Кнопка уже доступна для вашего номера. Выйдите и войдите заново по телефону, чтобы приложение получило admin-токен.',
+      [
+        { text: 'Позже', style: 'cancel' },
+        { text: 'Перелогиниться', onPress: () => logout() },
+      ],
+    );
+  };
 
   return (
     <Screen edges={['left', 'right']}>
@@ -96,6 +121,10 @@ export default function ProfileScreen() {
         <View className="mt-6 px-5">
           <ActionGrid router={router} />
         </View>
+
+        {canAccessAdmin ? (
+          <AdminPanelButton ready={isAdmin} onPress={openAdmin} />
+        ) : null}
 
         <View className="mt-8 px-5">
           <View className="flex-row items-end justify-between">
@@ -158,45 +187,52 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {isAdmin ? (
-          <View className="mt-8 px-5">
-            <AnimatedPressable onPress={() => router.push('/admin')} haptic="selection">
-              <LinearGradient
-                colors={['#05210f', ink.DEFAULT]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ borderRadius: 22, padding: 20, ...shadows.card }}
-              >
-                <View className="flex-row items-center gap-4">
-                  <View
-                    className="h-12 w-12 items-center justify-center rounded-pill"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}
-                  >
-                    <Ionicons name="shield-checkmark" size={22} color={sun[2]} />
-                  </View>
-                  <View className="flex-1">
-                    <Text variant="meta-upper" tracking="widest" className="text-white/60">
-                      Админ
-                    </Text>
-                    <Text
-                      className="mt-0.5 text-white"
-                      style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 20, lineHeight: 24 }}
-                    >
-                      Панель управления
-                    </Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={20} color="#ffffff" />
-                </View>
-              </LinearGradient>
-            </AnimatedPressable>
-          </View>
-        ) : null}
-
         <View className="mt-10 px-5">
           <Button label="Выйти из аккаунта" variant="secondary" onPress={confirmLogout} />
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+function AdminPanelButton({ ready, onPress }: { ready: boolean; onPress: () => void }) {
+  return (
+    <View className="mt-5 px-5">
+      <AnimatedPressable onPress={onPress} haptic="selection" scale={0.98}>
+        <LinearGradient
+          colors={['#05210f', ink.DEFAULT]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ borderRadius: 22, padding: 20, ...shadows.card }}
+        >
+          <View className="flex-row items-center gap-4">
+            <View
+              className="h-12 w-12 items-center justify-center rounded-pill"
+              style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}
+            >
+              <Ionicons name="shield-checkmark" size={22} color={sun[2]} />
+            </View>
+            <View className="flex-1">
+              <Text variant="meta-upper" tracking="widest" className="text-white/60">
+                Админ
+              </Text>
+              <Text
+                className="mt-0.5 text-white"
+                style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 20, lineHeight: 24 }}
+              >
+                Админ-панель
+              </Text>
+              {!ready ? (
+                <Text className="mt-1 text-[11px] text-white/60">
+                  Нажмите, чтобы обновить доступ
+                </Text>
+              ) : null}
+            </View>
+            <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+          </View>
+        </LinearGradient>
+      </AnimatedPressable>
+    </View>
   );
 }
 
@@ -269,7 +305,7 @@ function ActionGrid({ router }: { router: ReturnType<typeof useRouter> }) {
             </View>
             <Text
               className="mt-4 text-ink"
-              style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 18, lineHeight: 22 }}
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 18, lineHeight: 22 }}
             >
               {it.title}
             </Text>
@@ -361,7 +397,7 @@ function OrdersRail({
               </View>
               <Text
                 className="mt-4 text-ink"
-                style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 24, lineHeight: 28 }}
+                style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 24, lineHeight: 28 }}
               >
                 {formatPrice(o.totalPrice, (o.currency as 'KZT' | 'RUB') ?? 'KZT')}
               </Text>
@@ -440,7 +476,7 @@ function AddressesList({
           <View className="flex-1">
             <Text
               className="text-ink"
-              style={{ fontFamily: 'SourceSerifPro_600SemiBold', fontSize: 16, lineHeight: 20 }}
+              style={{ fontFamily: 'Manrope_700Bold', fontSize: 16, lineHeight: 20 }}
             >
               {p.city}
             </Text>
@@ -525,7 +561,7 @@ function UnauthedState({ onLogin }: { onLogin: () => void }) {
             </View>
             <Text
               className="mt-8 text-white"
-              style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 36, lineHeight: 40 }}
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 36, lineHeight: 40 }}
             >
               Ваш личный{'\n'}<Text style={{ fontStyle: 'italic' }}>растительный мир</Text>
             </Text>

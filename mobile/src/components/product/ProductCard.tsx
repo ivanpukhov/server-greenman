@@ -2,12 +2,15 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { memo } from 'react';
+import { memo, useRef, useState } from 'react';
+import type { BottomSheetModal } from '@gorhom/bottom-sheet';
 import Toast from 'react-native-toast-message';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Text } from '@/components/ui/Text';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { IconButton } from '@/components/ui/IconButton';
+import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Sheet';
 import { ProductPlaceholder } from '@/components/ui/ProductPlaceholder';
 import { useCountryStore } from '@/stores/country.store';
 import { useCartStore } from '@/stores/cart.store';
@@ -61,11 +64,14 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
   const currency = useCountryStore((s) => s.currency);
   const add = useCartStore((s) => s.add);
   const items = useCartStore((s) => s.items);
+  const sheetRef = useRef<BottomSheetModal>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
   const price = minPrice(product);
   const hasMultiple = (product.types?.length ?? 0) > 1;
   const types = product.types ?? [];
   const inCart = items.some((i) => i.productId === product.id);
+  const selectedType = types.find((type) => type.id === selectedTypeId) ?? types[0];
 
   const goDetail = () => router.push(`/product/${product.id}`);
   const goCart = () => {
@@ -76,7 +82,9 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
   const quickAdd = () => {
     if (!types.length) return;
     if (hasMultiple) {
-      goDetail();
+      Haptics.selectionAsync().catch(() => {});
+      setSelectedTypeId(types[0]?.id ?? null);
+      sheetRef.current?.present();
       return;
     }
     const t = types[0];
@@ -92,12 +100,63 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
     Toast.show({ type: 'success', text1: 'Добавлено', text2: `${product.name} · ${t.type}` });
   };
 
+  const addSelected = () => {
+    if (!selectedType) return;
+    add(
+      {
+        productId: product.id,
+        productName: product.name,
+        type: { id: selectedType.id, type: selectedType.type, price: selectedType.price },
+      },
+      1,
+    );
+    sheetRef.current?.dismiss();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Toast.show({ type: 'success', text1: 'Добавлено', text2: `${product.name} · ${selectedType.type}` });
+  };
+
+  const variantSheet = hasMultiple ? (
+    <Sheet ref={sheetRef} title="Выберите вариант" subtitle={product.name} snapPoints={['48%']}>
+      <View className="gap-2">
+        {types.map((type) => {
+          const selected = selectedType?.id === type.id;
+          return (
+            <AnimatedPressable
+              key={type.id}
+              onPress={() => setSelectedTypeId(type.id)}
+              haptic="selection"
+              className={`min-h-16 flex-row items-center rounded-md border p-3 ${
+                selected ? 'border-greenman-7 bg-greenman-0' : 'border-ink/10 bg-white'
+              }`}
+            >
+              <View className="flex-1">
+                <Text className="text-[13px] font-semibold text-ink">{type.type}</Text>
+                <Text className="mt-1 font-display text-[15px] leading-[20px] text-ink">
+                  {formatPrice(type.price, currency)}
+                </Text>
+              </View>
+              {selected ? <Ionicons name="checkmark-circle" size={20} color={greenman[7]} /> : null}
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+      <Button
+        label={selectedType ? `Добавить · ${formatPrice(selectedType.price, currency)}` : 'Добавить'}
+        size="lg"
+        full
+        className="mt-5"
+        onPress={addSelected}
+      />
+    </Sheet>
+  ) : null;
+
   if (variant === 'rail' || variant === 'compact' || variant === 'hero') {
     const cardW = width ?? (variant === 'hero' ? 260 : variant === 'compact' ? 150 : 180);
     const imgH = variant === 'hero' ? 260 : variant === 'compact' ? 150 : 180;
     const bodyH = variant === 'compact' ? 92 : 104;
 
     return (
+      <>
       <AnimatedPressable
         onPress={goDetail}
         haptic="selection"
@@ -181,11 +240,14 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
           )}
         </View>
       </AnimatedPressable>
+      {variantSheet}
+      </>
     );
   }
 
   // GRID variant — 2-col
   return (
+    <>
     <View className="flex-1" style={{ minWidth: 0 }}>
       <AnimatedPressable
         onPress={goDetail}
@@ -271,6 +333,8 @@ function ProductCardInner({ product, variant = 'grid', width }: Props) {
         </View>
       </AnimatedPressable>
     </View>
+    {variantSheet}
+    </>
   );
 }
 

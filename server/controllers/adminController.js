@@ -9,6 +9,7 @@ const OrderBundle = require('../models/orders/OrderBundle');
 const KazpostRequest = require('../models/orders/KazpostRequest');
 const OrderDraftRequest = require('../models/orders/OrderDraftRequest');
 const { buildProductTypeCode, buildQrCodeUrl } = require('../utilities/productTypeCode');
+const { storeProductImage } = require('../utilities/productImageStorage');
 const PaymentLink = require('../models/orders/PaymentLink');
 const sendFileNotification = require('../utilities/sendFileNotification');
 const sendMessageToChannel = require('../utilities/sendMessageToChannel');
@@ -553,6 +554,12 @@ const enrichOrderProducts = async (order) => {
 const buildProductPayload = (body) => {
     const types = parseTypes(body.types);
     const diseases = parseDiseases(body.diseases);
+    const rawImageUrls = Array.isArray(body.imageUrls) ? body.imageUrls : parseJsonParam(body.imageUrls, []);
+    const imageUrls = Array.isArray(rawImageUrls)
+        ? rawImageUrls
+              .map((item) => String(item || '').trim())
+              .filter(Boolean)
+        : [];
 
     return {
         name: String(body.name || '').trim(),
@@ -563,6 +570,7 @@ const buildProductPayload = (body) => {
         diseases,
         contraindications: body.contraindications || '',
         videoUrl: body.videoUrl || null,
+        imageUrls,
         types
     };
 };
@@ -1464,7 +1472,8 @@ const adminController = {
                     applicationMethodAdults: payload.applicationMethodAdults,
                     diseases: payload.diseases,
                     contraindications: payload.contraindications,
-                    videoUrl: payload.videoUrl
+                    videoUrl: payload.videoUrl,
+                    imageUrls: payload.imageUrls
                 },
                 { transaction }
             );
@@ -1515,7 +1524,8 @@ const adminController = {
                 applicationMethodAdults: payload.applicationMethodAdults,
                 diseases: payload.diseases,
                 contraindications: payload.contraindications,
-                videoUrl: payload.videoUrl
+                videoUrl: payload.videoUrl,
+                imageUrls: payload.imageUrls
             };
             if (payload.alias !== undefined) {
                 updateFields.alias = payload.alias;
@@ -1612,6 +1622,20 @@ const adminController = {
         } catch (error) {
             await transaction.rollback();
             return res.status(500).json({ message: 'Не удалось удалить товар', error: error.message });
+        }
+    },
+
+    async uploadProductImages(req, res) {
+        try {
+            const files = Array.isArray(req.files) ? req.files : [];
+            if (files.length === 0) {
+                return res.status(400).json({ message: 'Выберите хотя бы одно изображение' });
+            }
+
+            const imageUrls = await Promise.all(files.map((file) => storeProductImage(file)));
+            return res.status(201).json({ data: { imageUrls } });
+        } catch (error) {
+            return res.status(500).json({ message: 'Не удалось загрузить изображения', error: error.message });
         }
     },
 

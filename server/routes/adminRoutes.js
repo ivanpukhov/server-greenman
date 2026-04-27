@@ -13,10 +13,26 @@ const orderPhotoUpload = multer({
         fileSize: 10 * 1024 * 1024
     }
 });
+const productImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 8 * 1024 * 1024,
+        files: 8
+    },
+    fileFilter: (_req, file, cb) => {
+        if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimetype)) {
+            cb(null, true);
+            return;
+        }
+
+        cb(new Error(`MIME-тип ${file.mimetype} не разрешён для товара`));
+    }
+});
 
 router.use(adminAuthMiddleware);
 
 router.get('/products', adminController.getProducts);
+router.post('/products/images', productImageUpload.array('images', 8), adminController.uploadProductImages);
 router.get('/products/:id', adminController.getProduct);
 router.post('/products', adminController.createProduct);
 router.put('/products/:id', adminController.updateProduct);

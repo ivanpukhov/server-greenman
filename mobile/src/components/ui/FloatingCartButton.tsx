@@ -1,9 +1,10 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useCartStore } from '@/stores/cart.store';
 import { Text } from './Text';
+import { AnimatedPressable } from './AnimatedPressable';
+import { shadows } from '@/theme/shadows';
 
 type Props = {
   bottomOffset?: number;
@@ -21,21 +22,22 @@ export function FloatingCartButton({ bottomOffset = 112, hidden }: Props) {
       pointerEvents="box-none"
       style={{ position: 'absolute', right: 16, bottom: bottomOffset }}
     >
-      <Pressable
+      <AnimatedPressable
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
           router.push('/cart');
         }}
+        haptic="light"
+        scale={0.94}
         accessibilityLabel="Открыть корзину"
         accessibilityRole="button"
-        className="h-12 flex-row items-center rounded-lg bg-greenman-7 pl-4 pr-4 shadow-pop active:opacity-90"
+        wrapperStyle={shadows.glow}
+        className="h-14 w-14 items-center justify-center rounded-full bg-greenman-7"
       >
-        <Ionicons name="bag-handle" size={22} color="#fff" />
-        <Text className="ml-2 text-sm font-bold text-white">Корзина</Text>
-        <View className="ml-3 min-w-6 items-center justify-center rounded-full bg-white px-2 py-0.5">
-          <Text className="text-xs font-bold text-greenman-8">{cartCount}</Text>
+        <Ionicons name="bag-handle" size={24} color="#fff" />
+        <View className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-pill bg-sun-2 px-1.5 py-0.5">
+          <Text className="text-[11px] font-bold text-ink">{cartCount}</Text>
         </View>
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

@@ -18,6 +18,7 @@ export function useRegisterLogin() {
 
 export function useConfirmCode() {
   const login = useAuthStore((s) => s.login);
+  const adminLogin = useAuthStore((s) => s.adminLogin);
   return useMutation({
     mutationFn: async ({ phoneNumber, code }: { phoneNumber: string; code: string }) => {
       const { data } = await api.post<AuthConfirmCodeResponse>(
@@ -30,9 +31,25 @@ export function useConfirmCode() {
       await login({
         token: data.token,
         userId: data.userId,
+        phoneNumber: data.user?.phoneNumber ?? null,
         firstName: data.user?.firstName ?? null,
         lastName: data.user?.lastName ?? null,
       });
+      const shouldGrantAdmin = data.isAdmin || data.user?.role === 'admin';
+      if (shouldGrantAdmin) {
+        await adminLogin({
+          token: data.token,
+          userId: data.userId,
+          profile: {
+            fullName:
+              data.adminProfile?.fullName ||
+              [data.user?.firstName, data.user?.lastName].filter(Boolean).join(' ') ||
+              'Greenman Admin',
+            iin: data.adminProfile?.iin ?? '',
+            phoneNumber: data.adminProfile?.phoneNumber ?? data.user?.phoneNumber ?? '',
+          },
+        });
+      }
     },
   });
 }

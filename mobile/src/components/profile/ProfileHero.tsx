@@ -86,7 +86,7 @@ export function ProfileHero({ name, subtitle, initials, stats, onSettings }: Pro
           >
             <Text
               className="text-white"
-              style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 36, lineHeight: 40 }}
+              style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 36, lineHeight: 40 }}
             >
               {fallbackInitials}
             </Text>

@@ -53,7 +53,7 @@ app.use(bodyParser.json({
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(express.static('public'));
+app.use(express.static(path.resolve(__dirname, 'public')));
 
 app.use('/api/products', productRoutes);
 app.use('/api/auth', authRoutes);
@@ -142,6 +142,14 @@ const ensureProductSchema = async () => {
                 type: Sequelize.STRING,
                 allowNull: true,
                 defaultValue: null
+            });
+        }
+
+        if (!tableDefinition.imageUrls) {
+            await queryInterface.addColumn('products', 'imageUrls', {
+                type: Sequelize.JSON,
+                allowNull: true,
+                defaultValue: []
             });
         }
     } catch (error) {

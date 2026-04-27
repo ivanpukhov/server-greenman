@@ -1,10 +1,16 @@
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { ScrollView, View } from 'react-native';
+import { Linking, ScrollView, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Header } from '@/components/ui/Header';
+import { StickyCTA } from '@/components/ui/StickyCTA';
+import { Button } from '@/components/ui/Button';
+import { OrderTracker } from '@/components/order/OrderTracker';
 import { useOrder } from '@/hooks/useOrders';
 import { formatPrice } from '@/lib/format/price';
+import { shadows } from '@/theme/shadows';
 import type { Currency } from '@/lib/api/types';
 
 export default function OrderScreen() {
@@ -14,7 +20,8 @@ export default function OrderScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: `Заказ #${id}` }} />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
+      <Header title={`Заказ #${id}`} />
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 132 }}>
         {isLoading ? (
           <View className="gap-2">
             <Skeleton className="h-6 w-1/3 rounded" />
@@ -25,19 +32,35 @@ export default function OrderScreen() {
           <Text className="text-sm text-ink-dim">Не удалось загрузить заказ.</Text>
         ) : (
           <>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-2xl font-display text-ink">Заказ #{order.id}</Text>
-              <View className="rounded-full bg-greenman-0 px-3 py-1.5">
-                <Text className="text-xs font-semibold text-greenman-8">{order.status}</Text>
+            <View>
+              <Text variant="meta-upper" className="text-ink/50" tracking="wide">
+                Заказ от {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ru-RU') : '—'}
+              </Text>
+              <View className="mt-2 flex-row items-center justify-between gap-3">
+                <Text className="font-display text-[28px] leading-[34px] text-ink">№{order.id}</Text>
+                <View className="rounded-pill bg-greenman-0 px-4 py-2">
+                  <Text className="text-[13px] font-semibold text-greenman-8">{order.status}</Text>
+                </View>
               </View>
             </View>
-            {order.createdAt ? (
-              <Text className="mt-1 text-xs text-ink-dim">
-                {new Date(order.createdAt).toLocaleString('ru-RU')}
-              </Text>
+
+            <View className="mt-5">
+              <OrderTracker status={order.status} />
+            </View>
+
+            {(order.trackingNumber || order.cdekTrackingNumber) ? (
+              <View className="mt-4 rounded-md bg-sand-1 p-4">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="barcode-outline" size={18} color="#007d38" />
+                  <Text className="text-[11px] font-semibold uppercase text-ink/50">Трек-номер</Text>
+                </View>
+                <Text className="mt-1 text-[15px] font-semibold text-ink">
+                  {order.cdekTrackingNumber || order.trackingNumber}
+                </Text>
+              </View>
             ) : null}
 
-            <View className="mt-5 rounded-xl bg-greenman-0 p-4">
+            <View className="mt-5 rounded-md bg-greenman-0 p-4">
               <Row label="Доставка" value={labelDelivery(order.deliveryMethod)} />
               <Row label="Оплата" value={labelPayment(order.paymentMethod)} />
               <Row
@@ -48,8 +71,8 @@ export default function OrderScreen() {
             </View>
 
             <View className="mt-6">
-              <Text className="text-lg font-bold text-ink">Получатель</Text>
-              <View className="mt-2 rounded-xl border border-border bg-white p-4">
+              <Text className="font-display text-[22px] leading-[28px] text-ink">Получатель</Text>
+              <View className="mt-2 rounded-md border border-border bg-white p-4" style={shadows.flat}>
                 <Text className="text-base font-semibold text-ink">{order.customerName}</Text>
                 {order.phoneNumber ? (
                   <Text className="mt-1 text-sm text-ink-dim">+{order.phoneNumber}</Text>
@@ -75,40 +98,48 @@ export default function OrderScreen() {
             </View>
 
             <View className="mt-6">
-              <Text className="text-lg font-bold text-ink">Состав</Text>
+              <Text className="font-display text-[22px] leading-[28px] text-ink">
+                Состав заказа · {(order.products ?? []).length} товаров
+              </Text>
               <View className="mt-2 gap-2">
                 {(order.products ?? []).map((line, idx) => (
                   <View
                     key={`${line.productId}-${line.typeId}-${idx}`}
-                    className="rounded-xl border border-border bg-white p-4"
+                    className="flex-row items-center rounded-md border border-border bg-white p-3"
+                    style={shadows.flat}
                   >
-                    <Text className="text-sm font-semibold text-ink">{line.productName}</Text>
-                    <Text className="mt-1 text-xs text-ink-dim">{line.type}</Text>
-                    <View className="mt-2 flex-row items-center justify-between">
-                      <Text className="text-xs text-ink-dim">× {line.quantity}</Text>
+                    <View className="h-14 w-14 items-center justify-center rounded-md bg-sand-1">
+                      <Ionicons name="leaf-outline" size={22} color="#007d38" />
+                    </View>
+                    <View className="ml-3 min-w-0 flex-1">
+                      <Text className="text-sm font-semibold text-ink" numberOfLines={2}>{line.productName}</Text>
+                      <Text className="mt-1 text-xs text-ink-dim">{line.type} · × {line.quantity}</Text>
+                    </View>
                       <Text className="text-sm font-bold text-greenman-8">
                         {formatPrice(
                           line.price * line.quantity,
                           (order.currency as Currency) ?? 'KZT'
                         )}
                       </Text>
-                    </View>
                   </View>
                 ))}
               </View>
             </View>
-
-            {order.trackingNumber || order.cdekTrackingNumber ? (
-              <View className="mt-6 rounded-xl border border-greenman-2 bg-greenman-0 p-4">
-                <Text className="text-sm font-semibold text-greenman-8">Трек-номер</Text>
-                <Text className="mt-1 text-base font-bold text-ink">
-                  {order.cdekTrackingNumber || order.trackingNumber}
-                </Text>
-              </View>
-            ) : null}
           </>
         )}
       </ScrollView>
+      {order ? (
+        <StickyCTA>
+          <Button
+            label={String(order.status).toLowerCase().includes('достав') ? 'Повторить заказ' : 'Связаться с менеджером'}
+            size="lg"
+            full
+            variant={String(order.status).toLowerCase().includes('достав') ? 'primary' : 'tonal'}
+            iconRight={<Ionicons name="logo-whatsapp" size={18} color={String(order.status).toLowerCase().includes('достав') ? '#fff' : '#00622a'} />}
+            onPress={() => Linking.openURL('https://wa.me/77001234567').catch(() => {})}
+          />
+        </StickyCTA>
+      ) : null}
     </Screen>
   );
 }

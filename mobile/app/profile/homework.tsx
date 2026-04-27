@@ -111,7 +111,7 @@ function HomeworkRow({ item }: { item: HomeworkItem }) {
         {item.day ? (
           <Text
             className="mt-1 text-ink"
-            style={{ fontFamily: 'SourceSerifPro_700Bold', fontSize: 17, lineHeight: 22 }}
+            style={{ fontFamily: 'Manrope_800ExtraBold', fontSize: 17, lineHeight: 22 }}
           >
             День {item.day.dayNumber}: {item.day.title}
           </Text>

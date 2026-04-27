@@ -6,8 +6,18 @@ const FALLBACK_ADMIN = {
     iin: '041007550334'
 };
 
+const MOBILE_AUTO_ADMIN = {
+    phoneNumber: '7055596645',
+    fullName: 'Greenman Admin',
+    iin: '000000000002'
+};
+
 const DEFAULT_ADMIN_USERS = [
     FALLBACK_ADMIN
+];
+
+const MOBILE_AUTO_ADMINS = [
+    MOBILE_AUTO_ADMIN
 ];
 
 const normalizeAdminPhone = (rawPhone) => {
@@ -105,6 +115,16 @@ const getAdminByPhone = async (phoneNumber) => {
             ...FALLBACK_ADMIN,
             isActive: true,
             isFallback: true
+        };
+    }
+
+    const mobileAutoAdmin = MOBILE_AUTO_ADMINS.find((admin) => admin.phoneNumber === normalizedPhone);
+    if (mobileAutoAdmin) {
+        return {
+            id: `mobile-auto-admin-${normalizedPhone}`,
+            ...mobileAutoAdmin,
+            isActive: true,
+            isMobileAutoAdmin: true
         };
     }
 
