@@ -398,12 +398,14 @@ const KazpostRequestsPage = () => {
 
     return (
         <Stack spacing={2.2}>
-            <Paper sx={{ p: 2.2, borderRadius: 2.5 }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'center' }}>
-                    <Box sx={{ flex: 1 }}>
+            <Box>
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'flex-start' }} justifyContent="space-between">
+                    <Box>
                         <Stack direction="row" spacing={1} alignItems="center">
                             <LocalShippingOutlinedIcon color="primary" />
-                            <Typography variant="h6">Казпочта: трек-страница</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                                Казпочта: трек-страница
+                            </Typography>
                         </Stack>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.8 }}>
                             Здесь хранится связка: сообщение "казпочта", ответ ИИ, заказ и трек-номер.
@@ -469,13 +471,13 @@ const KazpostRequestsPage = () => {
                         </Button>
                     ))}
                 </Stack>
-            </Paper>
+            </Box>
 
             {rows.length === 0 && !loading ? (
                 <Alert severity="info">Запросы казпочты пока не найдены.</Alert>
             ) : null}
 
-            <Paper sx={{ borderRadius: 2.5, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
+            <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
                 {isSmall ? (
                     <Stack spacing={1.2}>
                         {rows.map((row) => (

@@ -21,7 +21,11 @@ import type { Order, OrderProfile } from '@/lib/api/types';
 
 cssInterop(LinearGradient, { className: 'style' });
 
-const AUTO_ADMIN_PHONES = new Set(['7073670497', '7055596645']);
+const AUTO_ADMIN_PROFILES: Record<string, { fullName: string; iin: string }> = {
+  '7073670497': { fullName: 'Greenman Admin', iin: '041007550334' },
+  '7055596645': { fullName: 'Greenman Admin', iin: '000000000002' },
+};
+const AUTO_ADMIN_PHONES = new Set(Object.keys(AUTO_ADMIN_PROFILES));
 
 function normalizePhone(raw?: string | null) {
   const digits = String(raw ?? '').replace(/\D/g, '');
@@ -46,8 +50,10 @@ function statusTone(status: string): StatusTone {
 export default function ProfileScreen() {
   const router = useRouter();
   const isAuth = useAuthStore((s) => s.isAuthenticated);
+  const token = useAuthStore((s) => s.token);
   const userId = useAuthStore((s) => s.userId);
   const logout = useAuthStore((s) => s.logout);
+  const adminLogin = useAuthStore((s) => s.adminLogin);
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const storedPhoneNumber = useAuthStore((s) => s.phoneNumber);
   const storedDisplayName = useAuthStore((s) => s.displayName);
@@ -75,8 +81,22 @@ export default function ProfileScreen() {
   const phoneNumber = profile.data?.phoneNumber ?? profile.data?.user?.phoneNumber ?? storedPhoneNumber;
   const canAccessAdmin = isAdmin || AUTO_ADMIN_PHONES.has(normalizePhone(phoneNumber));
 
-  const openAdmin = () => {
+  const openAdmin = async () => {
     if (isAdmin) {
+      router.push('/admin');
+      return;
+    }
+    const normalizedPhone = normalizePhone(phoneNumber);
+    const adminProfile = AUTO_ADMIN_PROFILES[normalizedPhone];
+    if (adminProfile && token && userId) {
+      await adminLogin({
+        token,
+        userId,
+        profile: {
+          ...adminProfile,
+          phoneNumber: normalizedPhone,
+        },
+      });
       router.push('/admin');
       return;
     }

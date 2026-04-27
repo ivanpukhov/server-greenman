@@ -387,7 +387,7 @@ const BarcodePreview = ({ value }) => {
 
     return (
         <Box
-            sx={{ width: '100%', maxWidth: 520, border: '1px solid rgba(16,40,29,0.15)', borderRadius: 1.5, p: 1, backgroundColor: '#fff' }}
+            sx={{ width: '100%', maxWidth: 520, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1, backgroundColor: 'background.paper' }}
             dangerouslySetInnerHTML={{ __html: markup }}
         />
     );
@@ -1005,8 +1005,7 @@ const OrderPricingSummary = () => {
                     sx={{
                         p: 1.5,
                         borderRadius: 2,
-                        borderColor: 'rgba(16,40,29,0.18)',
-                        background: 'linear-gradient(180deg, rgba(31,154,96,0.06) 0%, rgba(19,111,99,0.03) 100%)'
+                        backgroundColor: (t) => t.palette.action.hover
                     }}
                 >
                     <Stack spacing={1}>
@@ -1176,7 +1175,7 @@ const parseOrderCreatePrefill = (search) => {
 };
 
 export const OrderList = () => {
-    const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+    const isSmall = useMediaQuery((theme) => theme.breakpoints.down('md'));
 
     const OrderTrackingQueuePanel = () => {
         const notify = useNotify();
@@ -1241,7 +1240,7 @@ export const OrderList = () => {
         const isRunning = status?.status === 'running';
 
         return (
-            <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)', mb: 1.5 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, mb: 1.5 }}>
                 <Stack spacing={1.2}>
                     <Stack
                         direction={{ xs: 'column', md: 'row' }}
@@ -1503,7 +1502,7 @@ const OrderPhotoSender = () => {
     };
 
     return (
-        <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)' }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>
                 Отправить фото заказа
             </Typography>
@@ -1681,11 +1680,10 @@ const OrderShowContent = () => {
         <Box>
             <Stack spacing={2.2}>
                 <Paper
+                    variant="outlined"
                     sx={{
                         p: { xs: 2, md: 2.5 },
-                        borderRadius: 3,
-                        border: '1px solid rgba(16,40,29,0.08)',
-                        background: 'linear-gradient(135deg, rgba(31,154,96,0.16) 0%, rgba(19,111,99,0.14) 100%)'
+                        borderRadius: 3
                     }}
                 >
                     <Stack spacing={1.5}>
@@ -1712,7 +1710,7 @@ const OrderShowContent = () => {
 
                 <Grid container spacing={1.5}>
                     <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)', height: '100%' }}>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, height: '100%' }}>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>
                                 Клиент
                             </Typography>
@@ -1722,7 +1720,7 @@ const OrderShowContent = () => {
                         </Paper>
                     </Grid>
                     <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)', height: '100%' }}>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, height: '100%' }}>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>
                                 Доставка
                             </Typography>
@@ -1734,7 +1732,7 @@ const OrderShowContent = () => {
                         </Paper>
                     </Grid>
                     <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)', height: '100%' }}>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, height: '100%' }}>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>
                                 Оплата и логистика
                             </Typography>
@@ -1767,7 +1765,7 @@ const OrderShowContent = () => {
                     </Grid>
                 </Grid>
 
-                <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)' }}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
                     <Typography variant="h6" sx={{ mb: 1 }}>
                         Товары в заказе
                     </Typography>

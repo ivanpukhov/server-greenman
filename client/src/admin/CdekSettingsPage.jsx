@@ -115,10 +115,12 @@ const CdekSettingsPage = () => {
     if (loading) return <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
 
     return (
-        <Box sx={{ p: 3, maxWidth: 700 }}>
+        <Box sx={{ maxWidth: 760 }}>
             <Stack direction="row" alignItems="center" gap={1} mb={3}>
                 <SettingsOutlinedIcon color="action" />
-                <Typography variant="h5" fontWeight={700}>Настройки СДЭК</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    Настройки СДЭК
+                </Typography>
             </Stack>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

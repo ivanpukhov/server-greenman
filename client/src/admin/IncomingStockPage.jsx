@@ -57,26 +57,20 @@ const IncomingStockPage = () => {
 
     return (
         <Stack spacing={3}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background:
-                        'linear-gradient(135deg, rgba(31,154,96,0.16) 0%, rgba(19,111,99,0.12) 100%)'
-                }}
-            >
-                <Typography variant="h5">Приход товара</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    Приход товара
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Сканируйте код на упаковке, укажите количество и подтвердите добавление на склад.
                 </Typography>
             </Box>
 
             <Paper
+                variant="outlined"
                 sx={{
                     p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)'
+                    borderRadius: 3
                 }}
             >
                 <Box component="form" onSubmit={submitIncoming}>
@@ -110,7 +104,7 @@ const IncomingStockPage = () => {
             </Paper>
 
             {lastEntry && (
-                <Alert severity="success" sx={{ borderRadius: 3, border: '1px solid rgba(31,154,96,0.2)' }}>
+                <Alert severity="success" sx={{ borderRadius: 3 }}>
                     <strong>{lastEntry.productName}</strong> / {lastEntry.typeName} <br />
                     Добавлено: {lastEntry.addedQuantity} шт. <br />
                     Остаток: {lastEntry.stockStatus}

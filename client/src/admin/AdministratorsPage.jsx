@@ -569,21 +569,16 @@ const AdministratorsPage = () => {
 
     return (
         <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'linear-gradient(135deg, rgba(20,76,112,0.14) 0%, rgba(39,108,176,0.12) 100%)'
-                }}
-            >
-                <Typography variant="h5">Администраторы</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    Администраторы
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Здесь управляются номера, которым разрешен вход в админ-панель, и платежные ссылки.
                 </Typography>
             </Box>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                     Добавить администратора
                 </Typography>
@@ -874,7 +869,7 @@ const AdministratorsPage = () => {
                 </Box>
             </Paper>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                     Конструктор отправки ссылок
                 </Typography>
@@ -1073,7 +1068,7 @@ const AdministratorsPage = () => {
                 </Stack>
             </Paper>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                     Платежные ссылки (ссылка - администратор)
                 </Typography>

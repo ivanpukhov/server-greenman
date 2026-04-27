@@ -207,11 +207,13 @@ const AliasesPage = () => {
 
     return (
         <Stack spacing={2}>
-            <Paper sx={{ p: 2, borderRadius: 2 }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} gap={1.5}>
-                    <Box sx={{ flex: 1 }}>
-                        <Typography variant="h6">Псевдонимы товаров</Typography>
-                        <Typography variant="body2" color="text.secondary">
+            <Box>
+                <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" gap={1.5}>
+                    <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                            Псевдонимы товаров
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Псевдоним задается для конкретного типа товара. Пустое значение сохранится как NULL.
                         </Typography>
                     </Box>
@@ -255,9 +257,9 @@ const AliasesPage = () => {
                         Сохранить все
                     </Button>
                 </Stack>
-            </Paper>
+            </Box>
 
-            <Paper sx={{ borderRadius: 2, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
+            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
                 {isSmall ? (
                     <Stack spacing={1.2}>
                         {rows.map((row) => {

@@ -26,9 +26,17 @@ export default function SocialAdminPage() {
     const active = TABS.find((t) => t.key === tab) || TABS[0];
     const ActiveComp = active.Component;
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h5" gutterBottom>Соцсеть</Typography>
-            <Paper sx={{ mb: 2 }}>
+        <Box>
+            <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, letterSpacing: '-0.015em', mb: 0.5 }}
+            >
+                Соцсеть
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Контент, посты и комментарии
+            </Typography>
+            <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
                 <Tabs
                     value={tab}
                     onChange={(_e, v) => setTab(v)}

@@ -62,17 +62,11 @@ const QrCodesPage = () => {
 
     return (
         <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background:
-                        'linear-gradient(135deg, rgba(19,111,99,0.17) 0%, rgba(88,196,142,0.12) 100%)'
-                }}
-            >
-                <Typography variant="h5">QR-коды товаров</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    QR-коды товаров
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Используйте эти коды для сканирования и удобного приёма товара на складе.
                 </Typography>
             </Box>
@@ -81,14 +75,13 @@ const QrCodesPage = () => {
                 {rows.map((row) => (
                     <Grid item xs={12} sm={6} md={4} lg={3} key={row.id}>
                         <Card
+                            variant="outlined"
                             sx={{
                                 borderRadius: 3,
                                 height: '100%',
-                                border: '1px solid rgba(16,40,29,0.08)',
-                                transition: 'transform 150ms ease, box-shadow 150ms ease',
+                                transition: 'border-color 150ms ease',
                                 '&:hover': {
-                                    transform: 'translateY(-3px)',
-                                    boxShadow: '0 18px 38px rgba(16,40,29,0.14)'
+                                    borderColor: 'primary.main'
                                 }
                             }}
                         >

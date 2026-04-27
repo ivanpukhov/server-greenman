@@ -189,7 +189,8 @@ const AccountingPage = () => {
                         <Chip
                             icon={<ReceiptLongOutlinedIcon fontSize="small" />}
                             label={`${summary.ordersCount || 0} оплат`}
-                            sx={{ bgcolor: 'rgba(15, 120, 84, 0.12)', border: '1px solid rgba(16,40,29,0.15)' }}
+                            color="success"
+                            variant="outlined"
                         />
                     </Stack>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
@@ -270,12 +271,12 @@ const AccountingPage = () => {
                             value={expenseShare}
                             sx={{
                                 mt: 1.2,
-                                height: 9,
+                                height: 6,
                                 borderRadius: 999,
-                                bgcolor: 'rgba(16,40,29,0.08)',
+                                bgcolor: (t) => t.palette.action.hover,
                                 '& .MuiLinearProgress-bar': {
                                     borderRadius: 999,
-                                    background: 'linear-gradient(90deg, #f3a145, #de6e2a)'
+                                    backgroundColor: 'warning.main'
                                 }
                             }}
                         />
