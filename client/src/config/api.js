@@ -10,3 +10,17 @@ export const apiUrl = (path = '') => {
 
     return `${apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 };
+
+export const publicAssetUrl = (url = '') => {
+    const safeUrl = String(url || '').trim();
+
+    if (!safeUrl || /^(https?:)?\/\//i.test(safeUrl) || safeUrl.startsWith('data:') || safeUrl.startsWith('blob:')) {
+        return safeUrl;
+    }
+
+    if (safeUrl.startsWith('/uploads/')) {
+        return `${normalizedApiHost}${safeUrl}`;
+    }
+
+    return safeUrl;
+};

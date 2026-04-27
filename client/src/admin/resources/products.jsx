@@ -48,7 +48,7 @@ import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
-import { apiUrl } from '../../config/api';
+import { apiUrl, publicAssetUrl } from '../../config/api';
 import { adminAuthStorage } from '../authProvider';
 
 const normalizeImageUrls = (value) => {
@@ -67,7 +67,7 @@ const normalizeImageUrls = (value) => {
 };
 
 const ProductImagePreview = ({ src, alt = '', size = 64 }) => {
-    const imageUrl = String(src || '').trim();
+    const imageUrl = publicAssetUrl(src);
 
     if (!imageUrl) {
         return (
@@ -344,7 +344,7 @@ const ProductImagesInput = ({ source = 'imageUrls' }) => {
                             >
                                 <Box
                                     component="img"
-                                    src={imageUrl}
+                                    src={publicAssetUrl(imageUrl)}
                                     alt=""
                                     loading="lazy"
                                     sx={{
@@ -704,7 +704,7 @@ const ProductShowContent = () => {
                             {imageUrls[0] ? (
                                 <Box
                                     component="img"
-                                    src={imageUrls[0]}
+                                    src={publicAssetUrl(imageUrls[0])}
                                     alt={record.name}
                                     sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
@@ -743,7 +743,7 @@ const ProductShowContent = () => {
                             <Grid item xs={6} sm={4} md={2} key={imageUrl}>
                                 <Box
                                     component="img"
-                                    src={imageUrl}
+                                    src={publicAssetUrl(imageUrl)}
                                     alt={record.name}
                                     loading="lazy"
                                     sx={{

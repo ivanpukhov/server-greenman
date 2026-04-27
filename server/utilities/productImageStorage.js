@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PUBLIC_DIR = path.resolve(__dirname, '../public');
+const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const UPLOADS_SUBDIR = 'uploads/products';
 
 const MIME_EXTENSIONS = {

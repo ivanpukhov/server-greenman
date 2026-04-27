@@ -53,6 +53,7 @@ app.use(bodyParser.json({
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(express.static(path.resolve(__dirname, 'public')));
 
 app.use('/api/products', productRoutes);

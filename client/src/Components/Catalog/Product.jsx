@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Card, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useFormatPrice } from '../../contexts/CountryContext.jsx';
+import { publicAssetUrl } from '../../config/api.js';
 import AddToCartControl from './AddToCartControl.jsx';
 import s from './Product.module.scss';
 
@@ -23,7 +24,7 @@ const Product = ({ product }) => {
             <NavLink to={`/product/${product.id}`} className={s.media} aria-label={product.name}>
                 <div className={s.thumb} aria-hidden="true">
                     {imageUrl ? (
-                        <img className={s.thumbImage} src={imageUrl} alt="" loading="lazy" />
+                        <img className={s.thumbImage} src={publicAssetUrl(imageUrl)} alt="" loading="lazy" />
                     ) : (
                         <span className={s.thumbInitial}>{initial}</span>
                     )}

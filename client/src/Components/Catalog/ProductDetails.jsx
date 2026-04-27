@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import ScrollToTop from '../ScrollToTop';
 import AddToCartControl from './AddToCartControl.jsx';
 import { useFormatPrice } from '../../contexts/CountryContext.jsx';
+import { publicAssetUrl } from '../../config/api.js';
 import {
     IconArrowLeft,
     IconAlertCircle,
@@ -81,7 +82,7 @@ const ProductInfo = () => {
                 <meta name="description" content={(product.description || '').slice(0, 160)} />
                 <meta property="og:title" content={`${product.name} — GreenMan`} />
                 <meta property="og:type" content="product" />
-                {imageUrls[0] && <meta property="og:image" content={imageUrls[0]} />}
+                {imageUrls[0] && <meta property="og:image" content={publicAssetUrl(imageUrls[0])} />}
             </Helmet>
             <ScrollToTop />
 
@@ -96,7 +97,7 @@ const ProductInfo = () => {
                 <Stack gap="sm">
                     <div className={s.gallery} aria-hidden="true">
                         {imageUrls[0] ? (
-                            <img className={s.galleryImage} src={imageUrls[0]} alt="" />
+                            <img className={s.galleryImage} src={publicAssetUrl(imageUrls[0])} alt="" />
                         ) : (
                             <>
                                 <span className={s.galleryInitial}>{initial}</span>
@@ -107,7 +108,7 @@ const ProductInfo = () => {
                     {imageUrls.length > 1 && (
                         <SimpleGrid cols={{ base: 4, sm: 5 }} spacing="xs">
                             {imageUrls.slice(1, 6).map((imageUrl) => (
-                                <img key={imageUrl} className={s.galleryThumb} src={imageUrl} alt="" loading="lazy" />
+                                <img key={imageUrl} className={s.galleryThumb} src={publicAssetUrl(imageUrl)} alt="" loading="lazy" />
                             ))}
                         </SimpleGrid>
                     )}
