@@ -70,6 +70,9 @@ const ProductInfo = () => {
 
     const minPrice = product.types?.length ? Math.min(...product.types.map((tp) => tp.price)) : 0;
     const initial = (product.name || '?').trim().charAt(0).toUpperCase();
+    const imageUrls = Array.isArray(product.imageUrls)
+        ? product.imageUrls.filter(Boolean)
+        : [];
 
     return (
         <Container size="xl" px="md" py="md" className={s.page}>
@@ -78,6 +81,7 @@ const ProductInfo = () => {
                 <meta name="description" content={(product.description || '').slice(0, 160)} />
                 <meta property="og:title" content={`${product.name} — GreenMan`} />
                 <meta property="og:type" content="product" />
+                {imageUrls[0] && <meta property="og:image" content={imageUrls[0]} />}
             </Helmet>
             <ScrollToTop />
 
@@ -89,10 +93,25 @@ const ProductInfo = () => {
             </Group>
 
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
-                <div className={s.gallery} aria-hidden="true">
-                    <span className={s.galleryInitial}>{initial}</span>
-                    <IconLeaf size={40} stroke={1.4} className={s.galleryLeaf} />
-                </div>
+                <Stack gap="sm">
+                    <div className={s.gallery} aria-hidden="true">
+                        {imageUrls[0] ? (
+                            <img className={s.galleryImage} src={imageUrls[0]} alt="" />
+                        ) : (
+                            <>
+                                <span className={s.galleryInitial}>{initial}</span>
+                                <IconLeaf size={40} stroke={1.4} className={s.galleryLeaf} />
+                            </>
+                        )}
+                    </div>
+                    {imageUrls.length > 1 && (
+                        <SimpleGrid cols={{ base: 4, sm: 5 }} spacing="xs">
+                            {imageUrls.slice(1, 6).map((imageUrl) => (
+                                <img key={imageUrl} className={s.galleryThumb} src={imageUrl} alt="" loading="lazy" />
+                            ))}
+                        </SimpleGrid>
+                    )}
+                </Stack>
 
                 <Stack gap="md">
                     <Stack gap={6}>

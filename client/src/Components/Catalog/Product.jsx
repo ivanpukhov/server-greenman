@@ -12,6 +12,9 @@ const Product = ({ product }) => {
     const minPrice = product.types?.length
         ? Math.min(...product.types.map((type) => type.price))
         : 0;
+    const imageUrl = Array.isArray(product.imageUrls)
+        ? product.imageUrls.find(Boolean)
+        : null;
 
     const initial = (product.name || '?').trim().charAt(0).toUpperCase();
 
@@ -19,7 +22,11 @@ const Product = ({ product }) => {
         <Card className={s.card} padding="lg" radius="lg" withBorder>
             <NavLink to={`/product/${product.id}`} className={s.media} aria-label={product.name}>
                 <div className={s.thumb} aria-hidden="true">
-                    <span className={s.thumbInitial}>{initial}</span>
+                    {imageUrl ? (
+                        <img className={s.thumbImage} src={imageUrl} alt="" loading="lazy" />
+                    ) : (
+                        <span className={s.thumbInitial}>{initial}</span>
+                    )}
                 </div>
             </NavLink>
 

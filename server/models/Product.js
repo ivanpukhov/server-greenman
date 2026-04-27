@@ -65,6 +65,11 @@ const Product = sequelize.define('product', {
                 msg: "Некорректный URL видео"
             }
         }
+    },
+    imageUrls: {
+        type: Sequelize.JSON,
+        allowNull: true,
+        defaultValue: []
     }
 });
 

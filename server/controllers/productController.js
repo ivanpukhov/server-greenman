@@ -76,7 +76,7 @@ const productController = {
     addProduct: async (req, res) => {
         try {
             console.log('Начало обработки запроса на добавление продукта');
-            const { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types } = req.body;
+            const { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types, imageUrls } = req.body;
             let videoUrl = req.file ? req.file.path : null;
             console.log('Полученные данные:', { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types, videoUrl });
 
@@ -87,7 +87,8 @@ const productController = {
                 applicationMethodAdults,
                 diseases,
                 contraindications,
-                videoUrl
+                videoUrl,
+                imageUrls: Array.isArray(imageUrls) ? imageUrls : []
             });
             console.log('Продукт создан:', product.toJSON());
 
@@ -200,7 +201,7 @@ const productController = {
     // Обновление продукта
     updateProduct: async (req, res) => {
         const { id } = req.params;
-        const { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types, videoUrl } = req.body;
+        const { name, description, applicationMethodChildren, applicationMethodAdults, diseases, contraindications, types, videoUrl, imageUrls } = req.body;
 
         try {
             const product = await Product.findByPk(id);
@@ -217,7 +218,8 @@ const productController = {
                 applicationMethodAdults,
                 diseases,
                 contraindications,
-                videoUrl: req.file ? req.file.path : videoUrl
+                videoUrl: req.file ? req.file.path : videoUrl,
+                imageUrls: Array.isArray(imageUrls) ? imageUrls : product.imageUrls
             });
 
             // Обновление типов продукта

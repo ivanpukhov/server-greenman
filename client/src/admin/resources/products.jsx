@@ -21,24 +21,91 @@ import {
     TopToolbar,
     ListContextProvider,
     useListContext,
+    useInput,
+    useRecordContext,
 } from 'react-admin';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Alert,
     Box,
     Button,
     Card,
     CardActionArea,
     CardContent,
+    Chip,
+    CircularProgress,
+    Grid,
+    IconButton,
     InputAdornment,
+    Paper,
     Stack,
     TextField as MuiTextField,
     Typography,
     useMediaQuery
 } from '@mui/material';
+import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
 import { apiUrl } from '../../config/api';
 import { adminAuthStorage } from '../authProvider';
+
+const normalizeImageUrls = (value) => {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+        return value
+            .split(/\n|,|;/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+};
+
+const ProductImagePreview = ({ src, alt = '', size = 64 }) => {
+    const imageUrl = String(src || '').trim();
+
+    if (!imageUrl) {
+        return (
+            <Box
+                sx={{
+                    width: size,
+                    height: size,
+                    borderRadius: 2,
+                    bgcolor: 'grey.100',
+                    color: 'text.secondary',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+            >
+                <ImageOutlinedIcon fontSize="small" />
+            </Box>
+        );
+    }
+
+    return (
+        <Box
+            component="img"
+            src={imageUrl}
+            alt={alt}
+            loading="lazy"
+            sx={{
+                width: size,
+                height: size,
+                borderRadius: 2,
+                objectFit: 'cover',
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'grey.100'
+            }}
+        />
+    );
+};
 
 const ProductListActions = ({ searchValue, onSearchChange, onSearchSubmit, onSearchReset }) => {
     return (
@@ -197,6 +264,135 @@ const ProductScannerSync = ({ onDetectProductName }) => {
     );
 };
 
+const ProductImagesInput = ({ source = 'imageUrls' }) => {
+    const { field } = useInput({ source });
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState('');
+    const imageUrls = normalizeImageUrls(field.value);
+
+    const uploadImages = async (event) => {
+        const files = Array.from(event.target.files || []);
+        event.target.value = '';
+
+        if (files.length === 0) {
+            return;
+        }
+
+        setUploading(true);
+        setError('');
+
+        try {
+            const formData = new FormData();
+            files.forEach((file) => formData.append('images', file));
+
+            const token = adminAuthStorage.getToken();
+            const response = await fetch(apiUrl('/admin/products/images'), {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: formData
+            });
+            const body = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(body.message || 'Не удалось загрузить изображения');
+            }
+
+            const uploaded = normalizeImageUrls(body?.data?.imageUrls);
+            field.onChange([...imageUrls, ...uploaded]);
+        } catch (uploadError) {
+            setError(uploadError.message || 'Не удалось загрузить изображения');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const removeImage = (imageUrl) => {
+        field.onChange(imageUrls.filter((item) => item !== imageUrl));
+    };
+
+    return (
+        <Stack spacing={1.5}>
+            <Box>
+                <Button
+                    component="label"
+                    variant="outlined"
+                    startIcon={uploading ? <CircularProgress size={16} /> : <AddPhotoAlternateOutlinedIcon />}
+                    disabled={uploading}
+                >
+                    Загрузить картинки
+                    <input type="file" accept="image/*" multiple hidden onChange={uploadImages} />
+                </Button>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    Можно выбрать несколько файлов. Первая картинка будет главной на сайте.
+                </Typography>
+            </Box>
+
+            {error && <Alert severity="error">{error}</Alert>}
+
+            {imageUrls.length > 0 ? (
+                <Grid container spacing={1.2}>
+                    {imageUrls.map((imageUrl) => (
+                        <Grid item xs={6} sm={4} md={3} lg={2} key={imageUrl}>
+                            <Paper
+                                variant="outlined"
+                                sx={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: 2,
+                                    bgcolor: 'background.default'
+                                }}
+                            >
+                                <Box
+                                    component="img"
+                                    src={imageUrl}
+                                    alt=""
+                                    loading="lazy"
+                                    sx={{
+                                        display: 'block',
+                                        width: '100%',
+                                        aspectRatio: '1 / 1',
+                                        objectFit: 'cover'
+                                    }}
+                                />
+                                <IconButton
+                                    size="small"
+                                    aria-label="Удалить картинку"
+                                    onClick={() => removeImage(imageUrl)}
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 6,
+                                        right: 6,
+                                        bgcolor: 'rgba(255,255,255,0.92)',
+                                        '&:hover': { bgcolor: 'background.paper' }
+                                    }}
+                                >
+                                    <DeleteOutlineOutlinedIcon fontSize="small" />
+                                </IconButton>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+            ) : (
+                <Paper
+                    variant="outlined"
+                    sx={{
+                        p: 2,
+                        borderStyle: 'dashed',
+                        borderRadius: 2,
+                        color: 'text.secondary',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                    }}
+                >
+                    <ImageOutlinedIcon fontSize="small" />
+                    <Typography variant="body2">Картинки пока не добавлены.</Typography>
+                </Paper>
+            )}
+        </Stack>
+    );
+};
+
 const ProductListContent = ({ searchTerm }) => {
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
     const listContext = useListContext();
@@ -242,17 +438,20 @@ const ProductListContent = ({ searchTerm }) => {
                         return (
                             <Card key={record.id} variant="outlined" sx={{ borderRadius: 2 }}>
                                 <CardActionArea href={`#/products/${record.id}/show`}>
-                                    <CardContent>
-                                        <Typography variant="subtitle2">{record.name}</Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Типов: {types.length}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            Остаток: {totalStock === 'Бесконечность' ? totalStock : `${totalStock} шт.`}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            ID: {record.id}
-                                        </Typography>
+                                    <CardContent sx={{ display: 'flex', gap: 1.5 }}>
+                                        <ProductImagePreview src={normalizeImageUrls(record.imageUrls)[0]} alt={record.name} size={72} />
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography variant="subtitle2" noWrap>{record.name}</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Типов: {types.length}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                Остаток: {totalStock === 'Бесконечность' ? totalStock : `${totalStock} шт.`}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                ID: {record.id}
+                                            </Typography>
+                                        </Box>
                                     </CardContent>
                                 </CardActionArea>
                             </Card>
@@ -261,8 +460,18 @@ const ProductListContent = ({ searchTerm }) => {
                 </Stack>
             ) : (
                 <Datagrid rowClick="show" bulkActionButtons={false}>
+                    <FunctionField
+                        label=""
+                        render={(record) => (
+                            <ProductImagePreview src={normalizeImageUrls(record.imageUrls)[0]} alt={record.name} size={52} />
+                        )}
+                    />
                     <TextField source="id" label="ID" />
                     <TextField source="name" label="Название" />
+                    <FunctionField
+                        label="Картинки"
+                        render={(record) => `${normalizeImageUrls(record.imageUrls).length} шт.`}
+                    />
                     <FunctionField label="Кол-во типов" render={(record) => record.types?.length || 0} />
                     <FunctionField
                         label="Остаток"
@@ -304,6 +513,7 @@ const transformProduct = (data) => {
 
     return {
         ...data,
+        imageUrls: normalizeImageUrls(data.imageUrls),
         diseases,
         types: Array.isArray(data.types)
             ? data.types.map((typeItem) => ({
@@ -361,64 +571,95 @@ export const ProductList = () => {
     );
 };
 
-const ProductFormFields = () => (
-    <>
-        <TextInput source="name" label="Название" fullWidth validate={required()} />
-        <TextInput source="description" label="Описание" fullWidth multiline minRows={4} />
-        <TextInput
-            source="applicationMethodChildren"
-            label="Способ применения (дети)"
-            fullWidth
-            multiline
-            minRows={3}
-        />
-        <TextInput
-            source="applicationMethodAdults"
-            label="Способ применения (взрослые)"
-            fullWidth
-            multiline
-            minRows={3}
-        />
-        <TextInput
-            source="diseases"
-            label="Заболевания (через запятую или новую строку)"
-            fullWidth
-            multiline
-            minRows={3}
-            parse={(value) =>
-                String(value || '')
-                    .split(/\n|,|;/)
-                    .map((item) => item.trim())
-                    .filter(Boolean)
-            }
-            format={(value) => (Array.isArray(value) ? value.join(', ') : value || '')}
-            validate={required()}
-        />
-        <TextInput source="contraindications" label="Противопоказания" fullWidth multiline minRows={3} validate={required()} />
-        <TextInput source="videoUrl" label="Ссылка на видео" fullWidth />
+const ProductFormSection = ({ title, subtitle, children }) => (
+    <Card variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2 }}>
+        <Stack spacing={2}>
+            <Box>
+                <Typography variant="h6">{title}</Typography>
+                {subtitle && (
+                    <Typography variant="body2" color="text.secondary">
+                        {subtitle}
+                    </Typography>
+                )}
+            </Box>
+            {children}
+        </Stack>
+    </Card>
+);
 
-        <ArrayInput source="types" label="Варианты товара" validate={required()}>
-            <SimpleFormIterator inline>
-                <Box sx={{ display: 'none' }}>
-                    <TextInput source="id" />
-                    <TextInput source="alias" />
-                </Box>
-                <TextInput source="type" label="Тип" validate={required()} />
-                <NumberInput source="price" label="Цена" validate={required()} min={0} />
-                <NumberInput
-                    source="stockQuantity"
-                    label="Остаток (пусто = бесконечность)"
-                    min={0}
-                    parse={(value) => (value === '' || value === null || value === undefined ? null : Number(value))}
-                />
-            </SimpleFormIterator>
-        </ArrayInput>
-    </>
+const ProductFormFields = () => (
+    <Stack spacing={2.5} sx={{ width: '100%' }}>
+        <ProductFormSection title="Основное" subtitle="Название, описание и публичные медиа товара.">
+            <TextInput source="name" label="Название" fullWidth validate={required()} />
+            <TextInput source="description" label="Описание" fullWidth multiline minRows={4} />
+            <ProductImagesInput source="imageUrls" />
+            <TextInput source="videoUrl" label="Ссылка на видео" fullWidth />
+        </ProductFormSection>
+
+        <ProductFormSection title="Показания и применение" subtitle="Эти тексты показываются на странице товара.">
+            <TextInput
+                source="diseases"
+                label="Заболевания (через запятую или новую строку)"
+                fullWidth
+                multiline
+                minRows={3}
+                parse={(value) =>
+                    String(value || '')
+                        .split(/\n|,|;/)
+                        .map((item) => item.trim())
+                        .filter(Boolean)
+                }
+                format={(value) => (Array.isArray(value) ? value.join(', ') : value || '')}
+                validate={required()}
+            />
+            <TextInput
+                source="applicationMethodAdults"
+                label="Способ применения (взрослые)"
+                fullWidth
+                multiline
+                minRows={3}
+            />
+            <TextInput
+                source="applicationMethodChildren"
+                label="Способ применения (дети)"
+                fullWidth
+                multiline
+                minRows={3}
+            />
+            <TextInput
+                source="contraindications"
+                label="Противопоказания"
+                fullWidth
+                multiline
+                minRows={3}
+                validate={required()}
+            />
+        </ProductFormSection>
+
+        <ProductFormSection title="Варианты товара" subtitle="Форма, цена и складской остаток.">
+            <ArrayInput source="types" label={false} validate={required()}>
+                <SimpleFormIterator inline>
+                    <Box sx={{ display: 'none' }}>
+                        <TextInput source="id" />
+                        <TextInput source="alias" />
+                    </Box>
+                    <TextInput source="type" label="Тип" validate={required()} />
+                    <NumberInput source="price" label="Цена" validate={required()} min={0} />
+                    <NumberInput
+                        source="stockQuantity"
+                        label="Остаток (пусто = бесконечность)"
+                        min={0}
+                        parse={(value) => (value === '' || value === null || value === undefined ? null : Number(value))}
+                    />
+                </SimpleFormIterator>
+            </ArrayInput>
+        </ProductFormSection>
+    </Stack>
 );
 
 export const ProductCreate = () => (
     <Create mutationMode="pessimistic" transform={transformProduct} redirect="list">
-        <SimpleForm>
+        <SimpleForm sx={{ maxWidth: 1120 }}>
             <ProductFormFields />
         </SimpleForm>
     </Create>
@@ -426,54 +667,134 @@ export const ProductCreate = () => (
 
 export const ProductEdit = () => (
     <Edit mutationMode="pessimistic" transform={transformProduct}>
-        <SimpleForm>
+        <SimpleForm sx={{ maxWidth: 1120 }}>
             <ProductFormFields />
         </SimpleForm>
     </Edit>
 );
 
-export const ProductShow = () => {
+const ProductShowContent = () => {
+    const record = useRecordContext();
     const isSmall = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
+    if (!record) {
+        return null;
+    }
+
+    const imageUrls = normalizeImageUrls(record.imageUrls);
+
     return (
-        <Show>
-            <SimpleShowLayout>
-                <TextField source="id" label="ID" />
-                <TextField source="name" label="Название" />
-                <TextField source="description" label="Описание" />
-                <TextField source="applicationMethodChildren" label="Применение (дети)" />
-                <TextField source="applicationMethodAdults" label="Применение (взрослые)" />
-                <TextField source="contraindications" label="Противопоказания" />
-                <TextField source="videoUrl" label="Видео URL" />
-                <FunctionField
-                    label="Заболевания"
-                    render={(record) => (Array.isArray(record.diseases) ? record.diseases.join(', ') : '')}
-                />
-                {isSmall ? (
+        <Stack spacing={2.5}>
+            <Card variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2 }}>
+                <Grid container spacing={2.5}>
+                    <Grid item xs={12} md={4}>
+                        <Box
+                            sx={{
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                bgcolor: 'background.default',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                aspectRatio: '1 / 1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {imageUrls[0] ? (
+                                <Box
+                                    component="img"
+                                    src={imageUrls[0]}
+                                    alt={record.name}
+                                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                            ) : (
+                                <ImageOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
+                            )}
+                        </Box>
+                    </Grid>
+                    <Grid item xs={12} md={8}>
+                        <Stack spacing={1.5}>
+                            <Box>
+                                <Typography variant="overline" color="text.secondary">ID {record.id}</Typography>
+                                <Typography variant="h4" sx={{ fontWeight: 750 }}>
+                                    {record.name}
+                                </Typography>
+                            </Box>
+                            {record.description && (
+                                <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                                    {record.description}
+                                </Typography>
+                            )}
+                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                <Chip label={`Картинки: ${imageUrls.length}`} />
+                                <Chip label={`Варианты: ${Array.isArray(record.types) ? record.types.length : 0}`} />
+                            </Stack>
+                        </Stack>
+                    </Grid>
+                </Grid>
+            </Card>
+
+            {imageUrls.length > 1 && (
+                <Card variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 1.5 }}>Галерея</Typography>
+                    <Grid container spacing={1.2}>
+                        {imageUrls.map((imageUrl) => (
+                            <Grid item xs={6} sm={4} md={2} key={imageUrl}>
+                                <Box
+                                    component="img"
+                                    src={imageUrl}
+                                    alt={record.name}
+                                    loading="lazy"
+                                    sx={{
+                                        display: 'block',
+                                        width: '100%',
+                                        aspectRatio: '1 / 1',
+                                        objectFit: 'cover',
+                                        borderRadius: 2,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        bgcolor: 'background.default'
+                                    }}
+                                />
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Card>
+            )}
+
+            <Card variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2 }}>
+                <SimpleShowLayout sx={{ p: 0 }}>
+                    <TextField source="applicationMethodChildren" label="Применение (дети)" />
+                    <TextField source="applicationMethodAdults" label="Применение (взрослые)" />
+                    <TextField source="contraindications" label="Противопоказания" />
+                    <TextField source="videoUrl" label="Видео URL" />
                     <FunctionField
-                        label="Типы"
-                        render={(record) => {
-                            const rows = Array.isArray(record?.types) ? record.types : [];
-                            return (
-                                <Stack spacing={1}>
-                                    {rows.map((row, index) => (
-                                        <Card key={`${row.code || row.type}-${index}`} variant="outlined" sx={{ borderRadius: 2 }}>
-                                            <CardContent>
-                                                <Typography variant="subtitle2">{row.type}</Typography>
-                                                <Typography variant="body2">Цена: {row.price} ₸</Typography>
-                                                <Typography variant="body2">
-                                                    Остаток: {row.stockQuantity === null ? 'Бесконечность' : `${row.stockQuantity} шт.`}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
-                                                    {row.code}
-                                                </Typography>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </Stack>
-                            );
-                        }}
+                        label="Заболевания"
+                        render={(item) => (Array.isArray(item.diseases) ? item.diseases.join(', ') : '')}
                     />
+                </SimpleShowLayout>
+            </Card>
+
+            <Card variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 2 }}>
+                <Typography variant="h6" sx={{ mb: 1.5 }}>Типы и QR</Typography>
+                {isSmall ? (
+                    <Stack spacing={1}>
+                        {(Array.isArray(record?.types) ? record.types : []).map((row, index) => (
+                            <Card key={`${row.code || row.type}-${index}`} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent>
+                                    <Typography variant="subtitle2">{row.type}</Typography>
+                                    <Typography variant="body2">Цена: {row.price} ₸</Typography>
+                                    <Typography variant="body2">
+                                        Остаток: {row.stockQuantity === null ? 'Бесконечность' : `${row.stockQuantity} шт.`}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+                                        {row.code}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </Stack>
                 ) : (
                     <ArrayField source="types" label="Типы">
                         <Datagrid bulkActionButtons={false}>
@@ -500,7 +821,15 @@ export const ProductShow = () => {
                         </Datagrid>
                     </ArrayField>
                 )}
-            </SimpleShowLayout>
+            </Card>
+        </Stack>
+    );
+};
+
+export const ProductShow = () => {
+    return (
+        <Show>
+            <ProductShowContent />
         </Show>
     );
 };
