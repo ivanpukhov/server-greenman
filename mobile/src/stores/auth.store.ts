@@ -19,6 +19,7 @@ type AuthState = {
   isReady: boolean;
   token: string | null;
   userId: number | null;
+  phoneNumber: string | null;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
@@ -31,7 +32,7 @@ type AuthState = {
   isAdmin: boolean;
 
   bootstrap: () => Promise<void>;
-  login: (session: { token: string; userId: number; firstName?: string | null; lastName?: string | null }) => Promise<void>;
+  login: (session: { token: string; userId: number; phoneNumber?: string | null; firstName?: string | null; lastName?: string | null }) => Promise<void>;
   updateUserProfile: (profile: { firstName: string; lastName: string }) => Promise<void>;
   logout: () => Promise<void>;
 
@@ -43,6 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isReady: false,
   token: null,
   userId: null,
+  phoneNumber: null,
   firstName: null,
   lastName: null,
   displayName: null,
@@ -67,6 +69,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isReady: true,
       token: userValid ? userSession!.token : null,
       userId: userValid ? userSession!.userId : null,
+      phoneNumber: userValid ? userSession!.phoneNumber ?? null : null,
       firstName: userValid ? userSession!.firstName ?? null : null,
       lastName: userValid ? userSession!.lastName ?? null : null,
       displayName: userValid
@@ -81,12 +84,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  login: async ({ token, userId, firstName = null, lastName = null }) => {
-    const record: SecureSession = { token, userId, firstName, lastName, authAt: Date.now() };
+  login: async ({ token, userId, phoneNumber = null, firstName = null, lastName = null }) => {
+    const record: SecureSession = { token, userId, phoneNumber, firstName, lastName, authAt: Date.now() };
     await writeSession(record);
     set({
       token,
       userId,
+      phoneNumber,
       firstName,
       lastName,
       displayName: [firstName, lastName].filter(Boolean).join(' ') || null,
@@ -113,6 +117,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       token: null,
       userId: null,
+      phoneNumber: null,
       firstName: null,
       lastName: null,
       displayName: null,

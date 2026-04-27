@@ -31,6 +31,7 @@ export function useConfirmCode() {
       await login({
         token: data.token,
         userId: data.userId,
+        phoneNumber: data.user?.phoneNumber ?? null,
         firstName: data.user?.firstName ?? null,
         lastName: data.user?.lastName ?? null,
       });
