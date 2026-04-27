@@ -519,12 +519,14 @@ const OrderDraftRequestsPage = () => {
 
     return (
         <Stack spacing={2.2}>
-            <Paper sx={{ p: 2.2, borderRadius: 2.5 }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'center' }}>
-                    <Box sx={{ flex: 1 }}>
+            <Box>
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} alignItems={{ md: 'flex-start' }} justifyContent="space-between">
+                    <Box>
                         <Stack direction="row" spacing={1} alignItems="center">
                             <AssignmentOutlinedIcon color="primary" />
-                            <Typography variant="h6">Ваш заказ</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                                Ваш заказ
+                            </Typography>
                         </Stack>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.8 }}>
                             Все сообщения, которые начинаются с фразы `Ваш заказ`, с привязкой к оплате, заказу и треку.
@@ -583,13 +585,13 @@ const OrderDraftRequestsPage = () => {
                         </Button>
                     ))}
                 </Stack>
-            </Paper>
+            </Box>
 
             {rows.length === 0 && !loading ? (
                 <Alert severity="info">Сообщения "Ваш заказ" пока не найдены.</Alert>
             ) : null}
 
-            <Paper sx={{ borderRadius: 2.5, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
+            <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden', p: isSmall ? 1.2 : 0 }}>
                 {isSmall ? (
                     <Stack spacing={1.2}>
                         {rows.map((row) => (

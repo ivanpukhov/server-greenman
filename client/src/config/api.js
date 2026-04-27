@@ -1,4 +1,4 @@
-const rawApiHost = (import.meta.env.VITE_API_HOST || '').trim().replace(/\/+$/, '');
+const rawApiHost = (import.meta.env.VITE_API_HOST || 'https://greenman.kz').trim().replace(/\/+$/, '');
 const normalizedApiHost = rawApiHost.endsWith('/api') ? rawApiHost.slice(0, -4) : rawApiHost;
 
 export const apiBaseUrl = normalizedApiHost ? `${normalizedApiHost}/api` : '/api';

@@ -74,26 +74,26 @@ const AdminLoginPage = () => {
                 minHeight: '100vh',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background:
-                    'radial-gradient(circle at 15% 20%, rgba(88,196,142,0.34), transparent 45%), radial-gradient(circle at 100% 90%, rgba(19,111,99,0.26), transparent 42%), #f2f8f4',
+                backgroundColor: 'background.default',
                 px: 2
             }}
         >
             <Card
+                variant="outlined"
                 sx={{
                     width: '100%',
-                    maxWidth: 480,
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.12)',
-                    boxShadow: '0 32px 80px rgba(19,111,99,0.26)',
-                    background: 'linear-gradient(180deg, rgba(250,255,252,0.94), rgba(242,250,246,0.94))'
+                    maxWidth: 420,
+                    borderRadius: 3
                 }}
             >
                 <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-                    <Typography variant="h4" sx={{ mb: 1, color: '#123524', lineHeight: 1.12 }}>
+                    <Typography
+                        variant="h4"
+                        sx={{ mb: 0.5, fontWeight: 700, letterSpacing: '-0.02em' }}
+                    >
                         Greenman Admin
                     </Typography>
-                    <Typography variant="body2" sx={{ mb: 3, color: '#456156' }}>
+                    <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">
                         Вход по ИИН и одноразовому коду
                     </Typography>
 

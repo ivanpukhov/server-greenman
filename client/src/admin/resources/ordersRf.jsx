@@ -8,6 +8,7 @@ import {
     Show,
     ShowButton,
     SimpleForm,
+    SimpleList,
     TextField,
     TextInput,
     useNotify,
@@ -22,7 +23,8 @@ import {
     Divider,
     Paper,
     Stack,
-    Typography
+    Typography,
+    useMediaQuery
 } from '@mui/material';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
@@ -106,15 +108,23 @@ const CdekNumberLink = () => {
     );
 };
 
-export const OrderRfList = () => (
-    <List
-        perPage={10}
-        sort={{ field: 'id', order: 'DESC' }}
-        filters={[
-            <TextInput key="q" source="q" label="Поиск (имя / телефон / трек)" alwaysOn />,
-            <SelectInput key="status" source="status" label="Статус" choices={orderStatusChoices} />
-        ]}
-    >
+const OrderRfListBody = () => {
+    const isMobile = useMediaQuery((t) => t.breakpoints.down('md'));
+    if (isMobile) {
+        return (
+            <SimpleList
+                primaryText={(record) =>
+                    `#${record.id} · ${record.customerName || '—'}`
+                }
+                secondaryText={(record) =>
+                    `${record.phoneNumber || ''}${record.totalPrice ? ` · ${formatRub(record.totalPrice)}` : ''}`
+                }
+                tertiaryText={(record) => record.status || '—'}
+                linkType="edit"
+            />
+        );
+    }
+    return (
         <Datagrid rowClick="edit" bulkActionButtons={false}>
             <TextField source="id" label="ID" />
             <TextField source="customerName" label="Клиент" />
@@ -128,6 +138,19 @@ export const OrderRfList = () => (
             <DateField source="createdAt" label="Создан" showTime locales="ru-RU" />
             <ShowButton label="Детали" />
         </Datagrid>
+    );
+};
+
+export const OrderRfList = () => (
+    <List
+        perPage={10}
+        sort={{ field: 'id', order: 'DESC' }}
+        filters={[
+            <TextInput key="q" source="q" label="Поиск (имя / телефон / трек)" alwaysOn />,
+            <SelectInput key="status" source="status" label="Статус" choices={orderStatusChoices} />
+        ]}
+    >
+        <OrderRfListBody />
     </List>
 );
 
@@ -277,7 +300,7 @@ const CdekActionsToolbar = () => {
     };
 
     return (
-        <Paper sx={{ p: 2, borderRadius: 2.5, mb: 2, border: '1px solid rgba(16,40,29,0.08)' }}>
+        <Paper sx={{ p: 2, borderRadius: 2.5, mb: 2 }}>
             <Stack spacing={1.2}>
                 <Typography variant="subtitle1">Действия СДЭК</Typography>
                 <Stack direction="row" spacing={1.2} flexWrap="wrap" useFlexGap>
@@ -401,7 +424,7 @@ const OrderRfShowContent = () => {
     return (
         <Stack spacing={2}>
             <CdekActionsToolbar />
-            <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper sx={{ p: 2, borderRadius: 2.5 }}>
                 <Stack spacing={0.5}>
                     <Typography variant="subtitle1">Получатель</Typography>
                     <Typography variant="body2">Имя: {record.customerName || '—'}</Typography>
@@ -409,7 +432,7 @@ const OrderRfShowContent = () => {
                     <Typography variant="body2">Телефон: {record.phoneNumber || '—'}</Typography>
                 </Stack>
             </Paper>
-            <Paper sx={{ p: 2, borderRadius: 2.5, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper sx={{ p: 2, borderRadius: 2.5 }}>
                 <Typography variant="subtitle1">Товары</Typography>
                 {products.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">Товары не добавлены</Typography>

@@ -184,12 +184,12 @@ const AccountingFullAccessPage = () => {
                             value={expenseLoad}
                             sx={{
                                 mt: 1.2,
-                                height: 9,
+                                height: 6,
                                 borderRadius: 999,
-                                bgcolor: 'rgba(16,40,29,0.08)',
+                                bgcolor: (t) => t.palette.action.hover,
                                 '& .MuiLinearProgress-bar': {
                                     borderRadius: 999,
-                                    background: 'linear-gradient(90deg, #f3a145, #de6e2a)'
+                                    backgroundColor: 'warning.main'
                                 }
                             }}
                         />

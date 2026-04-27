@@ -77,21 +77,16 @@ const AddExpensePage = () => {
 
     return (
         <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'linear-gradient(135deg, rgba(19,111,99,0.16) 0%, rgba(31,154,96,0.12) 100%)'
-                }}
-            >
-                <Typography variant="h5">Добавить расход</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    Добавить расход
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Кто потратил: <strong>{currentAdminName}</strong> (автоматически)
                 </Typography>
             </Box>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Box component="form" onSubmit={onSubmitExpense}>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
                         <TextField

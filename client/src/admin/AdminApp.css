@@ -1,22 +1,6 @@
 .admin-shell .RaLayout-appFrame {
-    backdrop-filter: blur(3px);
     margin-top: 0 !important;
-}
-
-.admin-shell .RaSidebar-root {
-    margin: 0;
-    border-radius: 0;
-    overflow: hidden;
-    border-right: 1px solid rgba(16, 40, 29, 0.09);
-    border-top: 0;
-    border-left: 0;
-    border-bottom: 0;
-    box-shadow: none;
-    background: linear-gradient(180deg, rgba(252, 255, 253, 0.98), rgba(240, 248, 243, 0.94));
-}
-
-.admin-shell .RaSidebar-fixed {
-    border-right: 0;
+    background-color: transparent;
 }
 
 .admin-shell .RaLayout-contentWithSidebar {
@@ -26,38 +10,24 @@
 .admin-shell .RaLayout-content {
     margin: 0;
     padding: 16px;
+    background-color: transparent;
 }
 
-.admin-shell .RaLayout-content .RaList-root,
-.admin-shell .RaLayout-content .RaShow-root,
-.admin-shell .RaLayout-content .RaEdit-root,
-.admin-shell .RaLayout-content .RaCreate-root {
-    background: rgba(249, 255, 252, 0.92);
-    border-radius: 20px;
-    border: 1px solid rgba(16, 40, 29, 0.08);
-    box-shadow: 0 16px 34px rgba(16, 40, 29, 0.09);
+.admin-shell .RaSidebar-root {
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
+    border-right: 1px solid rgba(15, 23, 28, 0.08);
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 0;
+    box-shadow: none;
+    background-color: #ffffff;
 }
 
-.admin-shell .RaLayout-content .RaList-main,
-.admin-shell .RaLayout-content .RaShow-main,
-.admin-shell .RaLayout-content .RaEdit-main,
-.admin-shell .RaLayout-content .RaCreate-main {
-    padding: 18px;
-}
-
-.admin-shell .RaDatagrid-root {
-    overflow-x: auto;
-    border-radius: 14px;
-}
-
-.admin-shell .RaDatagrid-table {
-    min-width: 860px;
-}
-
-.admin-shell .RaCreate-main .MuiFormControl-root,
-.admin-shell .RaEdit-main .MuiFormControl-root,
-.admin-shell .RaShow-main .MuiFormControl-root {
-    max-width: 100%;
+.admin-shell .RaSidebar-fixed {
+    border-right: 0;
+    background-color: transparent;
 }
 
 .admin-topbar.MuiAppBar-root {
@@ -65,29 +35,21 @@
     border-radius: 0;
     left: 0 !important;
     width: 100% !important;
-    background: linear-gradient(130deg, rgba(24, 145, 101, 0.98), rgba(19, 111, 99, 0.98));
-    color: #f5fffa;
+    background-color: #ffffff;
+    color: inherit;
     border: 0;
-    box-shadow: 0 8px 20px rgba(13, 79, 63, 0.28);
+    box-shadow: none;
+    border-bottom: 1px solid rgba(15, 23, 28, 0.08);
 }
 
 .admin-topbar__inner {
     width: 100%;
-    min-height: 62px;
+    min-height: 56px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 16px;
-}
-
-.admin-topbar__title {
-    line-height: 1.1;
-    font-weight: 700;
-}
-
-.admin-topbar__subtitle {
-    opacity: 0.94;
+    padding: 8px 16px;
 }
 
 .admin-topbar__actions {
@@ -96,62 +58,38 @@
     gap: 8px;
 }
 
-.admin-menu .RaMenu-open {
-    padding: 12px 10px;
-}
-
-.admin-shell .RaMenuItemLink-root {
-    border: 1px solid rgba(16, 40, 29, 0.06);
-    background: rgba(255, 255, 255, 0.56);
-}
-
-.admin-shell .RaMenuItemLink-active {
-    box-shadow: 0 8px 18px rgba(19, 111, 99, 0.16);
-}
-
 .admin-shell .MuiToolbar-root {
-    min-height: 52px;
+    min-height: 48px;
 }
 
-@media (max-width: 900px) {
+.admin-shell .RaDatagrid-root {
+    overflow-x: auto;
+    border-radius: 12px;
+}
+
+.admin-shell .RaCreate-main .MuiFormControl-root,
+.admin-shell .RaEdit-main .MuiFormControl-root,
+.admin-shell .RaShow-main .MuiFormControl-root {
+    max-width: 100%;
+}
+
+@media (min-width: 900px) {
     .admin-shell .RaLayout-content {
-        margin: 0;
-        padding: 12px;
-    }
-
-    .admin-shell .RaSidebar-root {
-        margin: 0;
-        border-radius: 0;
-    }
-
-    .admin-topbar.MuiAppBar-root {
-        margin: 0;
-        border-radius: 0;
-    }
-
-    .admin-topbar__subtitle {
-        display: none;
+        padding: 24px;
     }
 
     .admin-topbar__inner {
-        min-height: 56px;
-        padding: 8px 10px;
+        min-height: 64px;
+        padding: 10px 20px;
     }
+}
 
-    .admin-topbar__actions {
-        width: 100%;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-    }
-
-    .admin-shell .RaLayout-content .RaList-main,
-    .admin-shell .RaLayout-content .RaShow-main,
-    .admin-shell .RaLayout-content .RaEdit-main,
-    .admin-shell .RaLayout-content .RaCreate-main {
+@media (max-width: 600px) {
+    .admin-shell .RaLayout-content {
         padding: 12px;
     }
 
-    .admin-shell .RaDatagrid-table {
-        min-width: 660px;
+    .admin-topbar__inner {
+        padding: 8px 12px;
     }
 }

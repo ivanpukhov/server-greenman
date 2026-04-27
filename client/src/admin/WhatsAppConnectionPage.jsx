@@ -85,23 +85,18 @@ const WhatsAppConnectionPage = () => {
 
     return (
         <Stack spacing={2.5}>
-            <Box
-                sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 3,
-                    border: '1px solid rgba(16,40,29,0.08)',
-                    background: 'linear-gradient(135deg, rgba(19,111,99,0.16) 0%, rgba(31,154,96,0.12) 100%)'
-                }}
-            >
-                <Typography variant="h5">Подключение WhatsApp (360dialog)</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.015em' }}>
+                    Подключение WhatsApp (360dialog)
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Здесь показан статус Cloud API, текущий webhook для номера и последние события, которые пришли на backend.
                 </Typography>
             </Box>
 
             {errorText ? <Alert severity="error">{errorText}</Alert> : null}
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Stack spacing={2}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems={{ sm: 'center' }}>
                         <Typography variant="body1">Статус:</Typography>
@@ -130,7 +125,7 @@ const WhatsAppConnectionPage = () => {
                 </Stack>
             </Paper>
 
-            <Paper sx={{ p: 2.5, borderRadius: 3, border: '1px solid rgba(16,40,29,0.08)' }}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
                 <Typography variant="h6" sx={{ mb: 1.2 }}>
                     Последние 15 сообщений из webhook
                 </Typography>
@@ -149,8 +144,9 @@ const WhatsAppConnectionPage = () => {
                                 sx={{
                                     p: 1.2,
                                     borderRadius: 1.5,
-                                    border: '1px solid rgba(16,40,29,0.08)',
-                                    backgroundColor: '#fff'
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    backgroundColor: 'background.paper'
                                 }}
                             >
                                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ md: 'center' }}>
